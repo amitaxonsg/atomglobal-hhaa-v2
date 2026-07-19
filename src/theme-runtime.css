@@ -1,0 +1,111 @@
+:root {
+  font-size: var(--base-font-size, 16px);
+}
+
+html,
+body,
+#root,
+button,
+input,
+select,
+textarea,
+table {
+  font-family: var(--body-font, Arial, Helvetica, sans-serif) !important;
+}
+
+h1,
+h2,
+h3,
+h4,
+.screen-content h1,
+.screen-content h2,
+.screen-content h3,
+.screen-content h4,
+.choice-card strong,
+.question-card legend,
+.consents legend,
+.report-card h2,
+.paid-report h2,
+.card-heading h2,
+.metric strong {
+  font-family: var(--heading-font, Georgia, "Times New Roman", serif) !important;
+}
+
+html,
+body,
+#root,
+.application-panel,
+.mobile-header,
+.action-bar {
+  background-color: var(--paper, #f7f4ef);
+  color: var(--ink, #211c16);
+}
+
+.choice-card,
+.question-card,
+.report-card,
+.paid-report,
+.admin-card,
+.metric,
+.admin-login__card {
+  background: var(--cream, #fff);
+  border-color: var(--line, #e4ddcf);
+  border-radius: var(--card-radius, 8px);
+}
+
+.button,
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.editor-form input,
+.editor-form select,
+.editor-form textarea,
+.admin-login input {
+  border-radius: var(--button-radius, 8px);
+}
+
+.assessment-shell .button--primary {
+  background: var(--gold, #c9a15a);
+  border-color: var(--gold, #c9a15a);
+}
+
+.assessment-shell .button--primary:hover:not(:disabled) {
+  background: var(--gold-dark, #af8540);
+  border-color: var(--gold-dark, #af8540);
+}
+
+.admin-shell .button--primary,
+.admin-login .button--primary {
+  background: var(--orange, #c1443f);
+  border-color: var(--orange, #c1443f);
+}
+
+.visual-logo,
+.mobile-header img,
+.admin-brand img,
+.admin-login__card > img,
+.fatal-error__card img,
+.editor-preview img {
+  background: transparent !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  object-fit: contain;
+}
+
+.form-grid input:focus,
+.form-grid select:focus,
+.form-grid textarea:focus,
+.editor-form input:focus,
+.editor-form select:focus,
+.editor-form textarea:focus,
+.admin-login input:focus {
+  border-color: var(--orange, #c1443f);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--orange, #c1443f) 14%, transparent);
+}
+
+@media (max-width: 900px) {
+  .mobile-header,
+  .action-bar {
+    background: color-mix(in srgb, var(--paper, #f7f4ef) 97%, transparent);
+  }
+}
