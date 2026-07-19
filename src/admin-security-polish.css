@@ -1,0 +1,27 @@
+.email-template-preview iframe {
+  display: block;
+  width: 100%;
+  min-height: 560px;
+  border: 0;
+  border-radius: 8px;
+  background: #f4f0ea;
+}
+
+.admin-global-search input[type="search"] {
+  width: min(420px, 42vw);
+}
+
+.admin-search-results {
+  max-height: min(520px, 70vh);
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .admin-global-search input[type="search"] {
+    width: min(100%, 520px);
+  }
+
+  .email-template-preview iframe {
+    min-height: 480px;
+  }
+}
