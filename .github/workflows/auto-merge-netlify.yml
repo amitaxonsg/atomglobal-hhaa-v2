@@ -1,0 +1,93 @@
+name: Auto-merge Netlify Coding PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+  statuses: read
+
+concurrency:
+  group: auto-merge-netlify-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.user.login == 'netlify-coding[bot]' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'agent-') &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wait for the V2 Netlify preview and merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_CONTEXT_PREFIX: netlify/atomglobal-hhaa-v2/
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          echo "Eligible Netlify Coding PR #${PR_NUMBER}."
+          echo "Waiting for successful atomglobal-hhaa-v2 Netlify status checks."
+
+          for attempt in $(seq 1 60); do
+            CURRENT_HEAD_SHA="$(
+              gh pr view "$PR_NUMBER" \
+                --repo "$REPOSITORY" \
+                --json headRefOid \
+                --jq '.headRefOid'
+            )"
+
+            if [[ "$CURRENT_HEAD_SHA" != "$EXPECTED_HEAD_SHA" ]]; then
+              echo "PR head changed; a newer workflow run will handle it."
+              exit 0
+            fi
+
+            STATUS_JSON="$(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                "repos/${REPOSITORY}/commits/${CURRENT_HEAD_SHA}/status"
+            )"
+
+            MATCHING_COUNT="$(
+              jq \
+                --arg prefix "$EXPECTED_CONTEXT_PREFIX" \
+                '[.statuses[] | select(.context | startswith($prefix))] | length' \
+                <<<"$STATUS_JSON"
+            )"
+
+            NON_SUCCESS_COUNT="$(
+              jq \
+                --arg prefix "$EXPECTED_CONTEXT_PREFIX" \
+                '[.statuses[] | select(.context | startswith($prefix)) | select(.state != "success")] | length' \
+                <<<"$STATUS_JSON"
+            )"
+
+            echo "Attempt ${attempt}/60: matching checks=${MATCHING_COUNT}, non-success=${NON_SUCCESS_COUNT}"
+
+            if [[ "$MATCHING_COUNT" -gt 0 && "$NON_SUCCESS_COUNT" -eq 0 ]]; then
+              echo "Required Netlify V2 checks passed. Merging PR #${PR_NUMBER}."
+
+              gh pr merge "$PR_NUMBER" \
+                --repo "$REPOSITORY" \
+                --squash \
+                --delete-branch
+
+              echo "PR #${PR_NUMBER} merged successfully."
+              exit 0
+            fi
+
+            sleep 15
+          done
+
+          echo "Timed out waiting for successful V2 Netlify checks."
+          echo "The PR remains open and was not merged."
+          exit 1
