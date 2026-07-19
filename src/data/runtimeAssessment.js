@@ -1,11 +1,14 @@
 export function buildRuntimeTrack(fallbackTrack, assessment) {
   if (!fallbackTrack || !assessment?.questions?.length) return fallbackTrack;
 
+  const fallbackSections = new Map((fallbackTrack.subscales || []).map(section => [section.code, section]));
   const sectionMap = new Map();
   (assessment.sections || []).forEach(section => {
+    const fallback = fallbackSections.get(section.code) || {};
     sectionMap.set(section.code, {
       code: section.code,
       name: section.name,
+      blurb: section.description || fallback.blurb || "",
       order: Number(section.order || 0),
       items: [],
     });
@@ -13,10 +16,12 @@ export function buildRuntimeTrack(fallbackTrack, assessment) {
 
   assessment.questions.forEach(question => {
     const code = question.subscaleCode;
+    const fallback = fallbackSections.get(code) || {};
     if (!sectionMap.has(code)) {
       sectionMap.set(code, {
         code,
         name: question.subscaleName || code,
+        blurb: question.subscaleDescription || fallback.blurb || "",
         order: Number(question.sectionOrder || sectionMap.size + 1),
         items: [],
       });
@@ -34,6 +39,7 @@ export function buildRuntimeTrack(fallbackTrack, assessment) {
     .map(section => ({
       code: section.code,
       name: section.name,
+      blurb: section.blurb,
       items: section.items.sort((left, right) => left.position - right.position),
     }));
 
