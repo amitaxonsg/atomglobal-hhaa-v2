@@ -25,9 +25,25 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 
 The current production release is live for client testing. New branch changes never alter production automatically; `head-heart-v2-sync.timer` must remain disabled.
 
+## Supplied questionnaire reference and CMS
+
+The latest branch verifies the editable questionnaire against the supplied standalone `index.html` and restores its complete participant process while retaining the approved V2 branding and secure backend:
+
+- four tracks: Personal, New Joiner, Manager and Executive;
+- 10 sections and exactly 50 questions per track;
+- dedicated introduction explaining Heart and Head before participant details;
+- name, email, age range, gender and five track-specific context questions;
+- five scored answer choices, optional `N/A — doesn’t apply / can’t answer`, and optional notes;
+- autosave, secure resume, immutable question/scoring snapshots and administration history;
+- Lite Report after completion and Full Report only after verified payment or authorised admin action.
+
+The new **Admin → Questionnaire** workspace controls track introduction copy, Heart/Head explanations, the five context-field labels and option lists, N/A availability and answer-note availability. Question wording, scoring direction, sections, answer labels and report profiles remain versioned under **Admin → Assessments**. Published versions remain immutable; editors clone, review and publish a new draft.
+
+Reference integrity is enforced by `tests/js/index-reference.test.mjs`. N/A persistence, resume, exclusion from scoring, CMS save and completion are covered by `tests/php/questionnaire-process.php`. Full details and the reference hashes are in `docs/QUESTIONNAIRE-INDEX-REFERENCE.md`.
+
 ## Feedback and client collaboration
 
-The latest branch includes a complete administration feedback workflow:
+The branch includes a complete administration feedback workflow:
 
 - **Feedback** and **Help** sections in the secure admin portal.
 - Feedback type, module, priority, title, details, expected outcome, page and optional attachment link.
@@ -47,7 +63,7 @@ GitHub synchronisation requires a fine-grained token restricted to `amitaxonsg/a
 
 ## Help and attribution
 
-The Help page explains dashboard graphs, participant search, assessments, content, branding, reports, payments, email templates, feedback and secure production operation. Public assessment and administration screens display **Powered by Axon 1Pro** linked to `https://axon.com.sg/`.
+The Help page explains dashboard graphs, participant search, questionnaire process, assessment versions, content, branding, reports, payments, email templates, feedback and secure production operation. Public assessment and administration screens display **Powered by Axon 1Pro** linked to `https://axon.com.sg/`.
 
 ## Administration coverage
 
@@ -55,7 +71,8 @@ The Help page explains dashboard graphs, participant search, assessments, conten
 - Password reset request and confirmation.
 - Dashboard trends, conversion funnel, track progress, revenue, email health and alerts.
 - Global search across participants, reports, payments, email, affiliates and feedback.
-- Participant search, status/track filters, history, export and anonymisation.
+- Participant search, status/track filters, history, answer notes/N/A, export and anonymisation.
+- Questionnaire introduction, context fields and response-process CMS.
 - Assessment clone, draft editing and controlled publishing.
 - Question, timing, Lite Report and Full Report editors.
 - Stage content, media and branding draft/publish workflow.
@@ -100,7 +117,10 @@ Automated integration tests cover:
 
 - administrator authentication and permissions;
 - four configured assessment tracks;
+- exact reference questionnaire hashes;
 - 50 questions and 10 sections;
+- CMS questionnaire introduction and participant-context settings;
+- scored answers, N/A exclusion and optional notes;
 - secure session creation, autosave and resume;
 - completion, scoring, Lite Report and Full Report protection;
 - PDF generation and secure access;
@@ -114,13 +134,15 @@ Automated integration tests cover:
 
 Before final operational sign-off:
 
+- deploy the verified questionnaire/CMS branch through the immutable backup-first process after Amit approval;
+- complete all four assessment tracks, including N/A, notes, resume and CMS copy changes;
 - rotate the previously exposed SMTP2GO credential and send a real selected-template test;
-- configure the repository-scoped GitHub Issues token and submit one harmless test feedback item;
+- configure the repository-scoped GitHub Issues token and submit one harmless feedback test item;
 - confirm that the GitHub issue is created and its URL appears in the feedback register;
 - move the test item through clarification, in progress, ready for review and done, confirming the expected emails;
 - configure Stripe test credentials, four Price IDs and the signed webhook secret;
 - complete one Stripe test purchase and refund;
-- complete all four assessment tracks and review scoring, Lite/Full reports and PDFs;
+- review scoring, Lite/Full reports and PDFs for all four tracks;
 - run `deploy/final-production-audit.sh` and retain its output;
 - merge PR #5 only after client acceptance.
 
