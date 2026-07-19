@@ -39,7 +39,7 @@ return [
     'settings' => $settings,
     'reports' => $reports,
     'privacy' => new PrivacyService($db),
-    'surveys' => new SurveyService($db, new ScoringService(), $reports, $mailQueue, $config),
+    'surveys' => new SurveyService($db, new ScoringService(), $reports, $mailQueue, $settings, $config),
     'health' => new HealthService($db, $config, $settings),
     'mailQueue' => $mailQueue,
     'mailDelivery' => new MailDeliveryService($db, $settings),
