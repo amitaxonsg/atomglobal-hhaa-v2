@@ -5,6 +5,7 @@ import { BrandLogo, useBranding } from "../../branding/BrandContext";
 import { Spinner, Notice } from "./AdminShared";
 import AdminDashboardPage from "./AdminDashboardPage";
 import AdminParticipantsPage from "./AdminParticipantsPage";
+import QuestionnairePage from "./QuestionnairePage";
 import { AssessmentsPage, BrandingPage, ContentPage } from "./AdminCorePages";
 import { AffiliatesPage, AnalyticsPage, AuditPage, EmailPage, PaymentsPage, ReportsPage, SeoPage, SettingsPage } from "./AdminOperationsEnhanced";
 import { FeedbackPage, HelpPage } from "./AdminSupportPages";
@@ -12,6 +13,7 @@ import { FeedbackPage, HelpPage } from "./AdminSupportPages";
 const sections = [
   { label: "Dashboard", group: "Overview", permission: "dashboard.view" },
   { label: "Participants", group: "Assessment", permission: "participants.view" },
+  { label: "Questionnaire", group: "Assessment", permission: "assessments.manage" },
   { label: "Assessments", group: "Assessment", permission: "assessments.manage" },
   { label: "Content", group: "Experience", permission: "content.manage" },
   { label: "Branding", group: "Experience", permission: "branding.manage" },
@@ -91,7 +93,7 @@ function AdminLogin({ onLogin }) {
         <BrandLogo />
         <span className="admin-login__badge">Secure, self-hosted platform</span>
         <h1>Manage the complete assessment journey.</h1>
-        <p>Participants, assessments, reports, payments, email, feedback and brand settings in one protected workspace.</p>
+        <p>Participants, questionnaire, assessments, reports, payments, email, feedback and brand settings in one protected workspace.</p>
         <div className="admin-login__assurance"><i aria-hidden="true" /><span>PHP sessions · MariaDB · role permissions · audit history</span></div>
       </div>
 
@@ -131,6 +133,7 @@ function AdminLogin({ onLogin }) {
 const pages = {
   Dashboard: AdminDashboardPage,
   Participants: AdminParticipantsPage,
+  Questionnaire: QuestionnairePage,
   Assessments: AssessmentsPage,
   Content: ContentPage,
   Branding: BrandingPage,
