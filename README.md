@@ -13,8 +13,8 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | VPS | `161.97.137.234` |
 | Development branch | `production-readiness-20260719` |
 | Pull request | Draft PR #5; open, mergeable and not merged |
-| Verified branch commit | `a8fa684cad2d13f76da6662e90f17b258a27f788` |
-| Verified CI | Production readiness checks run #380 passed frontend, PHP, database and deployment-script syntax checks |
+| Verified branch commit | `9e31344695a2b88406397b7d86f61005f46db3a7` |
+| Verified CI | Production readiness checks run #382 passed frontend, PHP, database and deployment-script syntax checks |
 | Public mode | React frontend with PHP 8.3 and MariaDB production API |
 | Last deployment marker | `7568577dc195e4e2e319cda6edf3be4c5822768d` |
 | Last created release | `/var/www/head-heart.atomglobal.com/releases/20260719224421-7568577dc195` |
@@ -170,7 +170,7 @@ bash deploy/final-production-audit.sh
 
 Before final production sign-off:
 
-1. Deploy verified commit `a8fa684cad2d13f76da6662e90f17b258a27f788` using the corrected immutable Nginx-switching script.
+1. Deploy verified commit `9e31344695a2b88406397b7d86f61005f46db3a7` using the corrected immutable Nginx-switching script.
 2. Confirm `/api/public/assessment-experience` returns HTTP 200 with `landing` and four tracks.
 3. Confirm the public page shows the latest centred card layout rather than the former split screen.
 4. Test all four tracks end-to-end, including N/A, notes, autosave and resume.
