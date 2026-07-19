@@ -1,0 +1,74 @@
+.admin-drawer__panel--wide {
+  width: min(1040px, 96vw);
+}
+
+.question-editor,
+.report-template-editor {
+  margin: 12px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--card-radius, 8px);
+  background: #fff;
+}
+
+.question-editor__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.question-editor textarea {
+  width: 100%;
+  min-height: 76px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  resize: vertical;
+}
+
+.question-editor select {
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.question-editor [disabled],
+.report-template-editor [disabled] {
+  opacity: .7;
+  cursor: not-allowed;
+}
+
+.report-template-editor + .report-template-editor {
+  margin-top: 18px;
+}
+
+.integration-tests {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-list > div button {
+  margin-top: 7px;
+  border: 0;
+  background: none;
+  color: var(--orange);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .question-editor__meta {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-drawer__panel--wide {
+    width: 100%;
+  }
+}
