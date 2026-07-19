@@ -30,7 +30,7 @@ return [
     'settings' => $settings,
     'reports' => $reports,
     'privacy' => new PrivacyService($db),
-    'surveys' => new SurveyService($db, new ScoringService(), $reports),
+    'surveys' => new SurveyService($db, new ScoringService(), $reports, $mailQueue, $config),
     'health' => new HealthService($db, $config, $settings),
     'mailQueue' => $mailQueue,
     'media' => new MediaService($db, $config),
