@@ -6,6 +6,7 @@ use AtomGlobal\Env;
 use AtomGlobal\Mail\MailDeliveryService;
 use AtomGlobal\Mail\MailQueue;
 use AtomGlobal\Security\Crypto;
+use AtomGlobal\Services\AdminInsightsService;
 use AtomGlobal\Services\AdminService;
 use AtomGlobal\Services\AttributionService;
 use AtomGlobal\Services\HealthService;
@@ -46,4 +47,5 @@ return [
     'media' => new MediaService($db, $config),
     'attribution' => new AttributionService($db, $config),
     'admin' => new AdminService($db, $settings, $mailQueue),
+    'adminInsights' => new AdminInsightsService($db, $mailQueue, $config),
 ];
