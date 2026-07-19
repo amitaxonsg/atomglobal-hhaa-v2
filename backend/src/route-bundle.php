@@ -5,6 +5,7 @@ use AtomGlobal\Http\Request;
 use AtomGlobal\Http\Response;
 use AtomGlobal\Security\RateLimiter;
 
+require __DIR__ . '/question-text-policy-routes.php';
 require __DIR__ . '/extra-routes.php';
 require __DIR__ . '/attribution-routes.php';
 require __DIR__ . '/feedback-routes.php';
