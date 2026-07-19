@@ -136,7 +136,8 @@ final class MailDeliveryService
             . '<a href="' . $safeWebsite . '">Website</a>'
             . '<a href="' . $safePrivacy . '">Privacy</a>'
             . '<a href="' . $safeTerms . '">Terms</a><br>'
-            . 'This message was sent because you started, completed or administer a Head–Heart Alignment assessment.'</n            . '</div></div></div></body></html>';
+            . 'This message was sent because you started, completed or administer a Head–Heart Alignment assessment.'
+            . '</div></div></div></body></html>';
     }
 
     private function absoluteUrl(string $value, string $baseUrl): string
