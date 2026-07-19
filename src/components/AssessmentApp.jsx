@@ -15,10 +15,10 @@ function StageShell({ stageKey, current, total = 4, label, onBack, children, act
   const stage = stageContent[stageKey] || stageContent.version;
   return <div className="assessment-shell">
     <aside className="visual-panel" style={{ "--stage-image": `url(${stage.image})`, "--focal-point": stage.focalPoint, "--overlay": stage.overlay / 100 }} aria-label={stage.alt}>
-      <img className="visual-logo" src="/atom-global-logo.jpg" alt="Atom Global Consulting" />
+      <img className="visual-logo" src="/media/brand/atom-global-wordmark.png" alt="Atom Global Consulting" />
       <div className="visual-copy"><h2>{stage.headline.split("\n").map(line => <React.Fragment key={line}>{line}<br/></React.Fragment>)}</h2><i/><p>{stage.supporting}</p></div>
     </aside>
-    <section className="application-panel"><header className="mobile-header"><img src="/atom-global-logo.jpg" alt="Atom Global Consulting"/><Progress current={current} total={total} label={label}/></header><div className="desktop-topbar"><button className="back-link" onClick={onBack} disabled={!onBack}><ArrowLeft/> Back</button><Progress current={current} total={total} label={label}/></div><main className="screen-content">{children}</main>{actions && <footer className="action-bar">{actions}</footer>}</section>
+    <section className="application-panel"><header className="mobile-header"><img src="/media/brand/atom-global-wordmark.png" alt="Atom Global Consulting"/><Progress current={current} total={total} label={label}/></header><div className="desktop-topbar"><button className="back-link" onClick={onBack} disabled={!onBack}><ArrowLeft/> Back</button><Progress current={current} total={total} label={label}/></div><main className="screen-content">{children}</main>{actions && <footer className="action-bar">{actions}</footer>}</section>
   </div>;
 }
 

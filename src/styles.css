@@ -8,3 +8,41 @@
 @media print{.visual-panel,.mobile-header,.desktop-topbar,.action-bar,.preview-note,.locked{display:none!important}.assessment-shell,.application-panel{display:block;min-height:0}.screen-content{width:100%;padding:20px;margin:0}.paid-report{break-before:page}body{background:white}}
 
 .fatal-error{min-height:100vh;display:grid;place-items:center;padding:32px;background:radial-gradient(circle at top left,#fffaf3 0,transparent 42%),var(--paper)}.fatal-error__card{width:min(620px,100%);padding:clamp(30px,6vw,62px);border:1px solid var(--line);border-radius:12px;background:rgba(255,253,249,.94);box-shadow:0 28px 80px rgba(55,39,24,.12)}.fatal-error__card img{width:min(245px,70%);margin-bottom:40px}.fatal-error__card h1{font-family:"Libre Caslon Display",Georgia,serif;font-size:clamp(39px,6vw,58px);font-weight:400;line-height:1.08;margin:0 0 20px}.fatal-error__card>p:not(.eyebrow){color:var(--muted);font-size:17px;line-height:1.65;margin:0 0 28px}.fatal-error__details{margin-top:26px;color:var(--muted)}.fatal-error__details pre{max-height:240px;overflow:auto;padding:14px;background:#eee5dc;white-space:pre-wrap;font-size:12px}.update-notice{position:fixed;z-index:100;right:20px;bottom:20px;display:flex;align-items:center;gap:18px;max-width:420px;padding:15px 16px 15px 20px;border-radius:9px;background:var(--navy);color:white;box-shadow:0 18px 50px rgba(23,49,61,.26)}.update-notice button{min-height:38px;padding:8px 14px;border:1px solid rgba(255,255,255,.55);border-radius:6px;background:white;color:var(--navy);font-weight:600}@media(max-width:520px){.fatal-error{padding:18px}.fatal-error__card{padding:30px 24px}.update-notice{left:14px;right:14px;bottom:14px;justify-content:space-between}}
+
+/* AXON DIRECT BRAND OVERRIDES */
+.assessment-shell,
+.assessment-shell button,
+.assessment-shell input,
+.assessment-shell select,
+.assessment-shell textarea {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.assessment-shell .screen-content h1,
+.assessment-shell .screen-content h2,
+.assessment-shell .screen-content h3,
+.assessment-shell .screen-content h4,
+.assessment-shell .choice-card strong,
+.assessment-shell .question-card legend,
+.assessment-shell .visual-copy h2,
+.assessment-shell .consents legend {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.assessment-shell .visual-logo {
+  width: min(310px, 82%);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 10px rgba(24, 15, 9, 0.22));
+  mix-blend-mode: normal;
+}
+
+.assessment-shell .visual-panel {
+  background-position: var(--focal-point);
+}
+
+@media (max-width: 1100px) {
+  .assessment-shell .visual-logo {
+    width: min(270px, 88%);
+  }
+}
