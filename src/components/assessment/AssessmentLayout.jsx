@@ -24,14 +24,37 @@ function PublicBrand({ visible = true }) {
   return <a className="latest-public-brand" href="https://www.atomglobal.com" target="_blank" rel="noreferrer"><BrandLogo /></a>;
 }
 
-function LatestPage({ children, width = "720", className = "", brandVisible = true, actions = null }) {
+function VisualPanel({ stageKey = "version" }) {
+  const { stages } = useBranding();
+  const stage = stages?.[stageKey] || stages?.version || {};
+  const overlay = Math.max(0, Math.min(90, Number(stage.overlay ?? 40))) / 100;
+  const image = stage.image || "/media/stages/reflection-portrait.png";
+  return <aside
+    className="latest-visual-panel"
+    aria-label={stage.alt || "A reflective professional moment"}
+    style={{
+      backgroundImage: `linear-gradient(rgba(20,16,12,${overlay}),rgba(20,16,12,${overlay})),url("${image}")`,
+      backgroundPosition: stage.focalPoint || "52% 50%",
+    }}
+  >
+    <a className="latest-visual-panel__logo" href="https://www.atomglobal.com" target="_blank" rel="noreferrer"><BrandLogo /></a>
+    <div className="latest-visual-panel__copy">
+      {stage.headline && <h2>{stage.headline}</h2>}
+      {stage.supporting && <p>{stage.supporting}</p>}
+    </div>
+  </aside>;
+}
+
+function LatestPage({ children, width = "720", className = "", brandVisible = true, actions = null, stageKey = "version" }) {
   return <div className="latest-questionnaire-shell">
-    <main className={`latest-questionnaire-page ${className}`} style={{ "--latest-page-width": `${width}px` }}>
-      <PublicBrand visible={brandVisible} />
-      {children}
-      {actions && <footer className="latest-page-actions">{actions}</footer>}
-      <div className="latest-powered-by">Powered by <a href="https://axon.com.sg/" target="_blank" rel="noreferrer">Axon 1Pro</a></div>
-    </main>
+    <VisualPanel stageKey={stageKey} />
+    <div className="latest-questionnaire-content">
+      <main className={`latest-questionnaire-page ${className}`} style={{ "--latest-page-width": `${width}px` }}>
+        <PublicBrand visible={brandVisible} />
+        {children}
+        {actions && <footer className="latest-page-actions">{actions}</footer>}
+      </main>
+    </div>
   </div>;
 }
 
@@ -46,8 +69,8 @@ export function AssessmentMeta({ trackKey }) {
   </div>;
 }
 
-export function StageShell({ children, actions, brandVisible = true }) {
-  return <LatestPage width="880" brandVisible={brandVisible} actions={actions}>{children}</LatestPage>;
+export function StageShell({ children, actions, brandVisible = true, stageKey = "report" }) {
+  return <LatestPage width="880" brandVisible={brandVisible} actions={actions} stageKey={stageKey}>{children}</LatestPage>;
 }
 
 function VoteCopy({ text }) {
@@ -60,25 +83,25 @@ function VoteCopy({ text }) {
 
 export function SelectVersion({ experience, onSelect }) {
   const landing = landingExperience(experience?.landing);
-  return <LatestPage width="640" className="latest-track-selection" brandVisible={landing.showBrandName}>
+  const liveTrack = assessmentTracks[experience?.liveTrackKey] || assessmentTracks.personal;
+  const details = trackExperience(liveTrack.key, experience?.tracks?.[liveTrack.key] || {}, liveTrack.priceLabel);
+  return <LatestPage width="640" className="latest-track-selection" brandVisible={landing.showBrandName} stageKey="version">
     <h1>{landing.title}</h1>
     <p className="latest-copy"><VoteCopy text={landing.primaryCopy} /></p>
     <p className="latest-copy latest-copy--last">{landing.secondaryCopy}</p>
-    <div className="latest-track-cards">
-      {Object.values(assessmentTracks).map(track => {
-        const details = trackExperience(track.key, experience?.tracks?.[track.key] || {}, track.priceLabel);
-        return <button className="latest-track-card" key={track.key} onClick={() => onSelect(track.key)}>
-          <strong>{landing.cardTitlePrefix} {track.label}</strong>
-          <span>{details.tagline}</span>
-        </button>;
-      })}
+    <div className="latest-track-cards latest-track-cards--single">
+      <button className="latest-track-card" onClick={() => onSelect(liveTrack.key)}>
+        <strong>{landing.cardTitlePrefix} {liveTrack.label}</strong>
+        <span>{details.tagline}</span>
+        <small>{fallbackMeta[liveTrack.key].questionCount} questions · {fallbackMeta[liveTrack.key].sectionCount} sections · {durationLabel(fallbackMeta[liveTrack.key])}</small>
+      </button>
     </div>
   </LatestPage>;
 }
 
 export function TrackIntroduction({ track, remoteExperience, onBack, onContinue }) {
   const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
-  return <LatestPage width="720" className="latest-track-introduction">
+  return <LatestPage width="720" className="latest-track-introduction" stageKey={track.key}>
     <button className="latest-text-back" onClick={onBack}>← Back</button>
     <AssessmentMeta trackKey={track.key} />
     <h1>{experience.introHeadline}</h1>
@@ -106,7 +129,7 @@ export function ParticipantDetails({ track, remoteExperience, participant, setPa
   const companyComplete = !showCompanyFields || Boolean(participant.department && participant.level);
   const valid = participant.name.trim() && /.+@.+\..+/.test(participant.email) && contextComplete && companyComplete && participant.privacyConsent && participant.transactionalConsent;
 
-  return <LatestPage width="480" className="latest-intake-page">
+  return <LatestPage width="480" className="latest-intake-page" stageKey="participant">
     <button className="latest-text-back" onClick={onBack}>← Back</button>
     <h1>Before you begin</h1>
     <p className="latest-copy latest-copy--last">A few details so your report can be sent to you and personalised correctly. Nothing here is identifying beyond your name and email — the rest is broad categories only.</p>
@@ -151,7 +174,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
   const goBack = () => section ? setSection(section - 1) : onBack();
   const goForward = () => lastSection ? onFinish() : setSection(section + 1);
 
-  return <LatestPage width="720" className="latest-questions-page">
+  return <LatestPage width="720" className="latest-questions-page" stageKey={track.key}>
     <div className="latest-question-progress">
       <div><span>Section {section + 1} of {track.subscales.length}</span><span>{answered}/{track.allItems.length} answered{saveLabel ? ` · ${saveLabel}` : ""}</span></div>
       <i><b style={{ width: `${progress}%` }} /></i>
