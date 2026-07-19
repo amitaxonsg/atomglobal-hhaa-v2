@@ -49,7 +49,12 @@ const mockAdmin = {
   affiliates: [],
   seo: [],
   users: [],
+  feedback: [],
 };
+
+function mockFeedbackDetail(item) {
+  return { ...item, updates: item.updates || [{ id: 1, updateType: "submitted", status: item.status, message: "Feedback submitted through the administration portal.", adminName: "Preview Owner", createdAt: item.createdAt }] };
+}
 
 const mock = {
   async publicConfiguration() { return mockConfiguration(); },
@@ -101,6 +106,15 @@ const mock = {
   async adminUsers() { return { items: [mockAdmin.user, ...mockAdmin.users] }; }, async saveAdminUser(payload) { mockAdmin.users.push({ id: Date.now(), ...payload }); return { id: Date.now() }; },
   async adminNotifications() { return { items: [] }; }, async acknowledgeNotification() { return { acknowledged: true }; },
   async adminAnalytics() { return { events: [], dropoff: [] }; }, async testIntegration(provider) { return { status: "success", message: `${provider} preview test passed` }; },
+  async adminFeedback(query = {}) {
+    const search = String(query.search || "").toLowerCase();
+    const items = mockAdmin.feedback.filter(item => (!search || `${item.title} ${item.details} ${item.moduleName}`.toLowerCase().includes(search)) && (!query.status || item.status === query.status) && (!query.priority || item.priority === query.priority));
+    return { items, summary: { total: items.length, new: items.filter(item => item.status === "new").length, clarification: items.filter(item => item.status === "clarification_requested").length, active: items.filter(item => ["accepted", "in_progress"].includes(item.status)).length, review: items.filter(item => item.status === "ready_for_review").length, done: items.filter(item => item.status === "done").length } };
+  },
+  async adminFeedbackDetail(id) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); if (!item) throw new Error("Feedback record not found."); return mockFeedbackDetail(item); },
+  async submitFeedback(payload) { const item = { id: Date.now(), status: "new", githubSyncStatus: "not_configured", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...payload }; mockAdmin.feedback.unshift(item); return mockFeedbackDetail(item); },
+  async updateFeedback(id, payload) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); Object.assign(item, payload, { updatedAt: new Date().toISOString() }); item.updates = [{ id: Date.now(), updateType: "status", status: item.status, message: payload.message || payload.resolution || "Status updated.", adminName: "Preview Owner", createdAt: item.updatedAt }, ...(item.updates || [])]; return mockFeedbackDetail(item); },
+  async syncFeedbackGitHub(id) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); item.githubSyncStatus = "not_configured"; return mockFeedbackDetail(item); },
 };
 
 const production = {
@@ -159,6 +173,11 @@ const production = {
   acknowledgeNotification: id => request(`/admin/notifications/${id}/acknowledge`, { method: "POST", body: "{}" }),
   adminAnalytics: () => request("/admin/analytics/funnel"),
   testIntegration: (provider, payload = {}) => request(`/admin/integrations/${encodeURIComponent(provider)}/test`, { method: "POST", body: JSON.stringify(payload) }),
+  adminFeedback: (query = {}) => request(`/admin/feedback?${new URLSearchParams(query)}`),
+  adminFeedbackDetail: id => request(`/admin/feedback/${id}`),
+  submitFeedback: payload => request("/admin/feedback", { method: "POST", body: JSON.stringify(payload) }),
+  updateFeedback: (id, payload) => request(`/admin/feedback/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  syncFeedbackGitHub: id => request(`/admin/feedback/${id}/sync-github`, { method: "POST", body: "{}" }),
 };
 
 export const api = mode === "mock" ? mock : production;
