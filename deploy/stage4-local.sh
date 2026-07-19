@@ -11,7 +11,8 @@ NGINX_CONF="${NGINX_CONF:-/etc/nginx/conf.d/head-heart-staging-local.conf}"
 PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.3-fpm}"
 PHP_SOCKET="${PHP_SOCKET:-/run/php/php8.3-fpm.sock}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:-}"
-PORT="${PORT:-8088}"
+PORT="${PORT:-18088}"
+STAGE_HOST="${STAGE_HOST:-head-heart-staging.local}"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 AUDIT="/root/head-heart-stage4-$STAMP"
@@ -176,11 +177,18 @@ log "8. VERIFY STAGING STORAGE"
 install -d -m 0750 "$STORAGE" "$STORAGE/media" "$STORAGE/reports" "$STORAGE/tmp"
 chown -R www-data:www-data "$STORAGE"
 
-log "9. CONFIGURE LOOPBACK-ONLY NGINX"
+log "9. VERIFY DEDICATED LOOPBACK PORT"
+if [[ "$HAD_NGINX" -eq 0 ]] && ss -ltnH | awk '{print $4}' | grep -Eq "(^|:)${PORT}$"; then
+  echo "ERROR: Loopback staging port $PORT is already in use."
+  ss -ltnp | grep -E ":${PORT}\\b" || true
+  exit 1
+fi
+
+log "10. CONFIGURE LOOPBACK-ONLY NGINX"
 cat > "$NGINX_CONF" <<NGINX
 server {
-    listen 127.0.0.1:${PORT};
-    server_name localhost 127.0.0.1;
+    listen 127.0.0.1:${PORT} default_server;
+    server_name ${STAGE_HOST};
 
     root ${NEW_RELEASE}/frontend;
     index index.html;
@@ -189,9 +197,15 @@ server {
     error_log /var/log/nginx/head-heart-staging-error.log;
     client_max_body_size 12m;
 
+    add_header X-Head-Heart-Staging "1" always;
     add_header X-Content-Type-Options nosniff always;
     add_header X-Frame-Options SAMEORIGIN always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    location = /__head-heart-stage4-marker {
+        default_type text/plain;
+        return 200 "head-heart-stage4\n";
+    }
 
     location ^~ /api/ {
         include fastcgi_params;
@@ -211,16 +225,19 @@ server {
         alias ${STORAGE}/media/;
         access_log off;
         autoindex off;
+        add_header X-Head-Heart-Staging "1" always;
         add_header X-Content-Type-Options nosniff always;
         add_header Cache-Control "no-store";
     }
 
     location = /index.html {
+        add_header X-Head-Heart-Staging "1" always;
         add_header Cache-Control "no-store, no-cache, must-revalidate";
         try_files \$uri =404;
     }
 
     location = /sw.js {
+        add_header X-Head-Heart-Staging "1" always;
         add_header Cache-Control "no-store, no-cache, must-revalidate";
         try_files \$uri =404;
     }
@@ -242,33 +259,71 @@ if ss -ltn | grep -qE "0\\.0\\.0\\.0:${PORT}|\[::\]:${PORT}"; then
   exit 1
 fi
 
-log "10. VERIFY PHP/MARIADB HEALTH"
+log "11. VERIFY CORRECT STAGING VHOST"
+MARKER_BODY="$AUDIT/marker.txt"
+MARKER_HEADERS="$AUDIT/marker.headers"
+MARKER_CODE="$(curl --noproxy '*' --silent --show-error --max-time 20 \
+  --header "Host: ${STAGE_HOST}" \
+  --dump-header "$MARKER_HEADERS" \
+  --output "$MARKER_BODY" \
+  --write-out '%{http_code}' \
+  "http://127.0.0.1:${PORT}/__head-heart-stage4-marker")"
+
+echo "Marker HTTP: $MARKER_CODE"
+cat "$MARKER_BODY" || true
+
+if [[ "$MARKER_CODE" != "200" ]] || ! grep -qx 'head-heart-stage4' "$MARKER_BODY" || ! grep -qi '^X-Head-Heart-Staging: 1' "$MARKER_HEADERS"; then
+  echo "ERROR: Request did not reach the Head–Heart staging virtual host."
+  echo "===== MARKER HEADERS ====="
+  cat "$MARKER_HEADERS" || true
+  echo "===== LOADED NGINX LISTENERS ====="
+  nginx -T 2>&1 | grep -nE "listen 127\\.0\\.0\\.1:${PORT}|server_name ${STAGE_HOST}|head-heart-stage4-marker" || true
+  exit 1
+fi
+
+log "12. VERIFY PHP/MARIADB HEALTH"
 HEALTH_BODY="$AUDIT/health.json"
-HEALTH_CODE="$(curl --silent --show-error --max-time 20 --output "$HEALTH_BODY" --write-out '%{http_code}' "http://127.0.0.1:${PORT}/api/health")"
+HEALTH_HEADERS="$AUDIT/health.headers"
+HEALTH_CODE="$(curl --noproxy '*' --silent --show-error --max-time 20 \
+  --header "Host: ${STAGE_HOST}" \
+  --dump-header "$HEALTH_HEADERS" \
+  --output "$HEALTH_BODY" \
+  --write-out '%{http_code}' \
+  "http://127.0.0.1:${PORT}/api/health")"
+
 echo "Health HTTP: $HEALTH_CODE"
 cat "$HEALTH_BODY" || true
 echo
 
-if [[ "$HEALTH_CODE" != "200" ]] || ! grep -q '"status":"ok"' "$HEALTH_BODY"; then
+if [[ "$HEALTH_CODE" != "200" ]] || ! grep -q '"status":"ok"' "$HEALTH_BODY" || ! grep -qi '^X-Head-Heart-Staging: 1' "$HEALTH_HEADERS"; then
   echo "ERROR: Staging health verification failed."
+  echo "===== HEALTH HEADERS ====="
+  cat "$HEALTH_HEADERS" || true
+  echo "===== NGINX STAGING ACCESS LOG ====="
+  tail -n 40 /var/log/nginx/head-heart-staging-access.log 2>/dev/null || true
   echo "===== NGINX STAGING ERROR LOG ====="
   tail -n 80 /var/log/nginx/head-heart-staging-error.log 2>/dev/null || true
   echo "===== PHP-FPM LOG ====="
-  journalctl -u "$PHP_FPM_SERVICE" -n 80 --no-pager 2>/dev/null || true
+  journalctl -u "$PHP_FPM_SERVICE" --since "10 minutes ago" --no-pager 2>/dev/null || true
   exit 1
 fi
 
-log "11. VERIFY ADMIN SESSION AND FRONTEND"
-SESSION_CODE="$(curl --silent --output "$AUDIT/admin-session.json" --write-out '%{http_code}' "http://127.0.0.1:${PORT}/api/admin/session")"
+log "13. VERIFY ADMIN SESSION AND FRONTEND"
+SESSION_CODE="$(curl --noproxy '*' --silent \
+  --header "Host: ${STAGE_HOST}" \
+  --output "$AUDIT/admin-session.json" \
+  --write-out '%{http_code}' \
+  "http://127.0.0.1:${PORT}/api/admin/session")"
+
 echo "Admin session HTTP: $SESSION_CODE"
 cat "$AUDIT/admin-session.json" || true
 echo
 [[ "$SESSION_CODE" == "401" ]] || { echo "ERROR: Expected HTTP 401 before login."; exit 1; }
 
-curl --fail --silent --show-error "http://127.0.0.1:${PORT}/" >/dev/null
-curl --fail --silent --show-error "http://127.0.0.1:${PORT}/admin" >/dev/null
+curl --noproxy '*' --fail --silent --show-error --header "Host: ${STAGE_HOST}" "http://127.0.0.1:${PORT}/" >/dev/null
+curl --noproxy '*' --fail --silent --show-error --header "Host: ${STAGE_HOST}" "http://127.0.0.1:${PORT}/admin" >/dev/null
 
-log "12. CONFIRM LIVE PRODUCTION UNCHANGED"
+log "14. CONFIRM LIVE PRODUCTION UNCHANGED"
 LIVE_RELEASE_AFTER="$(readlink -f "$LIVE_APP/current")"
 LIVE_COMMIT_AFTER="$(cat "$LIVE_APP/v2-deployed-commit.txt")"
 echo "Before release: $LIVE_RELEASE_BEFORE"
@@ -279,7 +334,7 @@ echo "After commit:   $LIVE_COMMIT_AFTER"
 [[ "$LIVE_COMMIT_BEFORE" == "$LIVE_COMMIT_AFTER" ]]
 curl -sS -o /dev/null -w 'Live HTTP %{http_code} | SSL %{ssl_verify_result}\n' https://head-heart.atomglobal.com/
 
-log "13. FINAL STATUS"
+log "15. FINAL STATUS"
 readlink -f "$APP/current"
 cat "$APP/deployed-commit.txt"
 ls -lah "$APP/current/backend/bin/create-admin.php"
@@ -290,6 +345,7 @@ printf '%s\n' \
   "==================================================" \
   " STAGE 4 LOCAL API AND FRONTEND READY" \
   " URL: http://127.0.0.1:${PORT}" \
+  " HOST: ${STAGE_HOST}" \
   " LIVE PRODUCTION WAS NOT CHANGED" \
   "=================================================="
 
