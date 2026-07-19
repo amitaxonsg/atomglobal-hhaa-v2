@@ -13,6 +13,8 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | VPS | `161.97.137.234` |
 | Development branch | `production-readiness-20260719` |
 | Pull request | Draft PR #5; open, mergeable and not merged |
+| Verified branch commit | `a8fa684cad2d13f76da6662e90f17b258a27f788` |
+| Verified CI | Production readiness checks run #380 passed frontend, PHP, database and deployment-script syntax checks |
 | Public mode | React frontend with PHP 8.3 and MariaDB production API |
 | Last deployment marker | `7568577dc195e4e2e319cda6edf3be4c5822768d` |
 | Last created release | `/var/www/head-heart.atomglobal.com/releases/20260719224421-7568577dc195` |
@@ -31,7 +33,7 @@ The production Nginx site intentionally points to an exact immutable release pat
 - the browser still displayed the former split-screen questionnaire;
 - the newly added public questionnaire CMS endpoint was unavailable even though the new release existed on disk.
 
-`deploy/update-vps.sh` is now corrected to:
+Commit `a8fa684cad2d13f76da6662e90f17b258a27f788` corrects `deploy/update-vps.sh` to:
 
 - back up only the Head–Heart Nginx site file;
 - build and test a new immutable release;
@@ -41,6 +43,8 @@ The production Nginx site intentionally points to an exact immutable release pat
 - reload PHP-FPM and Nginx;
 - require `/api/health` and `/api/public/assessment-experience` to pass before reporting success;
 - restore the prior Nginx file, release symlink and marker automatically on failure.
+
+CI also executes `bash -n` against the production deployment and final-audit scripts so shell syntax errors block release approval.
 
 The repeated `gatorinbox.com` conflicting-server-name messages are warnings from unrelated Nginx site definitions. They did not fail `nginx -t` and this project does not modify those sites.
 
@@ -166,7 +170,7 @@ bash deploy/final-production-audit.sh
 
 Before final production sign-off:
 
-1. Deploy the latest branch commit using the corrected immutable Nginx-switching script.
+1. Deploy verified commit `a8fa684cad2d13f76da6662e90f17b258a27f788` using the corrected immutable Nginx-switching script.
 2. Confirm `/api/public/assessment-experience` returns HTTP 200 with `landing` and four tracks.
 3. Confirm the public page shows the latest centred card layout rather than the former split screen.
 4. Test all four tracks end-to-end, including N/A, notes, autosave and resume.
