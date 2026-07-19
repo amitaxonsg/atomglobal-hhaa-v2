@@ -9,6 +9,67 @@ import AdminApp from "./admin/AdminApp";
 const blankParticipant = { name: "", email: "", ageRange: "", gender: "", role: "", industry: "", region: "", purpose: "", tenure: "", privacyConsent: false, transactionalConsent: false, marketingConsent: false };
 const trackDescriptions = { personal: "For anyone who wants to understand how they lead their own life.", newjoiner: "For new joiners and anyone in their first 1–2 years of work.", manager: "For people managers—how you lead your team, not just yourself.", executive: "For senior leaders shaping strategy and culture at scale." };
 
+
+const trackMeta = {
+  personal: {
+    duration: "~15 minutes",
+    estimateMinutes: 15,
+  },
+  newjoiner: {
+    duration: "~15 minutes",
+    estimateMinutes: 15,
+  },
+  manager: {
+    duration: "~15–18 minutes",
+    estimateMinutes: 18,
+  },
+  executive: {
+    duration: "~18–20 minutes",
+    estimateMinutes: 20,
+  },
+};
+
+function remainingTimeLabel(trackKey, answered) {
+  const meta = trackMeta[trackKey] || trackMeta.personal;
+  const calculated = Math.ceil(
+    ((50 - answered) / 50) * meta.estimateMinutes
+  );
+
+  if (calculated <= 1) return "less than 2 min left";
+  if (calculated <= 4) return "about 5 min left";
+  if (calculated <= 8) return "about 10 min left";
+  if (calculated <= 13) return "about 15 min left";
+
+  return `about ${Math.ceil(calculated / 5) * 5} min left`;
+}
+
+function AssessmentMeta({ trackKey }) {
+  const track = assessmentTracks[trackKey];
+  const meta = trackMeta[trackKey];
+
+  return (
+    <div className="assessment-meta">
+      <i
+        className="
+          assessment-meta__dot
+          assessment-meta__dot--heart
+        "
+      />
+      <span>
+        Head–Heart Alignment: {track.label}
+        {" · "}Lite Report Free
+        {" · "}{meta.duration}
+      </span>
+      <i
+        className="
+          assessment-meta__dot
+          assessment-meta__dot--head
+        "
+      />
+    </div>
+  );
+}
+
 function Progress({ current, total, label }) { return <div className="top-progress"><span>{label || `Step ${current} of ${total}`}</span><div><i style={{ width: `${current / total * 100}%` }} /></div></div>; }
 
 function StageShell({ stageKey, current, total = 4, label, onBack, children, actions }) {
@@ -24,9 +85,75 @@ function StageShell({ stageKey, current, total = 4, label, onBack, children, act
 
 function SelectVersion({ onSelect }) {
   const [selected, setSelected] = React.useState("personal");
-  return <StageShell stageKey="version" current={1} actions={<><button className="button button--ghost" disabled><ArrowLeft/> Back</button><button className="button button--primary" onClick={() => onSelect(selected)}>Continue <ArrowRight/></button></>}>
-    <p className="eyebrow">Begin your assessment</p><h1>Head–Heart Alignment</h1><p className="lead">Choose the version that fits you best.</p><div className="choice-stack" role="radiogroup" aria-label="Assessment version">{Object.values(assessmentTracks).map(track => <button role="radio" aria-checked={selected === track.key} className={`choice-card ${selected === track.key ? "selected" : ""}`} key={track.key} onClick={() => setSelected(track.key)}><span className="radio-dot">{selected === track.key && <i/>}</span><span><strong>{track.label}</strong><small>{trackDescriptions[track.key]}</small></span></button>)}</div>
-  </StageShell>;
+
+  return (
+    <StageShell
+      stageKey="version"
+      current={1}
+      actions={
+        <>
+          <button className="button button--ghost" disabled>
+            <ArrowLeft /> Back
+          </button>
+
+          <button
+            className="button button--primary"
+            onClick={() => onSelect(selected)}
+          >
+            Continue <ArrowRight />
+          </button>
+        </>
+      }
+    >
+      <AssessmentMeta trackKey={selected} />
+
+      <h1>Head–Heart Alignment</h1>
+
+      <p className="lead">
+        Choose the version that fits you best.
+      </p>
+
+      <div
+        className="choice-stack"
+        role="radiogroup"
+        aria-label="Assessment version"
+      >
+        {Object.values(assessmentTracks).map(track => {
+          const meta = trackMeta[track.key];
+
+          return (
+            <button
+              role="radio"
+              aria-checked={selected === track.key}
+              className={
+                `choice-card ${
+                  selected === track.key ? "selected" : ""
+                }`
+              }
+              key={track.key}
+              onClick={() => setSelected(track.key)}
+            >
+              <span className="radio-dot">
+                {selected === track.key && <i />}
+              </span>
+
+              <span className="choice-card__copy">
+                <strong>{track.label}</strong>
+
+                <small>
+                  {trackDescriptions[track.key]}
+                </small>
+
+                <small className="choice-card__meta">
+                  50 questions · 10 sections · {meta.duration}
+                </small>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </StageShell>
+  );
 }
 
 function ParticipantDetails({ track, participant, setParticipant, onBack, onContinue }) {
@@ -34,7 +161,7 @@ function ParticipantDetails({ track, participant, setParticipant, onBack, onCont
   const update = key => event => setParticipant(current => ({ ...current, [key]: event.target.type === "checkbox" ? event.target.checked : event.target.value }));
   const valid = participant.name.trim() && /.+@.+\..+/.test(participant.email) && participant.privacyConsent && participant.transactionalConsent;
   return <StageShell stageKey="participant" current={2} onBack={onBack} actions={<><button className="button button--ghost" onClick={onBack}><ArrowLeft/> Back</button><button className="button button--primary" disabled={!valid} onClick={onContinue}>Continue <ArrowRight/></button></>}>
-    <p className="eyebrow">{track.label} assessment</p><h1>Before you begin</h1><p className="lead">A few details personalise your report and create your secure resume link.</p><div className="form-grid participant-form"><label>Full name *<input autoComplete="name" value={participant.name} onChange={update("name")} placeholder="Your name"/></label><label>Email address *<input type="email" autoComplete="email" value={participant.email} onChange={update("email")} placeholder="you@example.com"/></label><label>{config.whoLabel}<select value={participant.role} onChange={update("role")}><option value="">Select…</option>{config.whoOptions.map(option => <option key={option}>{option}</option>)}</select></label><label>{config.whatLabel}<select value={participant.industry} onChange={update("industry")}><option value="">Select…</option>{config.whatOptions.map(option => <option key={option}>{option}</option>)}</select></label></div><fieldset className="consents"><legend>Privacy and communication</legend><label><input type="checkbox" checked={participant.privacyConsent} onChange={update("privacyConsent")}/><span>I have read the privacy notice and consent to my answers being processed for this assessment. *</span></label><label><input type="checkbox" checked={participant.transactionalConsent} onChange={update("transactionalConsent")}/><span>Send essential messages including my resume link and report. *</span></label><label><input type="checkbox" checked={participant.marketingConsent} onChange={update("marketingConsent")}/><span>Send occasional Atom Global insights. Optional and unchecked by default.</span></label></fieldset>
+    <AssessmentMeta trackKey={track.key}/><p className="eyebrow">{track.label} assessment</p><h1>Before you begin</h1><p className="lead">A few details personalise your report and create your secure resume link.</p><div className="form-grid participant-form"><label>Full name *<input autoComplete="name" value={participant.name} onChange={update("name")} placeholder="Your name"/></label><label>Email address *<input type="email" autoComplete="email" value={participant.email} onChange={update("email")} placeholder="you@example.com"/></label><label>{config.whoLabel}<select value={participant.role} onChange={update("role")}><option value="">Select…</option>{config.whoOptions.map(option => <option key={option}>{option}</option>)}</select></label><label>{config.whatLabel}<select value={participant.industry} onChange={update("industry")}><option value="">Select…</option>{config.whatOptions.map(option => <option key={option}>{option}</option>)}</select></label></div><fieldset className="consents"><legend>Privacy and communication</legend><label><input type="checkbox" checked={participant.privacyConsent} onChange={update("privacyConsent")}/><span>I have read the privacy notice and consent to my answers being processed for this assessment. *</span></label><label><input type="checkbox" checked={participant.transactionalConsent} onChange={update("transactionalConsent")}/><span>Send essential messages including my resume link and report. *</span></label><label><input type="checkbox" checked={participant.marketingConsent} onChange={update("marketingConsent")}/><span>Send occasional Atom Global insights. Optional and unchecked by default.</span></label></fieldset>
   </StageShell>;
 }
 
@@ -44,9 +171,10 @@ function Questions({ track, answers, onAnswer, section, setSection, onBack, onFi
   const sectionAnswers = answers.slice(offset, offset + 5);
   const canContinue = sectionAnswers.every(answer => answer?.value != null);
   const answered = answers.filter(answer => answer?.value != null).length;
+  const remaining = remainingTimeLabel(track.key, answered);
   const continueFlow = () => section === track.subscales.length - 1 ? onFinish() : setSection(section + 1);
-  return <StageShell stageKey={track.key} current={section + 1} total={track.subscales.length} label={`${answered} of 50 answered`} onBack={section ? () => setSection(section - 1) : onBack} actions={<><button className="button button--ghost" onClick={section ? () => setSection(section - 1) : onBack}><ArrowLeft/> Back</button><button className="button button--primary" disabled={!canContinue} onClick={continueFlow}>{section === 9 ? "View result" : "Continue"} <ArrowRight/></button></>}>
-    <p className="eyebrow">Section {section + 1} of 10</p><h1>{subscale.name}</h1><p className="lead">Choose the response that feels most true of you, not the one that sounds ideal.</p><div className="question-list">{subscale.items.map((item, itemIndex) => { const answerIndex = offset + itemIndex; return <fieldset className="question-card" key={item.t}><legend><span>{answerIndex + 1}</span>{item.t}</legend><div className="scale-options">{answerChoices.map((choice, choiceIndex) => <label className={answers[answerIndex]?.value === choiceIndex + 1 ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} value={choiceIndex + 1} checked={answers[answerIndex]?.value === choiceIndex + 1} onChange={() => onAnswer(answerIndex, choiceIndex + 1)}/><i>{choiceIndex + 1}</i><span>{choice}</span></label>)}</div></fieldset>})}</div>
+  return <StageShell stageKey={track.key} current={section + 1} total={track.subscales.length} label={`${answered} of 50 · ${remaining}`} onBack={section ? () => setSection(section - 1) : onBack} actions={<><button className="button button--ghost" onClick={section ? () => setSection(section - 1) : onBack}><ArrowLeft/> Back</button><button className="button button--primary" disabled={!canContinue} onClick={continueFlow}>{section === 9 ? "View result" : "Continue"} <ArrowRight/></button></>}>
+    <AssessmentMeta trackKey={track.key}/><p className="eyebrow">Section {section + 1} of 10</p><h1>{subscale.name}</h1><p className="lead">Choose the response that feels most true of you, not the one that sounds ideal.</p><div className="question-list">{subscale.items.map((item, itemIndex) => { const answerIndex = offset + itemIndex; return <fieldset className="question-card" key={item.t}><legend><span>{answerIndex + 1}</span>{item.t}</legend><div className="scale-options">{answerChoices.map((choice, choiceIndex) => <label className={answers[answerIndex]?.value === choiceIndex + 1 ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} value={choiceIndex + 1} checked={answers[answerIndex]?.value === choiceIndex + 1} onChange={() => onAnswer(answerIndex, choiceIndex + 1)}/><i>{choiceIndex + 1}</i><span>{choice}</span></label>)}</div></fieldset>})}</div>
   </StageShell>;
 }
 

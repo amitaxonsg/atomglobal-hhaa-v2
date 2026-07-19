@@ -1,0 +1,306 @@
+:root {
+  --paper: #f7f4ef;
+  --cream: #ffffff;
+  --ink: #211c16;
+  --muted: #726a5b;
+  --line: #e4ddcf;
+  --orange: #c1443f;
+  --orange-dark: #a8443d;
+  --gold: #c9a15a;
+  --gold-dark: #af8540;
+  --head: #6c8fae;
+  --navy: #14141c;
+  --green: #52735a;
+
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+html,
+body,
+#root {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body,
+button,
+input,
+select,
+textarea,
+table {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+.screen-content h1,
+.screen-content h2,
+.screen-content h3,
+.screen-content h4,
+.choice-card strong,
+.question-card legend,
+.consents legend,
+.report-card h2,
+.paid-report h2,
+.admin-main h1,
+.admin-login h1,
+.card-heading h2,
+.metric strong {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.screen-content h1,
+.admin-main h1,
+.admin-login h1 {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.application-panel,
+.mobile-header {
+  background: var(--paper);
+}
+
+.lead,
+.choice-card small,
+.report-card li,
+.paid-report p,
+.hint {
+  color: var(--muted);
+}
+
+/* Transparent Atom wordmark */
+
+.visual-logo {
+  width: min(310px, 82%);
+  height: auto;
+  object-fit: contain;
+  filter: none;
+  mix-blend-mode: normal;
+}
+
+.mobile-header img,
+.admin-login__card > img,
+.admin-brand img,
+.fatal-error__card img {
+  height: auto;
+  object-fit: contain;
+  filter: none;
+  mix-blend-mode: normal;
+}
+
+/* Assessment type and duration */
+
+.assessment-meta {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 0 28px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+.assessment-meta__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.assessment-meta__dot--heart {
+  background: var(--orange);
+}
+
+.assessment-meta__dot--head {
+  background: var(--head);
+}
+
+.choice-card__copy {
+  display: grid;
+}
+
+.choice-card__meta {
+  display: block;
+  margin-top: 9px;
+  color: #9b7542 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.02em;
+}
+
+/* Forms */
+
+.form-grid label,
+.admin-login label,
+.editor-form label {
+  color: #a87532;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.form-grid input,
+.form-grid select,
+.form-grid textarea,
+.admin-login input,
+.editor-form input,
+.editor-form select,
+.editor-form textarea {
+  min-height: 52px;
+  background: #ffffff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.form-grid input:focus,
+.form-grid select:focus,
+.form-grid textarea:focus,
+.admin-login input:focus,
+.editor-form input:focus,
+.editor-form select:focus,
+.editor-form textarea:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(193, 68, 63, 0.12);
+}
+
+.consents input {
+  accent-color: var(--orange);
+}
+
+/* Cards */
+
+.choice-card,
+.question-card,
+.report-card,
+.paid-report,
+.admin-card,
+.metric {
+  background: #ffffff;
+  border-color: var(--line);
+}
+
+.choice-card.selected {
+  border-color: var(--orange);
+  box-shadow:
+    inset 0 0 0 1px rgba(193, 68, 63, 0.14);
+}
+
+.selected .radio-dot {
+  border-color: var(--orange);
+}
+
+.radio-dot i {
+  background: var(--orange);
+}
+
+/* Buttons */
+
+.button {
+  min-height: 52px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.assessment-shell .button--primary {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: var(--ink);
+}
+
+.assessment-shell .button--primary:hover:not(:disabled) {
+  background: var(--gold-dark);
+  border-color: var(--gold-dark);
+}
+
+.admin-shell .button--primary,
+.admin-login .button--primary {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #ffffff;
+}
+
+.admin-shell .button--primary:hover:not(:disabled),
+.admin-login .button--primary:hover:not(:disabled) {
+  background: var(--orange-dark);
+  border-color: var(--orange-dark);
+}
+
+.button:disabled {
+  background: #e7dece !important;
+  border-color: #e7dece !important;
+  color: #746b5f !important;
+  opacity: 1;
+}
+
+.top-progress i {
+  background: var(--orange);
+}
+
+.scale-options label:hover,
+.scale-options label.selected {
+  border-color: var(--orange);
+  background: #fff7f4;
+}
+
+.scale-options .selected i {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+
+/* Admin */
+
+.admin-shell {
+  background: #f3eee7;
+}
+
+.admin-sidebar {
+  background: var(--navy);
+}
+
+.admin-brand img {
+  filter: none;
+}
+
+.admin-user i {
+  background: var(--orange);
+}
+
+.card-heading button {
+  color: var(--orange);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(108, 143, 174, 0.48);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .assessment-meta {
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 9px;
+    letter-spacing: 0.11em;
+  }
+
+  .mobile-header {
+    background: rgba(247, 244, 239, 0.97);
+  }
+
+  .mobile-header img {
+    width: 175px;
+    max-height: 48px;
+  }
+}

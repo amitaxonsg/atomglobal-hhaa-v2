@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import AssessmentApp from "./components/AssessmentApp";
 import AppErrorBoundary from "./components/shared/AppErrorBoundary";
 import "./styles.css";
+import "./brand-overrides.css";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
