@@ -14,7 +14,7 @@ final class HealthService
         $checks = [];
         try {
             $checks['database'] = (int) ($this->db->fetch('SELECT 1 ok')['ok'] ?? 0) === 1;
-            $checks['migrations'] = (bool) $this->db->fetch('SELECT 1 ok FROM migrations WHERE migration = ? LIMIT 1', ['009_production_search_indexes.sql']);
+            $checks['migrations'] = (bool) $this->db->fetch('SELECT 1 ok FROM migrations WHERE migration = ? LIMIT 1', ['010_client_feedback_and_help.sql']);
         } catch (\Throwable) {
             $checks['database'] = false;
             $checks['migrations'] = false;
@@ -25,6 +25,10 @@ final class HealthService
         $checks['email'] = (bool) (
             $this->settings->get('email.smtp2go_api_key', $_ENV['SMTP2GO_API_KEY'] ?? '')
             ?: $this->settings->get('email.smtp_host', $_ENV['SMTP_HOST'] ?? '')
+        );
+        $checks['feedbackGitHub'] = (bool) (
+            $this->settings->get('feedback.github_token', $_ENV['GITHUB_FEEDBACK_TOKEN'] ?? '')
+            && $this->settings->get('feedback.github_repository', $_ENV['GITHUB_FEEDBACK_REPOSITORY'] ?? '')
         );
         $cron = $this->settings->get('system.cron_last_run');
         $checks['cron'] = $cron && strtotime((string) $cron) > time() - 900;
