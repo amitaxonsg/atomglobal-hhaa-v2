@@ -27,6 +27,11 @@ $router->add('POST', '/api/admin/password-reset/confirm', function (Request $req
     return Response::json(['reset' => true]);
 });
 
+$router->add('GET', '/api/admin/insights', function () use ($auth, $container) {
+    $auth->requirePermission('dashboard.view');
+    return Response::json($container['adminInsights']->dashboard());
+});
+
 $router->add('GET', '/api/admin/search', function (Request $request) use ($auth, $container) {
     $user = $auth->requirePermission('dashboard.view');
     $term = trim((string) ($request->query['q'] ?? ''));
