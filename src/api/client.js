@@ -3,20 +3,65 @@ import { dashboardData, emailTemplates, stageContent } from "./mockData";
 const mode = import.meta.env.VITE_API_MODE || "mock";
 const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 const storageKey = "hhaa-v2-preview-session";
+let csrfToken = "";
 
 async function request(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  const isForm = options.body instanceof FormData;
+  if (!isForm && options.body !== undefined && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (csrfToken && !["GET", "HEAD"].includes((options.method || "GET").toUpperCase())) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+
   const response = await fetch(`${baseUrl}${path}`, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
+    headers,
   });
-  if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || "Request failed");
-  return response.json();
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.message || "Request failed");
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
 }
 
+function mockConfiguration() {
+  return {
+    branding: {
+      canvas: "#F7F4EF", surface: "#FFFFFF", textPrimary: "#211C16", textMuted: "#726A5B",
+      border: "#E4DDCF", cta: "#C9A15A", ctaHover: "#AF8540", heart: "#C1443F",
+      head: "#6C8FAE", accent: "#C9A15A", navy: "#14141C",
+      headingFont: 'Georgia, "Times New Roman", serif', bodyFont: "Arial, Helvetica, sans-serif",
+      baseFontSize: "16", cardRadius: "8", buttonRadius: "8",
+      logoUrl: "/media/brand/atom-global-wordmark.png", emailLogoUrl: "/media/brand/atom-global-wordmark.png",
+      reportLogoUrl: "/media/brand/atom-global-wordmark.png", faviconUrl: "/icon-192.png", bannerUrl: "",
+    },
+    stages: stageContent,
+    tracks: {
+      personal: { key: "personal", label: "Personal", durationMin: 15, durationMax: 15, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free", paidReportLabel: "Full Report" },
+      newjoiner: { key: "newjoiner", label: "New Joiner", durationMin: 15, durationMax: 15, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free", paidReportLabel: "Full Report" },
+      manager: { key: "manager", label: "Manager", durationMin: 15, durationMax: 18, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free", paidReportLabel: "Full Report" },
+      executive: { key: "executive", label: "Executive", durationMin: 18, durationMax: 20, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free", paidReportLabel: "Full Report" },
+    },
+  };
+}
+
+const mockAdmin = {
+  user: { id: 1, email: "preview@atomglobal.com", displayName: "Preview Owner", roleKey: "owner", roleName: "Owner", permissions: ["*"] },
+  branding: null,
+  settings: {},
+  affiliates: [],
+  seo: [],
+};
+
 const mock = {
+  async publicConfiguration() { return mockConfiguration(); },
   async createSession(payload) {
-    const session = { id: crypto.randomUUID(), token: crypto.randomUUID().replaceAll("-", ""), status: "in_progress", updatedAt: new Date().toISOString(), ...payload };
+    const session = { id: crypto.randomUUID(), resumeToken: crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", ""), status: "in_progress", updatedAt: new Date().toISOString(), ...payload };
     localStorage.setItem(storageKey, JSON.stringify(session));
     return session;
   },
@@ -30,21 +75,82 @@ const mock = {
   async completeSession(payload) { return this.saveSession({ ...payload, status: "completed", completedAt: new Date().toISOString() }); },
   async createCheckout(payload) { return { preview: true, url: `${location.pathname}?payment=success&session=${payload.sessionId}` }; },
   async getReport() { return null; },
-  async adminDashboard() { return dashboardData; },
-  async adminContent() { return stageContent; },
-  async emailTemplates() { return emailTemplates; },
+  async adminSession() { return { user: mockAdmin.user, csrfToken: "preview" }; },
+  async adminLogin() { return { user: mockAdmin.user, csrfToken: "preview" }; },
+  async adminLogout() { return { loggedOut: true }; },
+  async adminDashboard() { return { metrics: dashboardData.metrics.map(([label, value]) => ({ label, value })), participants: dashboardData.participants, activity: dashboardData.activity.map(action => ({ action })), failures: {} }; },
+  async adminParticipants() { return { items: dashboardData.participants.map((item, index) => ({ id: index + 1, ...item, status: item.progress === 100 ? "completed" : "in_progress" })), total: dashboardData.participants.length, page: 1, limit: 25 }; },
+  async adminParticipant(id) { return { participant: { id, name: "Preview Participant", email: "preview@example.com" }, sessions: [], answers: [], reports: [], payments: [], emails: [], consents: [] }; },
+  async adminAssessments() { return { items: Object.values(mockConfiguration().tracks).map((track, index) => ({ trackId: index + 1, trackKey: track.key, trackName: track.label, versionId: index + 1, versionNumber: "1.0.0", status: "published", questionCount: 50, sectionCount: 10 })) }; },
+  async adminAssessmentVersion(id) { return { version: { id, version_number: "1.0.0", status: "published" }, sections: [], questions: [], options: [], reports: [] }; },
+  async cloneAssessment() { return { versionId: Date.now() }; },
+  async publishAssessment() { return { published: true }; },
+  async adminContent() { return { items: stageContent }; },
+  async saveContentStage(key, payload) { stageContent[key] = { ...stageContent[key], ...payload }; return stageContent[key]; },
+  async adminMedia() { return { items: [] }; },
+  async uploadMedia(file, metadata = {}) { return { id: Date.now(), url: URL.createObjectURL(file), fileName: file.name, ...metadata }; },
+  async adminBranding() { return mockAdmin.branding || { published: mockConfiguration().branding, draft: null, draftId: null }; },
+  async saveBrandingDraft(payload) { mockAdmin.branding = { published: mockConfiguration().branding, draft: payload, draftId: 1 }; return { draftId: 1 }; },
+  async publishBranding() { if (mockAdmin.branding?.draft) mockAdmin.branding.published = mockAdmin.branding.draft; return { published: true }; },
+  async adminReports() { return { items: [] }; }, async reportAction() { return { ok: true }; },
+  async adminPayments() { return { items: [] }; },
+  async adminEmailTemplates() { return { items: emailTemplates.map((name, index) => ({ id: index + 1, template_key: name.toLowerCase().replaceAll(" ", "_"), template_name: name, subject: name, html_body: `<p>${name}</p>`, text_body: name, is_active: 1 })) }; },
+  async saveEmailTemplate() { return { saved: true }; },
+  async adminEmailQueue() { return { items: [] }; }, async retryEmail() { return { queued: true }; }, async testEmail() { return { queueId: 1 }; },
+  async adminAffiliates() { return { items: mockAdmin.affiliates }; }, async saveAffiliate(payload) { mockAdmin.affiliates.push({ id: Date.now(), ...payload }); return { id: Date.now() }; },
+  async adminSeoPages() { return { items: mockAdmin.seo }; }, async saveSeoPage(key, payload) { mockAdmin.seo.push({ page_key: key, ...payload }); return { saved: true }; },
+  async adminSettings() { return mockAdmin.settings; }, async saveSettings(group, payload) { mockAdmin.settings[group] = payload; return { saved: true }; },
+  async adminAlertRecipients() { return { items: [] }; }, async saveAlertRecipient() { return { id: 1 }; },
+  async adminAuditLogs() { return { items: [] }; },
 };
 
 const production = {
+  publicConfiguration: () => request("/public/configuration"),
   createSession: (payload) => request("/survey-sessions", { method: "POST", body: JSON.stringify(payload) }),
   saveSession: ({ id, ...payload }) => request(`/survey-sessions/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  loadSession: () => Promise.resolve(null),
+  loadSession: () => {
+    const token = new URLSearchParams(location.search).get("resume");
+    return token ? request(`/survey-sessions/resume/${encodeURIComponent(token)}`) : Promise.resolve(null);
+  },
   completeSession: ({ id, ...payload }) => request(`/survey-sessions/${id}/complete`, { method: "POST", body: JSON.stringify(payload) }),
   createCheckout: (payload) => request("/payments/checkout", { method: "POST", body: JSON.stringify(payload) }),
   getReport: (token) => request(`/reports/${encodeURIComponent(token)}`),
+  adminSession: async () => { const result = await request("/admin/session"); csrfToken = result.csrfToken; return result; },
+  adminLogin: async (credentials) => { const result = await request("/admin/login", { method: "POST", body: JSON.stringify(credentials) }); csrfToken = result.csrfToken; return result; },
+  adminLogout: async () => { const result = await request("/admin/logout", { method: "POST", body: "{}" }); csrfToken = ""; return result; },
   adminDashboard: () => request("/admin/dashboard"),
+  adminParticipants: (query = {}) => request(`/admin/participants?${new URLSearchParams(query)}`),
+  adminParticipant: (id) => request(`/admin/participants/${id}`),
+  exportParticipant: (id) => request(`/admin/participants/${id}/export`),
+  anonymiseParticipant: (id) => request(`/admin/participants/${id}`, { method: "DELETE", body: "{}" }),
+  adminAssessments: () => request("/admin/assessments"),
+  adminAssessmentVersion: (id) => request(`/admin/assessment-versions/${id}`),
+  cloneAssessment: (id, payload) => request(`/admin/assessment-versions/${id}/clone`, { method: "POST", body: JSON.stringify(payload) }),
+  publishAssessment: (id) => request(`/admin/assessment-versions/${id}/publish`, { method: "POST", body: "{}" }),
   adminContent: () => request("/admin/content-stages"),
-  emailTemplates: () => request("/admin/email-templates"),
+  saveContentStage: (key, payload) => request(`/admin/content-stages/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  adminMedia: () => request("/admin/media"),
+  uploadMedia: (file, metadata = {}) => { const form = new FormData(); form.append("file", file); Object.entries(metadata).forEach(([key, value]) => form.append(key, String(value))); return request("/admin/media", { method: "POST", body: form }); },
+  adminBranding: () => request("/admin/branding"),
+  saveBrandingDraft: (payload) => request("/admin/branding/draft", { method: "PUT", body: JSON.stringify(payload) }),
+  publishBranding: (id) => request(`/admin/branding/${id}/publish`, { method: "POST", body: "{}" }),
+  adminReports: () => request("/admin/reports"),
+  reportAction: (id, action) => request(`/admin/reports/${id}/${action}`, { method: "POST", body: "{}" }),
+  adminPayments: () => request("/admin/payments"),
+  adminEmailTemplates: () => request("/admin/email-templates"),
+  saveEmailTemplate: (key, payload) => request(`/admin/email-templates/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify(payload) }),
+  adminEmailQueue: (query = {}) => request(`/admin/email-queue?${new URLSearchParams(query)}`),
+  retryEmail: (id) => request(`/admin/email-queue/${id}/retry`, { method: "POST", body: "{}" }),
+  testEmail: (recipient) => request("/admin/email/test", { method: "POST", body: JSON.stringify({ recipient }) }),
+  adminAffiliates: () => request("/admin/affiliates"),
+  saveAffiliate: (payload) => payload.id ? request(`/admin/affiliates/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/affiliates", { method: "POST", body: JSON.stringify(payload) }),
+  adminSeoPages: () => request("/admin/seo-pages"),
+  saveSeoPage: (key, payload) => request(`/admin/seo-pages/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify(payload) }),
+  adminSettings: (groups = []) => request(`/admin/settings${groups.length ? `?groups=${encodeURIComponent(groups.join(","))}` : ""}`),
+  saveSettings: (group, payload) => request(`/admin/settings/${encodeURIComponent(group)}`, { method: "PUT", body: JSON.stringify(payload) }),
+  adminAlertRecipients: () => request("/admin/alert-recipients"),
+  saveAlertRecipient: (payload) => payload.id ? request(`/admin/alert-recipients/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/alert-recipients", { method: "POST", body: JSON.stringify(payload) }),
+  adminAuditLogs: (query = {}) => request(`/admin/audit-logs?${new URLSearchParams(query)}`),
 };
 
 export const api = mode === "mock" ? mock : production;
