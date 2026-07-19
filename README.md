@@ -16,7 +16,7 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Public mode | Real React frontend with PHP 8.3 and MariaDB production API |
 | Current live commit | `b5204caddfd9b93a3d3d532e38dfe385d071022c` |
 | Current live release | `/var/www/head-heart.atomglobal.com/releases/20260719103507-b5204caddfd9` |
-| Latest branch commit | `2d81daac28e853eb5da0592b597bb9bee6c07233` |
+| Latest verified branch build | GitHub Actions run #270 passed |
 | Production health | Database, migrations, storage, email and cron healthy |
 | Stripe | Not configured yet; checkout and signed-webhook acceptance remain pending |
 | Owner login | Confirmed for `amit@axon.com.sg` |
