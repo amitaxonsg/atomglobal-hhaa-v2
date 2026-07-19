@@ -11,6 +11,7 @@ use AtomGlobal\Services\HealthService;
 use AtomGlobal\Services\MediaService;
 use AtomGlobal\Services\PdfService;
 use AtomGlobal\Services\PrivacyService;
+use AtomGlobal\Services\ReportAdminService;
 use AtomGlobal\Services\ReportService;
 use AtomGlobal\Services\ScoringService;
 use AtomGlobal\Services\SettingsService;
@@ -24,6 +25,7 @@ $crypto = new Crypto($config['key']);
 $settings = new SettingsService($db, $crypto);
 $reports = new ReportService($db, $config);
 $mailQueue = new MailQueue($db);
+$pdf = new PdfService($db, $settings, $config);
 
 return [
     'config' => $config,
@@ -36,7 +38,8 @@ return [
     'health' => new HealthService($db, $config, $settings),
     'mailQueue' => $mailQueue,
     'mailDelivery' => new MailDeliveryService($db, $settings),
-    'pdf' => new PdfService($db, $settings, $config),
+    'pdf' => $pdf,
+    'reportAdmin' => new ReportAdminService($db, $reports, $pdf, $mailQueue, $config),
     'media' => new MediaService($db, $config),
     'admin' => new AdminService($db, $settings, $mailQueue),
 ];
