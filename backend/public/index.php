@@ -47,12 +47,10 @@ $auditLogin = static function (?array $user, string $action) use ($db): void {
     );
 };
 
-// Public system and configuration.
+// Public system and participant routes.
 $router->add('GET', '/api/health', fn() => Response::json($container['health']->check()));
 $router->add('GET', '/api/csrf', fn() => Response::json(['token' => Csrf::token()]));
 $router->add('GET', '/api/public/configuration', fn() => Response::json($admin->publicConfiguration()));
-
-// Participant assessment flow.
 $router->add('POST', '/api/survey-sessions', fn(Request $request) => Response::json($container['surveys']->create($request->body), 201));
 $router->add('GET', '/api/survey-sessions/resume/{token}', fn(Request $request, array $params) => Response::json($container['surveys']->resume($params['token'])));
 $router->add('PATCH', '/api/survey-sessions/{id}', fn(Request $request, array $params) => Response::json($container['surveys']->save((int) $params['id'], $request->body)));
@@ -73,8 +71,7 @@ $router->add('POST', '/api/stripe/webhook', function (Request $request) use ($co
 
 // Secure administration session.
 $router->add('POST', '/api/admin/login', function (Request $request) use ($db, $auth, $auditLogin) {
-    $limiter = new RateLimiter($db);
-    if (!$limiter->hit('admin-login:' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10, 900)) {
+    if (!(new RateLimiter($db))->hit('admin-login:' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'), 10, 900)) {
         return Response::error('Too many login attempts.', 429);
     }
     $user = $auth->attempt((string) ($request->body['email'] ?? ''), (string) ($request->body['password'] ?? ''));
@@ -97,20 +94,18 @@ $router->add('POST', '/api/admin/logout', function (Request $request) use ($auth
     return Response::json(['loggedOut' => true]);
 });
 
-// Dashboard and participants.
+// Dashboard and participant records.
 $router->add('GET', '/api/admin/dashboard', function () use ($auth, $admin) { $auth->requirePermission('dashboard.view'); return Response::json($admin->dashboard()); });
 $router->add('GET', '/api/admin/participants', function (Request $request) use ($auth, $admin) { $auth->requirePermission('participants.view'); return Response::json($admin->participants($request->query)); });
 $router->add('GET', '/api/admin/participants/{id}', function (Request $request, array $params) use ($auth, $admin) { $auth->requirePermission('participants.view'); return Response::json($admin->participant((int) $params['id'])); });
 $router->add('GET', '/api/admin/participants/{id}/export', function (Request $request, array $params) use ($auth, $container) { $auth->requirePermission('participants.export'); return Response::json($container['privacy']->export((int) $params['id'])); });
 $router->add('DELETE', '/api/admin/participants/{id}', function (Request $request, array $params) use ($auth, $container, $csrf) { $user = $auth->requirePermission('participants.delete'); $csrf($request); $container['privacy']->anonymise((int) $params['id'], (int) $user['id']); return Response::json(['anonymised' => true]); });
 
-// Assessment CMS.
+// Assessment, content, media and branding CMS.
 $router->add('GET', '/api/admin/assessments', function () use ($auth, $admin) { $auth->requirePermission('assessments.manage'); return Response::json(['items' => $admin->assessments()]); });
 $router->add('GET', '/api/admin/assessment-versions/{id}', function (Request $request, array $params) use ($auth, $admin) { $auth->requirePermission('assessments.manage'); return Response::json($admin->assessmentVersion((int) $params['id'])); });
 $router->add('POST', '/api/admin/assessment-versions/{id}/clone', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('assessments.manage'); $csrf($request); $id = $admin->cloneAssessment((int) $params['id'], (int) $user['id'], (string) ($request->body['versionNumber'] ?? ''), (string) ($request->body['changeSummary'] ?? '')); return Response::json(['versionId' => $id], 201); });
 $router->add('POST', '/api/admin/assessment-versions/{id}/publish', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('assessments.manage'); $csrf($request); $admin->publishAssessment((int) $params['id'], (int) $user['id']); return Response::json(['published' => true]); });
-
-// Stage content, media and branding.
 $router->add('GET', '/api/admin/content-stages', function () use ($auth, $admin) { $auth->requirePermission('content.manage'); return Response::json(['items' => $admin->publicConfiguration()['stages']]); });
 $router->add('PATCH', '/api/admin/content-stages/{key}', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('content.manage'); $csrf($request); return Response::json($admin->saveStage($params['key'], $request->body, (int) $user['id'])); });
 $router->add('GET', '/api/admin/media', function () use ($auth, $container) { $auth->requirePermission('content.manage'); return Response::json(['items' => $container['media']->all()]); });
@@ -121,10 +116,10 @@ $router->add('POST', '/api/admin/branding/{id}/publish', function (Request $requ
 
 // Reports and payments.
 $router->add('GET', '/api/admin/reports', function () use ($auth, $admin) { $auth->requirePermission('reports.manage'); return Response::json(['items' => $admin->reports()]); });
-$router->add('POST', '/api/admin/reports/{id}/unlock', function (Request $request, array $params) use ($auth, $db, $container, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); $report = $db->fetch('SELECT survey_session_id FROM generated_reports WHERE id = ?', [(int) $params['id']]); if (!$report) return Response::error('Report not found.', 404); $container['reports']->unlockBySession((int) $report['survey_session_id'], 'admin_manual'); $db->execute('INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, NOW())', [$user['id'], 'report.unlocked', 'generated_report', $params['id']]); return Response::json(['unlocked' => true]); });
-$router->add('POST', '/api/admin/reports/{id}/lock', function (Request $request, array $params) use ($auth, $db, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); $db->execute('UPDATE generated_reports SET is_unlocked = 0, unlock_reason = ?, unlocked_at = NULL, updated_at = NOW() WHERE id = ?', ['admin_manual_lock', (int) $params['id']]); $db->execute('INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, NOW())', [$user['id'], 'report.locked', 'generated_report', $params['id']]); return Response::json(['unlocked' => false]); });
-$router->add('POST', '/api/admin/reports/{id}/revoke', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); $admin->revokeReport((int) $params['id'], (int) $user['id']); return Response::json(['revoked' => true]); });
-$router->add('POST', '/api/admin/reports/{id}/resend', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); return Response::json(['queueId' => $admin->resendReport((int) $params['id'], (int) $user['id'])]); });
+$router->add('POST', '/api/admin/reports/{id}/unlock', function (Request $request, array $params) use ($auth, $container, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); $container['reportAdmin']->unlock((int) $params['id'], (int) $user['id']); return Response::json(['unlocked' => true]); });
+$router->add('POST', '/api/admin/reports/{id}/lock', function (Request $request, array $params) use ($auth, $container, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); $container['reportAdmin']->lock((int) $params['id'], (int) $user['id']); return Response::json(['unlocked' => false]); });
+$router->add('POST', '/api/admin/reports/{id}/revoke', function (Request $request, array $params) use ($auth, $container, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); $container['reportAdmin']->revoke((int) $params['id'], (int) $user['id']); return Response::json(['revoked' => true]); });
+$router->add('POST', '/api/admin/reports/{id}/resend', function (Request $request, array $params) use ($auth, $container, $csrf) { $user = $auth->requirePermission('reports.manage'); $csrf($request); return Response::json($container['reportAdmin']->resend((int) $params['id'], (int) $user['id'])); });
 $router->add('GET', '/api/admin/payments', function () use ($auth, $admin) { $auth->requirePermission('payments.manage'); return Response::json(['items' => $admin->payments()]); });
 
 // Email, alerts and integrations.
@@ -146,6 +141,9 @@ $router->add('PUT', '/api/admin/seo-pages/{key}', function (Request $request, ar
 $router->add('GET', '/api/admin/settings', function (Request $request) use ($auth, $admin) { $auth->requirePermission('settings.manage'); $groups = isset($request->query['groups']) ? array_filter(explode(',', (string) $request->query['groups'])) : []; return Response::json($admin->settings($groups)); });
 $router->add('PUT', '/api/admin/settings/{group}', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('settings.manage'); $csrf($request); $admin->saveSettings($params['group'], $request->body, (int) $user['id']); return Response::json(['saved' => true]); });
 $router->add('GET', '/api/admin/audit-logs', function (Request $request) use ($auth, $admin) { $auth->requirePermission('audit.view'); return Response::json(['items' => $admin->auditLogs($request->query)]); });
+
+// Additional production routes: PDF, question/report editors, users, alerts, analytics and integration tests.
+require dirname(__DIR__) . '/src/extra-routes.php';
 
 try {
     $router->dispatch($request);
