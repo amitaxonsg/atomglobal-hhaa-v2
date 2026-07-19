@@ -2,6 +2,9 @@ import React from "react";
 import { api } from "../api/client";
 import { stageContent } from "../api/mockData";
 
+const legacyLogoUrl = "/media/brand/atom-global-wordmark.png";
+const transparentLogoUrl = "/media/brand/atom-global-wordmark-transparent.svg";
+
 const defaults = {
   branding: {
     canvas: "#F7F4EF", surface: "#FFFFFF", textPrimary: "#211C16", textMuted: "#726A5B",
@@ -9,14 +12,18 @@ const defaults = {
     head: "#6C8FAE", accent: "#C9A15A", navy: "#14141C",
     headingFont: 'Georgia, "Times New Roman", serif', bodyFont: "Arial, Helvetica, sans-serif",
     baseFontSize: "16", cardRadius: "8", buttonRadius: "8",
-    logoUrl: "/media/brand/atom-global-wordmark.png", emailLogoUrl: "/media/brand/atom-global-wordmark.png",
-    reportLogoUrl: "/media/brand/atom-global-wordmark.png", faviconUrl: "/icon-192.png", bannerUrl: "",
+    logoUrl: transparentLogoUrl, emailLogoUrl: transparentLogoUrl,
+    reportLogoUrl: transparentLogoUrl, faviconUrl: "/icon-192.png", bannerUrl: "",
   },
   stages: stageContent,
   tracks: {},
 };
 
 const BrandContext = React.createContext(defaults);
+
+function normaliseLogoUrl(value) {
+  return !value || value === legacyLogoUrl ? transparentLogoUrl : value;
+}
 
 function applyBranding(branding) {
   const root = document.documentElement;
@@ -51,8 +58,16 @@ export function BrandProvider({ children }) {
     api.publicConfiguration()
       .then(remote => {
         if (!active) return;
+        const remoteBranding = remote.branding || {};
+        const nextBranding = {
+          ...defaults.branding,
+          ...remoteBranding,
+          logoUrl: normaliseLogoUrl(remoteBranding.logoUrl),
+          emailLogoUrl: normaliseLogoUrl(remoteBranding.emailLogoUrl),
+          reportLogoUrl: normaliseLogoUrl(remoteBranding.reportLogoUrl),
+        };
         const next = {
-          branding: { ...defaults.branding, ...(remote.branding || {}) },
+          branding: nextBranding,
           stages: { ...defaults.stages, ...(remote.stages || {}) },
           tracks: remote.tracks || {},
         };
@@ -73,7 +88,7 @@ export function useBranding() {
 
 export function BrandLogo({ className = "", alt = "Atom Global Consulting" }) {
   const { branding } = useBranding();
-  return <img className={className} src={branding.logoUrl || defaults.branding.logoUrl} alt={alt} />;
+  return <img className={className} src={normaliseLogoUrl(branding.logoUrl)} alt={alt} />;
 }
 
-export { defaults as defaultConfiguration };
+export { defaults as defaultConfiguration, transparentLogoUrl };
