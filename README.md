@@ -9,20 +9,36 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Item | State |
 |---|---|
 | Public URL | `https://head-heart.atomglobal.com/` |
+| Admin URL | `https://head-heart.atomglobal.com/admin` |
 | VPS | `161.97.137.234` |
 | Development branch | `production-readiness-20260719` |
 | Pull request | Draft PR #5 |
-| Live mode | Frontend preview; PHP/MariaDB not connected publicly |
-| Live deployed commit | `42744f41cd96d134ef0059f5175c890280f811f4` |
+| Public mode | Real React frontend with PHP 8.3 and MariaDB production API |
+| Live deployed commit | `bc9e73ba97ad2f9709eab01fa05fd873eab8ff4e` |
+| Live release | `/var/www/head-heart.atomglobal.com/releases/20260719083359-bc9e73ba97ad` |
+| Production health | `status: ok`; database, migrations, storage, email and cron healthy |
+| Stripe | Not configured yet; checkout and webhook checks remain false by design |
+| Owner login | Confirmed for `amit@axon.com.sg` |
 | Deployment timer | Disabled and inactive |
-| Phase A staging | Completed successfully |
-| Stage 4 | Not yet passed |
-| Stage 4 diagnosis | The former local request reached an unrelated Dr Tammi virtual host |
-| Corrected staging endpoint | `127.0.0.1:18088`, host `head-heart-staging.local` |
-| Latest approved branch commit | `583802df7945c3cf81e2a63c8e326a0fc0cdcff2` |
-| Production deployment | Not started |
+| Application cron | Installed and running every minute |
+| Stage 4 | Passed on private port `18088` |
 
-The public `/admin` remains preview mode. The real administration must pass private staging before production activation. The attempted owner creation with a password shorter than 12 characters did not create an account.
+The production site is live for client testing. The automatic Git deployment timer remains disabled so later branch changes cannot alter production without an explicit reviewed deployment.
+
+## Final polish now on the branch
+
+The branch contains a post-launch polish set that is not part of the currently deployed `bc9e73...` release until it is explicitly deployed:
+
+- reflective login-page image using the existing stage artwork;
+- transparent browser logo without the white rectangle;
+- responsive login and dashboard refinements;
+- administrator password-request and password-reset screens;
+- role-aware navigation that hides modules the signed-in role cannot access;
+- registration of the complete route bundle, including password recovery and attribution routes;
+- migration `008_final_admin_polish.sql` for the browser logo setting;
+- read-only reboot readiness audit at `deploy/reboot-readiness-audit.sh`.
+
+The PNG remains the default email and report asset because SVG support varies across email clients. The transparent SVG is used for browser pages only.
 
 ## VPS layout
 
@@ -31,99 +47,70 @@ The public `/admin` remains preview mode. The real administration must pass priv
 /srv/head-heart.atomglobal.com/staging-source
 /var/www/head-heart.atomglobal.com/releases
 /var/www/head-heart.atomglobal.com/current
-/var/www/head-heart-staging.atomglobal.com
-/etc/head-heart-alignment/staging.env
+/var/www/head-heart-staging.atomglobal.com/current
 /etc/head-heart-alignment/app.env
+/etc/head-heart-alignment/staging.env
+/var/lib/head-heart-alignment
 /var/lib/head-heart-alignment-staging
+/var/backups/head-heart-alignment
 /var/backups/head-heart-alignment-staging
 ```
 
-## Audited VPS stack
+## Production verification already completed
 
-- Nginx active and configuration syntax valid.
-- PHP 8.3.6 and `php8.3-fpm.service` active.
-- PDO, `pdo_mysql`, JSON, mbstring, OpenSSL, cURL, DOM and fileinfo available.
-- MariaDB 10.11.14.
-- Node 22 available from `/opt/node-v22/bin`.
-- Composer 2 working.
-- Live Home and Admin return HTTP 200 with valid SSL.
-- Duplicate `gatorinbox.com` Nginx warnings are unrelated maintenance.
+- Private staging marker returned HTTP 200.
+- Private staging `/api/health` returned `status: ok`.
+- Production-mode private preflight returned HTTP 200.
+- Public Home and Admin return HTTP 200 with valid SSL.
+- Signed-out `/api/admin/session` returns the expected HTTP 401.
+- Public `/api/health` returns HTTP 200 in the production environment.
+- Production owner login succeeds.
+- PHP syntax, Composer dependencies, migrations, seed, scoring tests, JavaScript tests and Vite production build passed for the currently deployed release.
+- Production cron recorded a recent run.
+- Live deployment uses an immutable release directory.
 
-## Phase A result
+## Reboot persistence
 
-Phase A completed on isolated VPS staging:
+The application uses persistent Nginx configuration, a persistent immutable-release symlink, protected environment and storage paths, MariaDB, PHP-FPM and `/etc/cron.d/head-heart-alignment`. It does not depend on an interactive shell or a temporary development process.
 
-```text
-Staging source: /srv/head-heart.atomglobal.com/staging-source
-Staging database: head_heart_staging
-Environment: /etc/head-heart-alignment/staging.env
-Backup: /var/backups/head-heart-alignment-staging/head_heart_staging-before-phase-a-20260719T064824Z.sql.gz
+Run the following after deployment and after any planned reboot:
+
+```bash
+cd /srv/head-heart.atomglobal.com/source
+bash deploy/reboot-readiness-audit.sh
 ```
 
-Migrations, seed data, PHP tests and the frontend build passed. The live release and deployed marker did not change.
+The audit requires Nginx, PHP 8.3 FPM, MariaDB and cron to be enabled and active; verifies Nginx syntax, persistent paths, environment permissions, writable storage, application cron, disabled Git timer and live HTTP/API behaviour.
 
-## Staging checkout refresh
+## Implemented administration coverage
 
-The staging checkout is disposable. Refresh it from the approved branch before every Stage 4 run instead of attempting to preserve local file-mode changes or generated files.
+- Secure session login, logout, CSRF, login rate limiting, roles and permissions.
+- Password reset request and confirmation flow.
+- Dashboard metrics, recent participants, failures and alert acknowledgement.
+- Participant search, status/track filters, detail history, export and anonymisation.
+- Assessment version clone, draft edit and publish controls.
+- Question, track timing, free-report and paid-report editors.
+- Stage content and media uploads.
+- Branding draft, preview and publish workflow.
+- Reports: unlock, lock, revoke, rotate/resend and PDF regeneration.
+- Payments and Stripe webhook status records.
+- Email templates, queue, retries, provider test and administrator alerts.
+- Affiliates, attribution, analytics funnel/drop-off, SEO/AEO/GEO, settings, administrators and audit logs.
 
-See `docs/STAGING-CHECKOUT-REFRESH.md` for the exact commands. Run `deploy/stage4-local.sh` through Bash and do not change its executable file mode.
+## Client testing status
 
-## Corrected Stage 4 process
+Client testing may proceed on the live site now. Use Stripe only after test credentials, test Price IDs and the webhook signing secret are configured. The previously exposed SMTP2GO key must be revoked and replaced through the protected Settings screen or environment file before final delivery testing.
 
-The corrected script:
+The remaining acceptance work is operational rather than a claim that every external integration is already complete:
 
-1. uses `127.0.0.1:18088` and `head-heart-staging.local`;
-2. refuses an occupied port;
-3. verifies a private marker before PHP;
-4. verifies the `X-Head-Heart-Staging: 1` response header;
-5. tests `/api/health` and unauthenticated admin behaviour;
-6. restores staging automatically after failure.
+- deploy and visually verify the final polish branch after CI passes;
+- rotate SMTP2GO credentials and confirm a delivered test message;
+- configure Stripe test mode and verify signed webhook processing and refund events;
+- complete all four assessment tracks and review scoring, Lite/Full reports and PDFs;
+- test secure resume, password reset, privacy export/anonymisation and retention;
+- run the reboot readiness audit and record its output;
+- merge PR #5 only after client acceptance.
 
-Required ending:
+## Safe deployment rule
 
-```text
-STAGE 4 LOCAL API AND FRONTEND READY
-URL: http://127.0.0.1:18088
-HOST: head-heart-staging.local
-LIVE PRODUCTION WAS NOT CHANGED
-```
-
-Do not delete the Dr Tammi site merely to reuse its port. Head–Heart has a separate staging port and can coexist safely. Disable or remove an unrelated site only after its exact Nginx files, domains and document root have been audited and backed up.
-
-## Implemented platform coverage
-
-- Real PHP admin sessions, CSRF, rate limiting, roles and permissions.
-- Participant registration, consent, autosave and secure resume links.
-- Four assessment tracks, 50 questions and ten sections.
-- Assessment draft, clone, preview and publish workflows.
-- Participants, reports, payments, email, affiliates, analytics, SEO, settings and audit modules.
-- Branding colours, fonts, logo, banner, stage images, email logo, report logo and favicon.
-- Modern administration login and compact dashboard styling.
-- Lite and Full reports, secure links and branded PDFs.
-- Stripe Checkout, signed webhooks and refund handling.
-- SMTP2GO/SMTP settings, templates, test email, reminders, queue and alerts.
-
-## Email workflow
-
-Templates cover welcome, resume, three incomplete-assessment reminders, completion, Lite Report, Full Report, payment, password reset, test email, privacy confirmation and administrator alerts.
-
-The shared email layout uses a centred transparent logo, white content card, cream surround, brand-red actions and footer links. Default reminder intervals are 24, 72 and 168 hours.
-
-## Production activation rule
-
-Do not switch the public Nginx site or live symlink until Stage 4 passes, a real owner can sign in, the production environment file exists, and the current live release and database have been backed up. Production deployment must use `deploy/update-vps.sh`, which creates a database backup, builds an immutable release, checks `/api/health` and restores the previous release after a failed health check.
-
-## Remaining production gates
-
-- [ ] Run corrected Stage 4 and obtain marker HTTP 200 and API `status: ok`.
-- [ ] Create and test the real staging owner.
-- [ ] Test authentication, expiry, lockout and CSRF.
-- [ ] Test participant registration, autosave and resume.
-- [ ] Deliver branded welcome, reminder and report emails.
-- [ ] Complete all four tracks and verify scoring.
-- [ ] Review Lite and Full reports and PDFs.
-- [ ] Test branding publish and rollback.
-- [ ] Test Stripe in test mode.
-- [ ] Restore the Phase A backup into a fresh database.
-- [ ] Test privacy export, anonymisation and retention.
-- [ ] Record staging acceptance before merging PR #5 or changing production.
+Every deployment must back up the production database, build a new immutable release, run migrations and tests, verify `/api/health`, switch atomically and retain rollback capability. Never enable `head-heart-v2-sync.timer` for automatic production changes.
