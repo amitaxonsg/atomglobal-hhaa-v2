@@ -221,7 +221,39 @@ export default function AssessmentApp() {
   const [section, setSection] = React.useState(0);
   const [session, setSession] = React.useState(null);
   const track = trackKey ? assessmentTracks[trackKey] : null;
-  React.useEffect(() => { api.loadSession().then(saved => { if (!saved?.trackKey || saved.status === "completed") return; setSession(saved); setTrackKey(saved.trackKey); setParticipant(saved.participant || blankParticipant); setAnswers(saved.answers || []); setSection(saved.section || 0); setStage(saved.participant?.email ? "questions" : "details"); }); }, []);
+  React.useEffect(() => {
+    const parameters = new URLSearchParams(window.location.search);
+    const shouldResume = parameters.get("resume") === "1";
+
+    if (!shouldResume) {
+      if (isMockMode) {
+        localStorage.removeItem("hhaa-v2-preview-session");
+      }
+
+      return;
+    }
+
+    api.loadSession()
+      .then(saved => {
+        if (!saved?.trackKey || saved.status === "completed") {
+          return;
+        }
+
+        setSession(saved);
+        setTrackKey(saved.trackKey);
+        setParticipant(saved.participant || blankParticipant);
+        setAnswers(saved.answers || []);
+        setSection(saved.section || 0);
+        setStage(
+          saved.participant?.email
+            ? "questions"
+            : "details"
+        );
+      })
+      .catch(() => {
+        history.replaceState({}, "", "/");
+      });
+  }, []);
   React.useEffect(() => { if (!session?.id || stage !== "questions") return; const timer = setTimeout(() => api.saveSession({ id: session.id, participant, answers, section }).then(setSession), 250); return () => clearTimeout(timer); }, [answers, section]);
   const selectTrack = key => { setTrackKey(key); setAnswers(assessmentTracks[key].allItems.map(() => ({ value: null, note: "" }))); setStage("details"); };
   const begin = async () => { const created = await api.createSession({ trackKey, assessmentVersion: "1.0.0", participant, answers, section: 0 }); setSession(created); setStage("questions"); };
