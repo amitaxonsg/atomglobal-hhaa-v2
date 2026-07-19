@@ -1,0 +1,12 @@
+/admin/*
+  X-Robots-Tag: noindex, nofollow
+/report/*
+  X-Robots-Tag: noindex, nofollow
+/payment/*
+  X-Robots-Tag: noindex, nofollow
+/assessment/*
+  X-Robots-Tag: noindex, nofollow
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN

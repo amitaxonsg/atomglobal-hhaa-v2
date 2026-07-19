@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /assessment
+Disallow: /report
+Disallow: /payment
+Sitemap: https://head-heart.atomglobal.com/sitemap.xml
