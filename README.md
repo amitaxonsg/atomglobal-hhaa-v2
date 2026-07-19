@@ -16,14 +16,13 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Live deployed commit | `42744f41cd96d134ef0059f5175c890280f811f4` |
 | Deployment timer | Disabled and inactive |
 | Phase A staging | Completed successfully |
-| Stage 4 | Rolled back safely after local routing tests failed |
-| Stage 4 diagnosis | The former loopback port returned an unrelated Dr Tammi site |
-| Corrected script | `deploy/stage4-local.sh` |
-| New staging endpoint | `127.0.0.1:18088`, host `head-heart-staging.local` |
-| Latest fix commit | `1b79ee4d047d0c5f6f3b1c77f17596d299b7ab4e` |
+| Stage 4 | Not yet passed |
+| Stage 4 diagnosis | The former local request reached an unrelated Dr Tammi virtual host |
+| Corrected staging endpoint | `127.0.0.1:18088`, host `head-heart-staging.local` |
+| Latest approved branch commit | `583802df7945c3cf81e2a63c8e326a0fc0cdcff2` |
 | Production deployment | Not started |
 
-The public `/admin` remains preview mode. The real administration must pass private staging before PR merge and production activation.
+The public `/admin` remains preview mode. The real administration must pass private staging before production activation. The attempted owner creation with a password shorter than 12 characters did not create an account.
 
 ## VPS layout
 
@@ -63,25 +62,22 @@ Backup: /var/backups/head-heart-alignment-staging/head_heart_staging-before-phas
 
 Migrations, seed data, PHP tests and the frontend build passed. The live release and deployed marker did not change.
 
+## Staging checkout refresh
+
+The staging checkout is disposable. Refresh it from the approved branch before every Stage 4 run instead of attempting to preserve local file-mode changes or generated files.
+
+See `docs/STAGING-CHECKOUT-REFRESH.md` for the exact commands. Run `deploy/stage4-local.sh` through Bash and do not change its executable file mode.
+
 ## Corrected Stage 4 process
 
-The first local health request reached the wrong Nginx virtual host. The corrected script now:
+The corrected script:
 
-1. uses the dedicated port `127.0.0.1:18088`;
-2. uses the unique host `head-heart-staging.local`;
-3. refuses to reuse an occupied port;
-4. bypasses shell proxy variables during local checks;
-5. verifies a private marker endpoint before testing PHP;
-6. verifies the `X-Head-Heart-Staging: 1` header;
-7. captures relevant access, error and recent PHP-FPM logs;
-8. restores the previous staging state automatically after failure.
-
-Run:
-
-```bash
-cd /srv/head-heart.atomglobal.com/staging-source
-EXPECTED_COMMIT=<approved-commit> bash deploy/stage4-local.sh
-```
+1. uses `127.0.0.1:18088` and `head-heart-staging.local`;
+2. refuses an occupied port;
+3. verifies a private marker before PHP;
+4. verifies the `X-Head-Heart-Staging: 1` response header;
+5. tests `/api/health` and unauthenticated admin behaviour;
+6. restores staging automatically after failure.
 
 Required ending:
 
@@ -92,7 +88,7 @@ HOST: head-heart-staging.local
 LIVE PRODUCTION WAS NOT CHANGED
 ```
 
-Create the first staging owner only after this success output.
+Do not delete the Dr Tammi site merely to reuse its port. Head–Heart has a separate staging port and can coexist safely. Disable or remove an unrelated site only after its exact Nginx files, domains and document root have been audited and backed up.
 
 ## Implemented platform coverage
 
@@ -112,6 +108,10 @@ Create the first staging owner only after this success output.
 Templates cover welcome, resume, three incomplete-assessment reminders, completion, Lite Report, Full Report, payment, password reset, test email, privacy confirmation and administrator alerts.
 
 The shared email layout uses a centred transparent logo, white content card, cream surround, brand-red actions and footer links. Default reminder intervals are 24, 72 and 168 hours.
+
+## Production activation rule
+
+Do not switch the public Nginx site or live symlink until Stage 4 passes, a real owner can sign in, the production environment file exists, and the current live release and database have been backed up. Production deployment must use `deploy/update-vps.sh`, which creates a database backup, builds an immutable release, checks `/api/health` and restores the previous release after a failed health check.
 
 ## Remaining production gates
 
