@@ -7,6 +7,7 @@ use AtomGlobal\Mail\MailDeliveryService;
 use AtomGlobal\Mail\MailQueue;
 use AtomGlobal\Security\Crypto;
 use AtomGlobal\Services\AdminService;
+use AtomGlobal\Services\AttributionService;
 use AtomGlobal\Services\HealthService;
 use AtomGlobal\Services\MediaService;
 use AtomGlobal\Services\PdfService;
@@ -41,5 +42,6 @@ return [
     'pdf' => $pdf,
     'reportAdmin' => new ReportAdminService($db, $reports, $pdf, $mailQueue, $config),
     'media' => new MediaService($db, $config),
+    'attribution' => new AttributionService($db, $config),
     'admin' => new AdminService($db, $settings, $mailQueue),
 ];
