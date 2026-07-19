@@ -1,6 +1,6 @@
 import React from "react";
 import { api } from "../../api/client";
-import { adminQuestionnaireConfiguration, saveQuestionnaireLanding } from "../../api/questionnaireCms";
+import { adminQuestionnaireConfiguration, saveLiveAssessment, saveQuestionnaireLanding } from "../../api/questionnaireCms";
 import { experienceDefaults, landingDefaults, questionnaireReference } from "../../data/assessmentExperience";
 import { Notice, PageHeader, Spinner, useLoader } from "./AdminShared";
 
@@ -40,6 +40,44 @@ function textToOptions(value) {
   return String(value || "").split("\n").map(item => item.trim()).filter(Boolean);
 }
 
+function LiveAssessmentControl({ tracks, initialTrackKey, onSaved }) {
+  const publishedTracks = [...new Map(tracks.filter(item => item.status === "published").map(item => [item.trackKey, item])).values()];
+  const [trackKey, setTrackKey] = React.useState(initialTrackKey || publishedTracks[0]?.trackKey || "personal");
+  const [notice, setNotice] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+
+  React.useEffect(() => {
+    if (initialTrackKey) setTrackKey(initialTrackKey);
+  }, [initialTrackKey]);
+
+  const save = async () => {
+    setBusy(true);
+    setNotice("");
+    try {
+      const result = await saveLiveAssessment(trackKey);
+      setNotice(`${result.trackName || trackKey} ${result.versionNumber ? `version ${result.versionNumber} ` : ""}is now the only assessment open to new participants.`);
+      onSaved?.();
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <section className="admin-card live-assessment-control">
+    <div className="card-heading"><div><h2>Live assessment</h2><small>Only one published assessment is offered to new participants at a time so scoring, report content and dashboard totals stay aligned.</small></div></div>
+    <Notice>{notice}</Notice>
+    <Notice>Changing the live assessment affects <strong>new starts only</strong>. Existing resume links, completed answers, scores and reports stay attached to their original published version and immutable snapshots.</Notice>
+    <div className="live-assessment-options">
+      {publishedTracks.map(track => <label className={`live-assessment-option ${trackKey === track.trackKey ? "active" : ""}`} key={track.trackKey}>
+        <input type="radio" name="live-assessment" value={track.trackKey} checked={trackKey === track.trackKey} onChange={() => setTrackKey(track.trackKey)} />
+        <span><strong>{track.trackName}</strong><small>Published v{track.versionNumber} · {track.questionCount} questions · {track.sectionCount} sections</small></span>
+      </label>)}
+    </div>
+    <button className="button button--primary" disabled={busy || !trackKey} onClick={save}>{busy ? "Switching…" : "Set as live assessment"}</button>
+  </section>;
+}
+
 function LandingEditor({ initial, onSaved }) {
   const [form, setForm] = React.useState({ ...landingDefaults, ...(initial || {}) });
   const [notice, setNotice] = React.useState("");
@@ -54,7 +92,7 @@ function LandingEditor({ initial, onSaved }) {
     try {
       const saved = await saveQuestionnaireLanding(form);
       setForm({ ...landingDefaults, ...saved });
-      setNotice("Latest questionnaire landing page saved. The public track-selection page uses this content immediately.");
+      setNotice("Questionnaire landing copy saved. The approved left-image branding remains controlled under Content and Branding.");
       onSaved?.();
     } catch (error) {
       setNotice(error.message);
@@ -64,14 +102,14 @@ function LandingEditor({ initial, onSaved }) {
   };
 
   return <form className="admin-card editor-form questionnaire-landing-editor" onSubmit={save}>
-    <div className="card-heading"><div><h2>Latest public landing page</h2><small>Matches the approved Netlify/index.html layout. The former split-screen stage image is not used by the public questionnaire.</small></div></div>
+    <div className="card-heading"><div><h2>Public landing content</h2><small>The latest index.html questionnaire process is displayed inside the approved responsive left-image layout.</small></div></div>
     <Notice>{notice}</Notice>
     <div className="form-grid">
       <label className="form-grid__wide">Main heading<input value={form.title || ""} onChange={update("title")} /></label>
       <label className="form-grid__wide">First introduction paragraph<textarea rows="4" value={form.primaryCopy || ""} onChange={update("primaryCopy")} /></label>
       <label className="form-grid__wide">Second introduction paragraph<textarea rows="4" value={form.secondaryCopy || ""} onChange={update("secondaryCopy")} /></label>
       <label>Track-card title prefix<input value={form.cardTitlePrefix || ""} onChange={update("cardTitlePrefix")} /></label>
-      <label className="check-row"><input type="checkbox" checked={Boolean(form.showBrandName)} onChange={update("showBrandName")} /> Show Atom Global brand name beside the logo</label>
+      <label className="check-row"><input type="checkbox" checked={Boolean(form.showBrandName)} onChange={update("showBrandName")} /> Show the Atom Global logo on mobile where the left image is hidden</label>
     </div>
     <button className="button button--primary" disabled={busy}>{busy ? "Saving…" : "Save landing page"}</button>
   </form>;
@@ -110,7 +148,7 @@ function TrackEditor({ track, onSaved }) {
   return <form className="questionnaire-cms editor-form" onSubmit={save}>
     <Notice>{notice}</Notice><Notice type="error">{loader.error}</Notice>
     <section className="admin-card">
-      <div className="card-heading"><div><h2>Track card and introduction</h2><small>Controls the selected track card and the next introduction screen.</small></div></div>
+      <div className="card-heading"><div><h2>Track card and introduction</h2><small>Controls the active track card and the following introduction screen.</small></div></div>
       <div className="form-grid">
         <label className="form-grid__wide">Track-card description<textarea rows="3" value={form.tagline || ""} onChange={update("tagline")} /></label>
         <label className="form-grid__wide">Introduction heading<input value={form.introHeadline || `Head–Heart Alignment: ${track.trackName}`} onChange={update("introHeadline")} /></label>
@@ -151,7 +189,7 @@ function TrackEditor({ track, onSaved }) {
         <label className="check-row"><input type="checkbox" checked={Boolean(form.allowNotApplicable)} onChange={update("allowNotApplicable")} /> Show “N/A — doesn’t apply / can’t answer” and exclude it from scoring</label>
         <label className="check-row"><input type="checkbox" checked={Boolean(form.allowAnswerNotes)} onChange={update("allowAnswerNotes")} /> Allow an optional note beneath every question</label>
       </div>
-      <Notice>Question wording is protected under <strong>Assessments</strong>. Only spelling, grammar or clarity corrections are allowed in a draft, and meaning, identity, section, position and scoring remain locked.</Notice>
+      <Notice><strong>Do not replace a question with a different question.</strong> A full meaning change can invalidate comparisons and report interpretation. Under <strong>Assessments</strong>, published versions are immutable and drafts allow only spelling, grammar or clarity corrections while identity, section, position and scoring remain locked.</Notice>
     </section>
 
     <div className="questionnaire-cms__actions"><button className="button button--primary" disabled={busy}>{busy ? "Saving…" : "Save questionnaire process"}</button></div>
@@ -170,13 +208,14 @@ export default function QuestionnairePage() {
   const selected = tracks.find(item => item.trackKey === trackKey) || tracks[0];
 
   return <>
-    <PageHeader eyebrow="Latest index.html / Netlify workflow" title="Questionnaire" actions={<button className="button" onClick={() => { assessments.refresh(); configuration.refresh(); }}>Refresh</button>} />
+    <PageHeader eyebrow="Latest index.html process · approved branded layout" title="Questionnaire" actions={<button className="button" onClick={() => { assessments.refresh(); configuration.refresh(); }}>Refresh</button>} />
     <Notice type="error">{assessments.error || configuration.error}</Notice>
     <section className="admin-card questionnaire-reference">
-      <div><strong>Latest reference verified</strong><span>Simple single-column public flow · 4 tracks · 10 sections · 50 questions per track</span></div>
+      <div><strong>Latest reference verified</strong><span>Responsive left-image layout · one live assessment · 10 sections · 50 questions</span></div>
       <small>Reference SHA-256: {questionnaireReference.sourceFileSha256.slice(0, 16)}… · Questionnaire SHA-256: {questionnaireReference.questionnaireSha256.slice(0, 16)}…</small>
     </section>
 
+    <LiveAssessmentControl tracks={rows} initialTrackKey={configuration.data?.liveTrackKey} onSaved={configuration.refresh} />
     <LandingEditor initial={configuration.data?.landing} onSaved={configuration.refresh} />
 
     <div className="questionnaire-track-tabs" role="tablist" aria-label="Questionnaire track">
