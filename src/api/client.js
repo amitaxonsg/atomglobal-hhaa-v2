@@ -8,18 +8,10 @@ let csrfToken = "";
 async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   const isForm = options.body instanceof FormData;
-  if (!isForm && options.body !== undefined && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
-  if (csrfToken && !["GET", "HEAD"].includes((options.method || "GET").toUpperCase())) {
-    headers["X-CSRF-Token"] = csrfToken;
-  }
+  if (!isForm && options.body !== undefined && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  if (csrfToken && !["GET", "HEAD"].includes((options.method || "GET").toUpperCase())) headers["X-CSRF-Token"] = csrfToken;
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    credentials: "include",
-    ...options,
-    headers,
-  });
+  const response = await fetch(`${baseUrl}${path}`, { credentials: "include", ...options, headers });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(payload.message || "Request failed");
@@ -56,6 +48,7 @@ const mockAdmin = {
   settings: {},
   affiliates: [],
   seo: [],
+  users: [],
 };
 
 const mock = {
@@ -81,10 +74,10 @@ const mock = {
   async adminDashboard() { return { metrics: dashboardData.metrics.map(([label, value]) => ({ label, value })), participants: dashboardData.participants, activity: dashboardData.activity.map(action => ({ action })), failures: {} }; },
   async adminParticipants() { return { items: dashboardData.participants.map((item, index) => ({ id: index + 1, ...item, status: item.progress === 100 ? "completed" : "in_progress" })), total: dashboardData.participants.length, page: 1, limit: 25 }; },
   async adminParticipant(id) { return { participant: { id, name: "Preview Participant", email: "preview@example.com" }, sessions: [], answers: [], reports: [], payments: [], emails: [], consents: [] }; },
-  async adminAssessments() { return { items: Object.values(mockConfiguration().tracks).map((track, index) => ({ trackId: index + 1, trackKey: track.key, trackName: track.label, versionId: index + 1, versionNumber: "1.0.0", status: "published", questionCount: 50, sectionCount: 10 })) }; },
-  async adminAssessmentVersion(id) { return { version: { id, version_number: "1.0.0", status: "published" }, sections: [], questions: [], options: [], reports: [] }; },
-  async cloneAssessment() { return { versionId: Date.now() }; },
-  async publishAssessment() { return { published: true }; },
+  async adminAssessments() { return { items: Object.values(mockConfiguration().tracks).map((track, index) => ({ trackId: index + 1, trackKey: track.key, trackName: track.label, versionId: index + 1, versionNumber: "1.0.0", status: index ? "published" : "draft", questionCount: 50, sectionCount: 10 })) }; },
+  async adminAssessmentVersion(id) { return { version: { id, version_number: "1.0.0", status: "draft", trackId: 1 }, sections: [], questions: Array.from({ length: 50 }, (_, index) => ({ id: index + 1, position: index + 1, question_text: `Preview question ${index + 1}`, scoring_direction: index % 2 ? "H" : "K", is_required: 1, is_active: 1 })), options: [], reports: [] }; },
+  async cloneAssessment() { return { versionId: Date.now() }; }, async publishAssessment() { return { published: true }; },
+  async saveTrackSettings() { return { saved: true }; }, async saveQuestion() { return { saved: true }; }, async saveReportTemplate() { return { saved: true }; },
   async adminContent() { return { items: stageContent }; },
   async saveContentStage(key, payload) { stageContent[key] = { ...stageContent[key], ...payload }; return stageContent[key]; },
   async adminMedia() { return { items: [] }; },
@@ -102,55 +95,64 @@ const mock = {
   async adminSettings() { return mockAdmin.settings; }, async saveSettings(group, payload) { mockAdmin.settings[group] = payload; return { saved: true }; },
   async adminAlertRecipients() { return { items: [] }; }, async saveAlertRecipient() { return { id: 1 }; },
   async adminAuditLogs() { return { items: [] }; },
+  async adminUsers() { return { items: [mockAdmin.user, ...mockAdmin.users] }; }, async saveAdminUser(payload) { mockAdmin.users.push({ id: Date.now(), ...payload }); return { id: Date.now() }; },
+  async adminNotifications() { return { items: [] }; }, async acknowledgeNotification() { return { acknowledged: true }; },
+  async adminAnalytics() { return { events: [], dropoff: [] }; }, async testIntegration(provider) { return { status: "success", message: `${provider} preview test passed` }; },
 };
 
 const production = {
   publicConfiguration: () => request("/public/configuration"),
-  createSession: (payload) => request("/survey-sessions", { method: "POST", body: JSON.stringify(payload) }),
+  createSession: payload => request("/survey-sessions", { method: "POST", body: JSON.stringify(payload) }),
   saveSession: ({ id, ...payload }) => request(`/survey-sessions/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
-  loadSession: () => {
-    const token = new URLSearchParams(location.search).get("resume");
-    return token ? request(`/survey-sessions/resume/${encodeURIComponent(token)}`) : Promise.resolve(null);
-  },
+  loadSession: () => { const token = new URLSearchParams(location.search).get("resume"); return token ? request(`/survey-sessions/resume/${encodeURIComponent(token)}`) : Promise.resolve(null); },
   completeSession: ({ id, ...payload }) => request(`/survey-sessions/${id}/complete`, { method: "POST", body: JSON.stringify(payload) }),
-  createCheckout: (payload) => request("/payments/checkout", { method: "POST", body: JSON.stringify(payload) }),
-  getReport: (token) => request(`/reports/${encodeURIComponent(token)}`),
+  createCheckout: payload => request("/payments/checkout", { method: "POST", body: JSON.stringify(payload) }),
+  getReport: token => request(`/reports/${encodeURIComponent(token)}`),
   adminSession: async () => { const result = await request("/admin/session"); csrfToken = result.csrfToken; return result; },
-  adminLogin: async (credentials) => { const result = await request("/admin/login", { method: "POST", body: JSON.stringify(credentials) }); csrfToken = result.csrfToken; return result; },
+  adminLogin: async credentials => { const result = await request("/admin/login", { method: "POST", body: JSON.stringify(credentials) }); csrfToken = result.csrfToken; return result; },
   adminLogout: async () => { const result = await request("/admin/logout", { method: "POST", body: "{}" }); csrfToken = ""; return result; },
   adminDashboard: () => request("/admin/dashboard"),
   adminParticipants: (query = {}) => request(`/admin/participants?${new URLSearchParams(query)}`),
-  adminParticipant: (id) => request(`/admin/participants/${id}`),
-  exportParticipant: (id) => request(`/admin/participants/${id}/export`),
-  anonymiseParticipant: (id) => request(`/admin/participants/${id}`, { method: "DELETE", body: "{}" }),
+  adminParticipant: id => request(`/admin/participants/${id}`),
+  exportParticipant: id => request(`/admin/participants/${id}/export`),
+  anonymiseParticipant: id => request(`/admin/participants/${id}`, { method: "DELETE", body: "{}" }),
   adminAssessments: () => request("/admin/assessments"),
-  adminAssessmentVersion: (id) => request(`/admin/assessment-versions/${id}`),
+  adminAssessmentVersion: id => request(`/admin/assessment-versions/${id}`),
   cloneAssessment: (id, payload) => request(`/admin/assessment-versions/${id}/clone`, { method: "POST", body: JSON.stringify(payload) }),
-  publishAssessment: (id) => request(`/admin/assessment-versions/${id}/publish`, { method: "POST", body: "{}" }),
+  publishAssessment: id => request(`/admin/assessment-versions/${id}/publish`, { method: "POST", body: "{}" }),
+  saveTrackSettings: (id, payload) => request(`/admin/assessment-tracks/${id}/settings`, { method: "PUT", body: JSON.stringify(payload) }),
+  saveQuestion: (id, payload) => request(`/admin/questions/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  saveReportTemplate: (id, payload) => request(`/admin/report-templates/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminContent: () => request("/admin/content-stages"),
   saveContentStage: (key, payload) => request(`/admin/content-stages/${encodeURIComponent(key)}`, { method: "PATCH", body: JSON.stringify(payload) }),
   adminMedia: () => request("/admin/media"),
   uploadMedia: (file, metadata = {}) => { const form = new FormData(); form.append("file", file); Object.entries(metadata).forEach(([key, value]) => form.append(key, String(value))); return request("/admin/media", { method: "POST", body: form }); },
   adminBranding: () => request("/admin/branding"),
-  saveBrandingDraft: (payload) => request("/admin/branding/draft", { method: "PUT", body: JSON.stringify(payload) }),
-  publishBranding: (id) => request(`/admin/branding/${id}/publish`, { method: "POST", body: "{}" }),
+  saveBrandingDraft: payload => request("/admin/branding/draft", { method: "PUT", body: JSON.stringify(payload) }),
+  publishBranding: id => request(`/admin/branding/${id}/publish`, { method: "POST", body: "{}" }),
   adminReports: () => request("/admin/reports"),
   reportAction: (id, action) => request(`/admin/reports/${id}/${action}`, { method: "POST", body: "{}" }),
   adminPayments: () => request("/admin/payments"),
   adminEmailTemplates: () => request("/admin/email-templates"),
   saveEmailTemplate: (key, payload) => request(`/admin/email-templates/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminEmailQueue: (query = {}) => request(`/admin/email-queue?${new URLSearchParams(query)}`),
-  retryEmail: (id) => request(`/admin/email-queue/${id}/retry`, { method: "POST", body: "{}" }),
-  testEmail: (recipient) => request("/admin/email/test", { method: "POST", body: JSON.stringify({ recipient }) }),
+  retryEmail: id => request(`/admin/email-queue/${id}/retry`, { method: "POST", body: "{}" }),
+  testEmail: recipient => request("/admin/email/test", { method: "POST", body: JSON.stringify({ recipient }) }),
   adminAffiliates: () => request("/admin/affiliates"),
-  saveAffiliate: (payload) => payload.id ? request(`/admin/affiliates/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/affiliates", { method: "POST", body: JSON.stringify(payload) }),
+  saveAffiliate: payload => payload.id ? request(`/admin/affiliates/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/affiliates", { method: "POST", body: JSON.stringify(payload) }),
   adminSeoPages: () => request("/admin/seo-pages"),
   saveSeoPage: (key, payload) => request(`/admin/seo-pages/${encodeURIComponent(key)}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminSettings: (groups = []) => request(`/admin/settings${groups.length ? `?groups=${encodeURIComponent(groups.join(","))}` : ""}`),
   saveSettings: (group, payload) => request(`/admin/settings/${encodeURIComponent(group)}`, { method: "PUT", body: JSON.stringify(payload) }),
   adminAlertRecipients: () => request("/admin/alert-recipients"),
-  saveAlertRecipient: (payload) => payload.id ? request(`/admin/alert-recipients/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/alert-recipients", { method: "POST", body: JSON.stringify(payload) }),
+  saveAlertRecipient: payload => payload.id ? request(`/admin/alert-recipients/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/alert-recipients", { method: "POST", body: JSON.stringify(payload) }),
   adminAuditLogs: (query = {}) => request(`/admin/audit-logs?${new URLSearchParams(query)}`),
+  adminUsers: () => request("/admin/users"),
+  saveAdminUser: payload => payload.id ? request(`/admin/users/${payload.id}`, { method: "PUT", body: JSON.stringify(payload) }) : request("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
+  adminNotifications: () => request("/admin/notifications"),
+  acknowledgeNotification: id => request(`/admin/notifications/${id}/acknowledge`, { method: "POST", body: "{}" }),
+  adminAnalytics: () => request("/admin/analytics/funnel"),
+  testIntegration: (provider, payload = {}) => request(`/admin/integrations/${encodeURIComponent(provider)}/test`, { method: "POST", body: JSON.stringify(payload) }),
 };
 
 export const api = mode === "mock" ? mock : production;
