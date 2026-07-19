@@ -100,6 +100,7 @@ final class SurveyService
                 'resumeUrl' => $resumeUrl,
                 'trackKey' => $track['track_key'],
                 'assessmentVersion' => $track['version_number'],
+                'assessment' => $this->publicAssessment($snapshot),
                 'status' => 'in_progress',
                 'section' => 0,
                 'answers' => [],
@@ -135,6 +136,7 @@ final class SurveyService
             'resumeToken' => $token,
             'trackKey' => $session['track_key'],
             'assessmentVersion' => $session['version_number'],
+            'assessment' => $this->publicAssessment($snapshot),
             'status' => $session['status'],
             'section' => (int) $session['current_section'],
             'answers' => $answers,
@@ -235,10 +237,53 @@ final class SurveyService
 
     private function versionSnapshot(int $versionId): array
     {
-        $questions = $this->db->fetchAll('SELECT q.id, q.position, q.question_text, q.scoring_direction direction, s.code subscale_code FROM questions q JOIN assessment_sections s ON s.id = q.section_id WHERE q.assessment_version_id = ? AND q.is_active = 1 ORDER BY q.position', [$versionId]);
+        $questions = $this->db->fetchAll(
+            'SELECT q.id, q.position, q.question_text, q.scoring_direction direction, s.code subscale_code, s.name subscale_name, s.display_order section_order FROM questions q JOIN assessment_sections s ON s.id = q.section_id WHERE q.assessment_version_id = ? AND q.is_active = 1 ORDER BY q.position',
+            [$versionId]
+        );
         if (count($questions) !== 50) throw new \RuntimeException('The published assessment does not contain exactly 50 active questions.');
         $profiles = $this->db->fetchAll('SELECT profile_key, profile_name, min_score, max_score, free_content_json, paid_content_json FROM report_templates WHERE assessment_version_id = ? ORDER BY min_score', [$versionId]);
-        return ['version_id' => $versionId, 'questions' => $questions, 'profiles' => $profiles, 'scoring' => ['scale_min' => 1, 'scale_max' => 5, 'reverse_formula' => '6 - answer', 'total_formula' => 'round(mean * 50)', 'subscale_formula' => 'round(mean * 5)']];
+        $options = $this->db->fetchAll('SELECT option_value value, label, display_order FROM answer_options WHERE assessment_version_id = ? ORDER BY display_order', [$versionId]);
+        if (count($options) !== 5) throw new \RuntimeException('The published assessment does not contain exactly five answer choices.');
+        return [
+            'version_id' => $versionId,
+            'questions' => $questions,
+            'profiles' => $profiles,
+            'options' => $options,
+            'scoring' => ['scale_min' => 1, 'scale_max' => 5, 'reverse_formula' => '6 - answer', 'total_formula' => 'round(mean * 50)', 'subscale_formula' => 'round(mean * 5)'],
+        ];
+    }
+
+    private function publicAssessment(array $snapshot): array
+    {
+        $sections = [];
+        $questions = [];
+        foreach ($snapshot['questions'] ?? [] as $question) {
+            $code = (string) $question['subscale_code'];
+            if (!isset($sections[$code])) {
+                $sections[$code] = [
+                    'code' => $code,
+                    'name' => (string) $question['subscale_name'],
+                    'order' => (int) $question['section_order'],
+                ];
+            }
+            $questions[] = [
+                'id' => (int) $question['id'],
+                'position' => (int) $question['position'],
+                'text' => (string) $question['question_text'],
+                'direction' => (string) $question['direction'],
+                'subscaleCode' => $code,
+                'subscaleName' => (string) $question['subscale_name'],
+                'sectionOrder' => (int) $question['section_order'],
+            ];
+        }
+        usort($sections, static fn(array $left, array $right): int => $left['order'] <=> $right['order']);
+        return [
+            'versionId' => (int) ($snapshot['version_id'] ?? 0),
+            'questions' => $questions,
+            'sections' => array_values($sections),
+            'answerChoices' => array_values(array_map(static fn(array $option): string => (string) $option['label'], $snapshot['options'] ?? [])),
+        ];
     }
 
     private function analytics(int $sessionId, string $eventName, array $properties = []): void
