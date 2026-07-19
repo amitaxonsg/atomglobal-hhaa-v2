@@ -104,10 +104,19 @@ export const participantBaseOptions = { ageRanges, genderOptions };
 export function trackExperience(trackKey, remote = {}, priceLabel = "") {
   const fallback = experienceDefaults[trackKey] || experienceDefaults.personal;
   const intake = remote.intake && typeof remote.intake === "object" ? remote.intake : fallback.intake;
+  const resolvedPrice = priceLabel || remote.priceLabel || "the listed price";
   return {
     ...fallback,
     ...remote,
+    introHeadline: remote.introHeadline || fallback.introHeadline,
+    introBody: remote.introBody || fallback.introBody,
+    introOffer: String(remote.introOffer || fallback.introOffer).replace("{{price}}", resolvedPrice),
+    heartLabel: remote.heartLabel || fallback.heartLabel,
+    heartDescription: remote.heartDescription || fallback.heartDescription,
+    headLabel: remote.headLabel || fallback.headLabel,
+    headDescription: remote.headDescription || fallback.headDescription,
     intake,
-    introOffer: String(remote.introOffer || fallback.introOffer).replace("{{price}}", priceLabel || remote.priceLabel || "the listed price"),
+    allowNotApplicable: remote.allowNotApplicable ?? fallback.allowNotApplicable,
+    allowAnswerNotes: remote.allowAnswerNotes ?? fallback.allowAnswerNotes,
   };
 }
