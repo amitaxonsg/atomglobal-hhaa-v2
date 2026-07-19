@@ -8,6 +8,7 @@ use AtomGlobal\Mail\MailQueue;
 use AtomGlobal\Security\Crypto;
 use AtomGlobal\Services\AdminInsightsService;
 use AtomGlobal\Services\AdminService;
+use AtomGlobal\Services\AssessmentExperienceService;
 use AtomGlobal\Services\AttributionService;
 use AtomGlobal\Services\FeedbackService;
 use AtomGlobal\Services\HealthService;
@@ -50,4 +51,5 @@ return [
     'admin' => new AdminService($db, $settings, $mailQueue),
     'adminInsights' => new AdminInsightsService($db, $mailQueue, $config),
     'feedback' => new FeedbackService($db, $settings, $mailQueue, $config),
+    'assessmentExperience' => new AssessmentExperienceService($db),
 ];
