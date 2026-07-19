@@ -68,6 +68,28 @@ if [[ -n "$RELEASE" ]]; then
   [[ -s "$RELEASE/backend/public/index.php" ]] && pass "Backend entry point exists" || fail "Backend entry point is missing"
   [[ -s "$RELEASE/backend/vendor/autoload.php" ]] && pass "Production Composer dependencies exist" || fail "Composer dependencies are missing"
   [[ -L "$RELEASE/backend/.env" || -s "$RELEASE/backend/.env" ]] && pass "Release environment link exists" || fail "Release environment link is missing"
+
+  if grep -R -F -q 'latest-visual-panel' "$RELEASE/frontend/assets" 2>/dev/null; then
+    pass "Frontend bundle contains the restored left-image layout"
+  else
+    fail "Frontend bundle does not contain the restored left-image layout"
+  fi
+  if grep -R -F -q 'liveTrackKey' "$RELEASE/frontend/assets" 2>/dev/null; then
+    pass "Frontend bundle contains the single live-assessment control"
+  else
+    fail "Frontend bundle does not contain the single live-assessment control"
+  fi
+fi
+
+NGINX_SITE=""
+for candidate in "/etc/nginx/sites-enabled/$DOMAIN.conf" "/etc/nginx/sites-available/$DOMAIN.conf"; do
+  if [[ -e "$candidate" ]]; then NGINX_SITE="$(readlink -f "$candidate")"; break; fi
+done
+if [[ -n "$NGINX_SITE" && -s "$NGINX_SITE" && -n "$RELEASE" ]]; then
+  grep -F -q "$RELEASE/frontend" "$NGINX_SITE" && pass "Nginx frontend points to the current immutable release" || fail "Nginx frontend is not pinned to the current release"
+  grep -F -q "$RELEASE/backend/public/index.php" "$NGINX_SITE" && pass "Nginx API points to the current immutable release" || fail "Nginx API is not pinned to the current release"
+else
+  fail "Head–Heart Nginx site file could not be validated"
 fi
 
 if [[ "$(systemctl is-enabled "$TIMER" 2>/dev/null || true)" == "disabled" && "$(systemctl is-active "$TIMER" 2>/dev/null || true)" == "inactive" ]]; then
@@ -104,6 +126,14 @@ else
   warn "Feedback is saved and emailed, but a repository-scoped GitHub Issues token must be configured before automatic issue creation can pass"
 fi
 
+EXPERIENCE="$(curl --fail --silent --show-error --max-time 30 "https://$DOMAIN/api/public/assessment-experience" || true)"
+echo "$EXPERIENCE"
+if grep -q '"landing"' <<<"$EXPERIENCE" && grep -q '"liveTrackKey"' <<<"$EXPERIENCE" && grep -q '"tracks"' <<<"$EXPERIENCE"; then
+  pass "Public questionnaire CMS endpoint includes landing, live assessment and managed tracks"
+else
+  fail "Public questionnaire CMS endpoint is incomplete or unavailable"
+fi
+
 if [[ -n "$RELEASE" && -x "$PHP_BIN" ]]; then
   export RELEASE
   AUDIT_ERROR="$(mktemp)"
@@ -115,11 +145,29 @@ if [[ -n "$RELEASE" && -x "$PHP_BIN" ]]; then
     $cronLastRun = $c["settings"]->get("system.cron_last_run");
     $feedbackToken = $c["settings"]->get("feedback.github_token", $_ENV["GITHUB_FEEDBACK_TOKEN"] ?? "");
     $feedbackRepository = $c["settings"]->get("feedback.github_repository", $_ENV["GITHUB_FEEDBACK_REPOSITORY"] ?? "");
+    $experience = $c["assessmentExperience"]->publicConfiguration();
+    $liveTrackKey = (string) ($experience["liveTrackKey"] ?? "");
+    $live = $db->fetch(
+      "SELECT t.id trackId, t.track_key trackKey, v.id versionId, v.version_number versionNumber, "
+      . "(SELECT COUNT(*) FROM questions q WHERE q.assessment_version_id = v.id AND q.is_active = 1) questionCount, "
+      . "(SELECT COUNT(*) FROM assessment_sections s WHERE s.assessment_version_id = v.id AND s.is_active = 1) sectionCount, "
+      . "(SELECT COUNT(*) FROM answer_options o WHERE o.assessment_version_id = v.id) optionCount, "
+      . "(SELECT COUNT(*) FROM report_templates r WHERE r.assessment_version_id = v.id) reportProfileCount "
+      . "FROM assessment_tracks t JOIN assessment_versions v ON v.track_id = t.id AND v.status = ? "
+      . "WHERE t.track_key = ? AND t.is_active = 1 LIMIT 1",
+      ["published", $liveTrackKey]
+    ) ?: [];
     $result = [
       "environment" => $c["config"]["env"] ?? null,
       "tracks" => (int) (($db->fetch("SELECT COUNT(*) value FROM assessment_tracks WHERE is_active = 1")["value"] ?? 0)),
       "publishedVersions" => (int) (($db->fetch("SELECT COUNT(*) value FROM assessment_versions WHERE status = ?", ["published"])["value"] ?? 0)),
       "publishedQuestions" => (int) (($db->fetch("SELECT COUNT(*) value FROM questions q JOIN assessment_versions v ON v.id = q.assessment_version_id WHERE v.status = ? AND q.is_active = 1", ["published"])["value"] ?? 0)),
+      "liveTrackKey" => $liveTrackKey,
+      "liveTrackFound" => (bool) $live,
+      "liveQuestionCount" => (int) ($live["questionCount"] ?? 0),
+      "liveSectionCount" => (int) ($live["sectionCount"] ?? 0),
+      "liveOptionCount" => (int) ($live["optionCount"] ?? 0),
+      "liveReportProfileCount" => (int) ($live["reportProfileCount"] ?? 0),
       "activeTemplates" => (int) (($db->fetch("SELECT COUNT(*) value FROM email_templates WHERE is_active = 1")["value"] ?? 0)),
       "feedbackTemplates" => (int) (($db->fetch("SELECT COUNT(*) value FROM email_templates WHERE template_key IN (?, ?, ?, ?) AND is_active = 1", ["feedback_received", "feedback_internal_notice", "feedback_clarification", "feedback_completed"])["value"] ?? 0)),
       "feedbackTables" => (int) (($db->fetch("SELECT COUNT(*) value FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (?, ?)", ["client_feedback", "client_feedback_updates"])["value"] ?? 0)),
@@ -144,7 +192,14 @@ if [[ -n "$RELEASE" && -x "$PHP_BIN" ]]; then
   else
     echo "$AUDIT_JSON"
     grep -q '"environment": "production"' <<<"$AUDIT_JSON" && pass "Backend bootstrap uses production environment" || fail "Backend bootstrap production environment"
-    grep -q '"tracks": 4' <<<"$AUDIT_JSON" && pass "Four active assessment tracks" || fail "Four active assessment tracks"
+    grep -q '"tracks": 4' <<<"$AUDIT_JSON" && pass "Four managed assessment tracks" || fail "Four managed assessment tracks"
+    grep -q '"liveTrackFound": true' <<<"$AUDIT_JSON" && pass "One active published assessment is selected for new starts" || fail "Live assessment selection is invalid"
+    grep -q '"liveQuestionCount": 50' <<<"$AUDIT_JSON" && pass "Live assessment has exactly 50 active questions" || fail "Live assessment question count is invalid"
+    grep -q '"liveSectionCount": 10' <<<"$AUDIT_JSON" && pass "Live assessment has exactly 10 active sections" || fail "Live assessment section count is invalid"
+    grep -q '"liveOptionCount": 5' <<<"$AUDIT_JSON" && pass "Live assessment has exactly five scored answer choices" || fail "Live assessment answer options are invalid"
+    LIVE_REPORTS="$(sed -n 's/.*"liveReportProfileCount": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
+    [[ "${LIVE_REPORTS:-0}" -ge 1 ]] && pass "Live assessment has report profiles" || fail "Live assessment report profiles are missing"
+
     PUBLISHED="$(sed -n 's/.*"publishedVersions": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     QUESTIONS="$(sed -n 's/.*"publishedQuestions": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     TEMPLATES="$(sed -n 's/.*"activeTemplates": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
