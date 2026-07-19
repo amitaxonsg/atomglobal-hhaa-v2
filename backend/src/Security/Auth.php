@@ -52,9 +52,7 @@ final class Auth
 
     public function current(): ?array
     {
-        if (empty($_SESSION['admin_user_id'])) {
-            return null;
-        }
+        if (empty($_SESSION['admin_user_id'])) return null;
 
         $user = $this->db->fetch(
             'SELECT u.*, r.role_key, r.role_name FROM admin_users u JOIN roles r ON r.id = u.role_id WHERE u.id = ? AND u.is_active = 1 LIMIT 1',
@@ -73,28 +71,21 @@ final class Auth
     public function requireUser(): array
     {
         $user = $this->current();
-        if (!$user) {
-            throw new \RuntimeException('Unauthorised', 401);
-        }
+        if (!$user) throw new \RuntimeException('Unauthorised', 401);
         return $user;
     }
 
     public function requirePermission(string $permission): array
     {
         $user = $this->requireUser();
-        if ($user['role_key'] === 'owner') {
-            return $user;
-        }
+        if (($user['roleKey'] ?? '') === 'owner') return $user;
 
         $allowed = $this->db->fetch(
             'SELECT 1 allowed FROM admin_users u JOIN role_permissions rp ON rp.role_id = u.role_id JOIN permissions p ON p.id = rp.permission_id WHERE u.id = ? AND p.permission_key = ? LIMIT 1',
             [$user['id'], $permission]
         );
 
-        if (!$allowed) {
-            throw new \RuntimeException('Forbidden', 403);
-        }
-
+        if (!$allowed) throw new \RuntimeException('Forbidden', 403);
         return $user;
     }
 
