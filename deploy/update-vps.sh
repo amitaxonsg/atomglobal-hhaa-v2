@@ -135,7 +135,9 @@ npm test
 npm run build
 
 test -s dist/index.html
+grep -R --include='*.js' -Fq 'latest-visual-panel' dist/assets
 grep -R --include='*.js' -Fq 'latest-track-card' dist/assets
+grep -R --include='*.js' -Fq 'liveTrackKey' dist/assets
 grep -R --include='*.js' -Fq 'Begin the free assessment' dist/assets
 mkdir -p "$TEMP_DIR/frontend" "$TEMP_DIR/backend"
 rsync -a dist/ "$TEMP_DIR/frontend/"
@@ -184,6 +186,10 @@ grep -q '"status":"ok"' <<<"$HEALTH" || { echo "Health check did not return stat
 
 EXPERIENCE="$(curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/public/assessment-experience")"
 grep -q '"landing"' <<<"$EXPERIENCE" || { echo "Questionnaire landing configuration is missing: $EXPERIENCE" >&2; exit 1; }
+grep -q '"liveTrackKey"' <<<"$EXPERIENCE" || { echo "Single live-assessment configuration is missing: $EXPERIENCE" >&2; exit 1; }
+for track_key in personal newjoiner manager executive; do
+  grep -q '"'"$track_key"'"' <<<"$EXPERIENCE" || { echo "Managed track $track_key is missing: $EXPERIENCE" >&2; exit 1; }
+done
 grep -q 'Every choice you make is cast by two votes' <<<"$EXPERIENCE" || { echo "Latest questionnaire copy is missing: $EXPERIENCE" >&2; exit 1; }
 
 curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/" >/dev/null
@@ -196,5 +202,5 @@ echo "Release $RELEASE_ID is active."
 echo "Commit: $COMMIT"
 echo "Nginx site: $NGINX_SITE"
 echo "Health: $HEALTH"
-echo "Questionnaire API: latest landing and four-track configuration verified."
+echo "Questionnaire API: landing, one live assessment and four managed tracks verified."
 trap - ERR
