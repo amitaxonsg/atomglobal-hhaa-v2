@@ -1,3 +1,5 @@
+import React from "react";
+
 export function AlignmentGauge({ score }) {
   const percentage = Math.max(0, Math.min(100, (score - 50) / 2));
   return <div className="gauge" aria-label={`Alignment score ${score} out of 250`}>
@@ -19,4 +21,3 @@ export function RadarChart({ values, labels }) {
     {labels.map((label, index) => { const angle = Math.PI * 2 * index / labels.length - Math.PI / 2; return <text key={label} x={120 + Math.cos(angle) * 108} y={123 + Math.sin(angle) * 108}>{label}</text>; })}
   </svg>;
 }
-
