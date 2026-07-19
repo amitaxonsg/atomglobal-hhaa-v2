@@ -7,7 +7,7 @@ STORAGE="${STORAGE:-/var/lib/head-heart-alignment-staging}"
 ENV_DIR="${ENV_DIR:-/etc/head-heart-alignment}"
 ENV_FILE="${ENV_FILE:-$ENV_DIR/staging.env}"
 LIVE_APP="${LIVE_APP:-/var/www/head-heart.atomglobal.com}"
-NGINX_CONF="${NGINX_CONF:-/etc/nginx/conf.d/head-heart-staging-local.conf}"
+NGINX_CONF="${NGINX_CONF:-/etc/nginx/conf.d/head-heart-stage4-local.conf}"
 PHP_FPM_SERVICE="${PHP_FPM_SERVICE:-php8.3-fpm}"
 PHP_SOCKET="${PHP_SOCKET:-/run/php/php8.3-fpm.sock}"
 EXPECTED_COMMIT="${EXPECTED_COMMIT:-}"
@@ -20,6 +20,7 @@ TEMP_RELEASE="$APP/releases/.stage4-$STAMP.tmp"
 NEW_RELEASE=""
 
 mkdir -p "$AUDIT"
+exec > >(tee -a "$AUDIT/stage4.log") 2>&1
 
 LIVE_RELEASE_BEFORE="$(readlink -f "$LIVE_APP/current")"
 LIVE_COMMIT_BEFORE="$(cat "$LIVE_APP/v2-deployed-commit.txt")"
@@ -33,11 +34,17 @@ else
 fi
 
 rollback() {
-  local code=$?
+  local code="${1:-1}"
+  local line="${2:-unknown}"
+  local command="${3:-unknown}"
+  trap - ERR
+
   echo
   echo "=================================================="
   echo " STAGE 4 FAILED — RESTORING STAGING"
   echo "=================================================="
+  echo "Failed line: $line"
+  echo "Failed command: $command"
 
   rm -rf "$TEMP_RELEASE"
   [[ -n "$NEW_RELEASE" ]] && rm -rf "$NEW_RELEASE"
@@ -60,7 +67,7 @@ rollback() {
   echo "Audit directory: $AUDIT"
   exit "$code"
 }
-trap rollback ERR
+trap 'rollback "$?" "$LINENO" "$BASH_COMMAND"' ERR
 
 log() { printf '\n===== %s =====\n' "$*"; }
 
@@ -178,16 +185,27 @@ install -d -m 0750 "$STORAGE" "$STORAGE/media" "$STORAGE/reports" "$STORAGE/tmp"
 chown -R www-data:www-data "$STORAGE"
 
 log "9. VERIFY DEDICATED LOOPBACK PORT"
-if [[ "$HAD_NGINX" -eq 0 ]] && ss -ltnH | awk '{print $4}' | grep -Eq "(^|:)${PORT}$"; then
+ss -ltnp > "$AUDIT/listeners.before.txt"
+nginx -T > "$AUDIT/nginx.loaded.before.txt" 2>&1
+
+if awk '{print $4}' "$AUDIT/listeners.before.txt" | grep -Fqx "127.0.0.1:${PORT}"; then
   echo "ERROR: Loopback staging port $PORT is already in use."
-  ss -ltnp | grep -E ":${PORT}\\b" || true
+  grep -E ":${PORT}\\b" "$AUDIT/listeners.before.txt" || true
   exit 1
 fi
+
+if grep -Eq "listen[[:space:]]+127\\.0\\.0\\.1:${PORT}([[:space:];]|$)" "$AUDIT/nginx.loaded.before.txt"; then
+  echo "ERROR: An Nginx configuration already claims port $PORT."
+  grep -nE "listen[[:space:]]+127\\.0\\.0\\.1:${PORT}|server_name" "$AUDIT/nginx.loaded.before.txt" | tail -n 30 || true
+  exit 1
+fi
+
+echo "Port $PORT is free and not claimed by another Nginx configuration."
 
 log "10. CONFIGURE LOOPBACK-ONLY NGINX"
 cat > "$NGINX_CONF" <<NGINX
 server {
-    listen 127.0.0.1:${PORT} default_server;
+    listen 127.0.0.1:${PORT};
     server_name ${STAGE_HOST};
 
     root ${NEW_RELEASE}/frontend;
@@ -246,15 +264,34 @@ server {
         try_files \$uri \$uri/ /index.html;
     }
 
-    location ~ /\. { deny all; }
-    location ~* \.(?:env|ini|log|sql|bak|sh)$ { deny all; }
+    location ~ /\\. { deny all; }
+    location ~* \\.(?:env|ini|log|sql|bak|sh)$ { deny all; }
 }
 NGINX
 
-nginx -t
-systemctl reload nginx
-ss -ltnp | grep -E "127\\.0\\.0\\.1:${PORT}\\b"
-if ss -ltn | grep -qE "0\\.0\\.0\\.0:${PORT}|\[::\]:${PORT}"; then
+if ! nginx -t; then
+  echo "ERROR: Nginx rejected the Head–Heart staging configuration."
+  exit 1
+fi
+
+if ! systemctl reload nginx; then
+  echo "ERROR: Nginx reload failed."
+  systemctl status nginx --no-pager || true
+  journalctl -u nginx --since "10 minutes ago" --no-pager || true
+  exit 1
+fi
+
+sleep 1
+ss -ltnp > "$AUDIT/listeners.after.txt"
+if ! awk '{print $4}' "$AUDIT/listeners.after.txt" | grep -Fqx "127.0.0.1:${PORT}"; then
+  echo "ERROR: Nginx did not start the loopback listener on port $PORT."
+  cat "$AUDIT/listeners.after.txt"
+  nginx -T 2>&1 | grep -nE "${PORT}|${STAGE_HOST}" || true
+  exit 1
+fi
+
+grep -E ":${PORT}\\b" "$AUDIT/listeners.after.txt" || true
+if awk '{print $4}' "$AUDIT/listeners.after.txt" | grep -Eq "^(0\\.0\\.0\\.0|\\[::\\]):${PORT}$"; then
   echo "ERROR: Staging port is publicly exposed."
   exit 1
 fi
@@ -274,10 +311,8 @@ cat "$MARKER_BODY" || true
 
 if [[ "$MARKER_CODE" != "200" ]] || ! grep -qx 'head-heart-stage4' "$MARKER_BODY" || ! grep -qi '^X-Head-Heart-Staging: 1' "$MARKER_HEADERS"; then
   echo "ERROR: Request did not reach the Head–Heart staging virtual host."
-  echo "===== MARKER HEADERS ====="
   cat "$MARKER_HEADERS" || true
-  echo "===== LOADED NGINX LISTENERS ====="
-  nginx -T 2>&1 | grep -nE "listen 127\\.0\\.0\\.1:${PORT}|server_name ${STAGE_HOST}|head-heart-stage4-marker" || true
+  nginx -T 2>&1 | grep -nE "${PORT}|${STAGE_HOST}|head-heart-stage4-marker" || true
   exit 1
 fi
 
@@ -297,13 +332,9 @@ echo
 
 if [[ "$HEALTH_CODE" != "200" ]] || ! grep -q '"status":"ok"' "$HEALTH_BODY" || ! grep -qi '^X-Head-Heart-Staging: 1' "$HEALTH_HEADERS"; then
   echo "ERROR: Staging health verification failed."
-  echo "===== HEALTH HEADERS ====="
   cat "$HEALTH_HEADERS" || true
-  echo "===== NGINX STAGING ACCESS LOG ====="
   tail -n 40 /var/log/nginx/head-heart-staging-access.log 2>/dev/null || true
-  echo "===== NGINX STAGING ERROR LOG ====="
   tail -n 80 /var/log/nginx/head-heart-staging-error.log 2>/dev/null || true
-  echo "===== PHP-FPM LOG ====="
   journalctl -u "$PHP_FPM_SERVICE" --since "10 minutes ago" --no-pager 2>/dev/null || true
   exit 1
 fi
