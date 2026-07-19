@@ -1,46 +1,87 @@
 import React from "react";
 import { api, isMockMode } from "../../api/client";
+import { requestAdminPasswordReset, confirmAdminPasswordReset } from "../../api/passwordReset";
 import { BrandLogo, useBranding } from "../../branding/BrandContext";
 import { Spinner, Notice } from "./AdminShared";
 import { AssessmentsPage, BrandingPage, ContentPage, DashboardPage, ParticipantsPage } from "./AdminCorePages";
 import { AffiliatesPage, AnalyticsPage, AuditPage, EmailPage, PaymentsPage, ReportsPage, SeoPage, SettingsPage } from "./AdminOperationsPages";
 
 const sections = [
-  { label: "Dashboard", group: "Overview" },
-  { label: "Participants", group: "Assessment" },
-  { label: "Assessments", group: "Assessment" },
-  { label: "Content", group: "Experience" },
-  { label: "Branding", group: "Experience" },
-  { label: "Reports", group: "Operations" },
-  { label: "Payments", group: "Operations" },
-  { label: "Email", group: "Operations" },
-  { label: "Affiliates", group: "Growth" },
-  { label: "Analytics", group: "Growth" },
-  { label: "SEO", group: "Growth" },
-  { label: "Settings", group: "System" },
-  { label: "Audit", group: "System" },
+  { label: "Dashboard", group: "Overview", permission: "dashboard.view" },
+  { label: "Participants", group: "Assessment", permission: "participants.view" },
+  { label: "Assessments", group: "Assessment", permission: "assessments.manage" },
+  { label: "Content", group: "Experience", permission: "content.manage" },
+  { label: "Branding", group: "Experience", permission: "branding.manage" },
+  { label: "Reports", group: "Operations", permission: "reports.manage" },
+  { label: "Payments", group: "Operations", permission: "payments.manage" },
+  { label: "Email", group: "Operations", permission: "email.manage" },
+  { label: "Affiliates", group: "Growth", permission: "affiliates.manage" },
+  { label: "Analytics", group: "Growth", permission: "dashboard.view" },
+  { label: "SEO", group: "Growth", permission: "seo.manage" },
+  { label: "Settings", group: "System", permission: "settings.manage" },
+  { label: "Audit", group: "System", permission: "audit.view" },
 ];
 
 function AdminLogin({ onLogin }) {
+  const { branding, stages } = useBranding();
+  const resetToken = new URLSearchParams(window.location.search).get("token") || "";
+  const [mode, setMode] = React.useState(resetToken ? "reset" : "login");
   const [form, setForm] = React.useState({
     email: isMockMode ? "preview@atomglobal.com" : "",
     password: isMockMode ? "preview-only" : "",
+    passwordConfirm: "",
   });
-  const [state, setState] = React.useState({ busy: false, error: "" });
+  const [state, setState] = React.useState({ busy: false, error: "", message: "" });
 
-  const submit = async event => {
+  const storyImage = branding.bannerUrl || stages?.version?.image || "/media/stages/reflection-portrait.png";
+
+  const submitLogin = async event => {
     event.preventDefault();
-    setState({ busy: true, error: "" });
+    setState({ busy: true, error: "", message: "" });
     try {
-      const result = await api.adminLogin(form);
+      const result = await api.adminLogin({ email: form.email, password: form.password });
       onLogin(result.user);
-      setState({ busy: false, error: "" });
     } catch (error) {
-      setState({ busy: false, error: error.message });
+      setState({ busy: false, error: error.message, message: "" });
     }
   };
 
-  return <main className="admin-login">
+  const requestReset = async event => {
+    event.preventDefault();
+    setState({ busy: true, error: "", message: "" });
+    try {
+      if (!isMockMode) await requestAdminPasswordReset(form.email);
+      setState({ busy: false, error: "", message: "If an active account matches that address, a secure reset email has been queued." });
+    } catch (error) {
+      setState({ busy: false, error: error.message, message: "" });
+    }
+  };
+
+  const confirmReset = async event => {
+    event.preventDefault();
+    if (form.password !== form.passwordConfirm) {
+      setState({ busy: false, error: "The passwords do not match.", message: "" });
+      return;
+    }
+    setState({ busy: true, error: "", message: "" });
+    try {
+      await confirmAdminPasswordReset(resetToken, form.password);
+      window.history.replaceState({}, "", "/admin");
+      setForm(current => ({ ...current, password: "", passwordConfirm: "" }));
+      setMode("login");
+      setState({ busy: false, error: "", message: "Password updated. Sign in with your new password." });
+    } catch (error) {
+      setState({ busy: false, error: error.message, message: "" });
+    }
+  };
+
+  const showLogin = () => {
+    window.history.replaceState({}, "", "/admin");
+    setMode("login");
+    setState({ busy: false, error: "", message: "" });
+  };
+
+  return <main className="admin-login" style={{ "--admin-login-image": `url("${storyImage}")` }}>
     <section className="admin-login__frame">
       <div className="admin-login__story">
         <BrandLogo />
@@ -53,12 +94,13 @@ function AdminLogin({ onLogin }) {
         </div>
       </div>
 
-      <form className="admin-login__card" onSubmit={submit}>
+      {mode === "login" && <form className="admin-login__card" onSubmit={submitLogin}>
         <div className="admin-login__mobile-logo"><BrandLogo /></div>
         <p className="eyebrow">{isMockMode ? "Preview workspace" : "Administrator access"}</p>
         <h2>Welcome back</h2>
         <p className="admin-login__intro">Sign in to manage Head–Heart Alignment.</p>
 
+        <Notice>{state.message}</Notice>
         <Notice type="error">{state.error}</Notice>
 
         <label>
@@ -89,13 +131,41 @@ function AdminLogin({ onLogin }) {
           {state.busy ? "Signing in…" : isMockMode ? "Open preview workspace" : "Sign in securely"}
         </button>
 
+        {!isMockMode && <button className="admin-login__text-button" type="button" onClick={() => { setMode("forgot"); setState({ busy: false, error: "", message: "" }); }}>
+          Forgot your password?
+        </button>}
+
         <div className="admin-login__security">
           <span aria-hidden="true">●</span>
           {isMockMode
             ? "Preview data only. No live participant or payment records are used."
             : "Protected by secure sessions, CSRF validation, rate limits and role permissions."}
         </div>
-      </form>
+      </form>}
+
+      {mode === "forgot" && <form className="admin-login__card" onSubmit={requestReset}>
+        <div className="admin-login__mobile-logo"><BrandLogo /></div>
+        <p className="eyebrow">Account recovery</p>
+        <h2>Reset access</h2>
+        <p className="admin-login__intro">Enter the email address used for your administrator account.</p>
+        <Notice>{state.message}</Notice>
+        <Notice type="error">{state.error}</Notice>
+        <label>Email address<input type="email" autoComplete="email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} required /></label>
+        <button className="button button--primary admin-login__submit" disabled={state.busy}>{state.busy ? "Requesting…" : "Send secure reset link"}</button>
+        <button className="admin-login__text-button" type="button" onClick={showLogin}>Back to sign in</button>
+      </form>}
+
+      {mode === "reset" && <form className="admin-login__card" onSubmit={confirmReset}>
+        <div className="admin-login__mobile-logo"><BrandLogo /></div>
+        <p className="eyebrow">Account recovery</p>
+        <h2>Choose a new password</h2>
+        <p className="admin-login__intro">Use at least 12 characters with upper-case, lower-case, a number and a symbol.</p>
+        <Notice type="error">{state.error}</Notice>
+        <label>New password<input type="password" autoComplete="new-password" value={form.password} onChange={event => setForm(current => ({ ...current, password: event.target.value }))} required /></label>
+        <label>Confirm new password<input type="password" autoComplete="new-password" value={form.passwordConfirm} onChange={event => setForm(current => ({ ...current, passwordConfirm: event.target.value }))} required /></label>
+        <button className="button button--primary admin-login__submit" disabled={state.busy}>{state.busy ? "Updating…" : "Update password"}</button>
+        <button className="admin-login__text-button" type="button" onClick={showLogin}>Cancel and return to sign in</button>
+      </form>}
     </section>
   </main>;
 }
@@ -120,7 +190,6 @@ export default function AdminApp() {
   const [user, setUser] = React.useState(null);
   const [checking, setChecking] = React.useState(true);
   const [active, setActive] = React.useState("Dashboard");
-  const { branding } = useBranding();
 
   React.useEffect(() => {
     api.adminSession()
@@ -132,8 +201,12 @@ export default function AdminApp() {
   if (checking) return <Spinner />;
   if (!user) return <AdminLogin onLogin={setUser} />;
 
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const allowed = permission => permissions.includes("*") || permissions.includes(permission);
+  const visibleSections = sections.filter(section => allowed(section.permission));
+  const safeActive = visibleSections.some(section => section.label === active) ? active : visibleSections[0]?.label || "Dashboard";
   const logout = () => api.adminLogout().finally(() => setUser(null));
-  const ActivePage = pages[active] || DashboardPage;
+  const ActivePage = pages[safeActive] || DashboardPage;
   let previousGroup = "";
 
   return <div className="admin-shell">
@@ -144,14 +217,14 @@ export default function AdminApp() {
       </a>
 
       <nav aria-label="Administration">
-        {sections.map(section => {
+        {visibleSections.map(section => {
           const showGroup = section.group !== previousGroup;
           previousGroup = section.group;
           return <React.Fragment key={section.label}>
             {showGroup && <small className="admin-nav-group">{section.group}</small>}
             <button
               type="button"
-              className={section.label === active ? "active" : ""}
+              className={section.label === safeActive ? "active" : ""}
               onClick={() => setActive(section.label)}
             >
               <span>{section.label}</span>
@@ -167,10 +240,10 @@ export default function AdminApp() {
       </div>
     </aside>
 
-    <main className="admin-main" style={{ "--admin-logo": `url(${branding.logoUrl})` }}>
+    <main className="admin-main">
       <div className="admin-context-bar">
         <span>Head–Heart Alignment</span>
-        <strong>{active}</strong>
+        <strong>{safeActive}</strong>
         <em>{isMockMode ? "Preview" : "Secure workspace"}</em>
       </div>
       <ActivePage />
