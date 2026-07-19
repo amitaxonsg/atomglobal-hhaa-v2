@@ -2,14 +2,25 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import AssessmentApp from "./components/AssessmentApp";
 import AppErrorBoundary from "./components/shared/AppErrorBoundary";
+import { BrandProvider } from "./branding/BrandContext";
 import "./styles.css";
 import "./brand-overrides.css";
+import "./admin-production.css";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
 
   React.useEffect(() => {
-    if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return undefined;
+    const enabled = import.meta.env.VITE_ENABLE_SW === "true";
+    const productionApi = import.meta.env.VITE_API_MODE === "production";
+    const correctHost = window.location.hostname === "head-heart.atomglobal.com";
+
+    if (!enabled || !productionApi || !correctHost || !("serviceWorker" in navigator)) {
+      navigator.serviceWorker?.getRegistrations?.().then(registrations => {
+        if (!correctHost || !enabled) registrations.forEach(registration => registration.unregister());
+      });
+      return undefined;
+    }
 
     let mounted = true;
     const hadController = Boolean(navigator.serviceWorker.controller);
@@ -47,8 +58,10 @@ function ServiceWorkerUpdate() {
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <AssessmentApp />
-      <ServiceWorkerUpdate />
+      <BrandProvider>
+        <AssessmentApp />
+        <ServiceWorkerUpdate />
+      </BrandProvider>
     </AppErrorBoundary>
   </React.StrictMode>,
 );
