@@ -94,14 +94,14 @@ final class FeedbackService
 
     public function create(array $payload, array $user): array
     {
-        $title = trim((string) ($payload['title'] ?? ''));
-        $details = trim((string) ($payload['details'] ?? ''));
-        if ($title === '' || mb_strlen($title) < 5) throw new \InvalidArgumentException('A clear feedback title is required.');
-        if ($details === '' || mb_strlen($details) < 10) throw new \InvalidArgumentException('Please describe the feedback in more detail.');
+        $title = mb_substr(trim((string) ($payload['title'] ?? '')), 0, 250);
+        $details = mb_substr(trim((string) ($payload['details'] ?? '')), 0, 20000);
+        if (mb_strlen($title) < 5) throw new \InvalidArgumentException('A clear feedback title is required.');
+        if (mb_strlen($details) < 10) throw new \InvalidArgumentException('Please describe the feedback in more detail.');
 
         $type = in_array($payload['feedbackType'] ?? '', self::TYPES, true) ? $payload['feedbackType'] : 'improvement';
         $priority = in_array($payload['priority'] ?? '', self::PRIORITIES, true) ? $payload['priority'] : 'normal';
-        $name = trim((string) ($payload['submitterName'] ?? $user['displayName'] ?? 'Client administrator'));
+        $name = mb_substr(trim((string) ($payload['submitterName'] ?? $user['displayName'] ?? 'Client administrator')), 0, 200);
         $email = strtolower(trim((string) ($payload['submitterEmail'] ?? $user['email'] ?? $this->clientEmail())));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $email = $this->clientEmail();
 
@@ -111,31 +111,35 @@ final class FeedbackService
             . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
             [
                 (int) ($user['id'] ?? 0) ?: null,
-                $name,
+                $name ?: 'Client administrator',
                 $email,
                 $type,
-                trim((string) ($payload['moduleName'] ?? 'General')) ?: 'General',
+                mb_substr(trim((string) ($payload['moduleName'] ?? 'General')) ?: 'General', 0, 100),
                 $priority,
                 $title,
                 $details,
-                trim((string) ($payload['expectedOutcome'] ?? '')) ?: null,
-                $this->safeUrl((string) ($payload['pageUrl'] ?? '')),
-                $this->safeUrl((string) ($payload['attachmentUrl'] ?? '')),
+                mb_substr(trim((string) ($payload['expectedOutcome'] ?? '')), 0, 10000) ?: null,
+                $this->safePageUrl((string) ($payload['pageUrl'] ?? '')),
+                $this->safeAttachmentUrl((string) ($payload['attachmentUrl'] ?? '')),
                 'new',
                 'pending',
             ]
         );
 
-        $this->addUpdate($id, (int) ($user['id'] ?? 0) ?: null, 'submitted', 'new', 'Feedback submitted through the administration portal.');
-        $this->audit((int) ($user['id'] ?? 0) ?: null, 'feedback.submitted', $id, ['title' => $title, 'priority' => $priority]);
+        $adminId = (int) ($user['id'] ?? 0) ?: null;
+        $this->addUpdate($id, $adminId, 'submitted', 'new', 'Feedback submitted through the administration portal.');
+        $this->audit($adminId, 'feedback.submitted', $id, ['title' => $title, 'priority' => $priority]);
 
-        $this->syncGitHub($id, (int) ($user['id'] ?? 0) ?: null, false);
+        $this->syncGitHub($id, $adminId, false);
         $item = $this->find($id);
         $variables = $this->variables($item);
         $this->mailQueue->enqueue('feedback_received', $email, $variables);
+        $this->addUpdate($id, $adminId, 'note', 'new', 'Acknowledgement email queued to the client update address.', true);
+
         $internal = $this->internalEmail();
         if ($internal && strtolower($internal) !== $email) {
             $this->mailQueue->enqueue('feedback_internal_notice', $internal, $variables);
+            $this->addUpdate($id, $adminId, 'note', 'new', 'Internal feedback notification queued.', true);
         }
 
         return $this->detail($id);
@@ -146,8 +150,9 @@ final class FeedbackService
         $before = $this->find($id);
         $status = (string) ($payload['status'] ?? $before['status']);
         if (!in_array($status, self::STATUSES, true)) throw new \InvalidArgumentException('Unknown feedback status.');
-        $resolution = trim((string) ($payload['resolution'] ?? $before['resolution'] ?? ''));
-        $message = trim((string) ($payload['message'] ?? ''));
+
+        $resolution = mb_substr(trim((string) ($payload['resolution'] ?? $before['resolution'] ?? '')), 0, 20000);
+        $message = mb_substr(trim((string) ($payload['message'] ?? '')), 0, 10000);
         if ($status === 'clarification_requested' && $message === '') {
             throw new \InvalidArgumentException('Add the clarification required before changing this status.');
         }
@@ -155,31 +160,29 @@ final class FeedbackService
             throw new \InvalidArgumentException('Add a completion note before marking feedback done.');
         }
 
+        $priority = in_array($payload['priority'] ?? '', self::PRIORITIES, true) ? $payload['priority'] : $before['priority'];
         $this->db->execute(
             'UPDATE client_feedback SET status = ?, priority = ?, resolution = ?, completed_at = IF(? = ?, COALESCE(completed_at, NOW()), NULL), updated_at = NOW() WHERE id = ?',
-            [
-                $status,
-                in_array($payload['priority'] ?? '', self::PRIORITIES, true) ? $payload['priority'] : $before['priority'],
-                $resolution ?: null,
-                $status,
-                'done',
-                $id,
-            ]
+            [$status, $priority, $resolution ?: null, $status, 'done', $id]
         );
 
+        $adminId = (int) ($user['id'] ?? 0) ?: null;
         $updateType = $status === 'clarification_requested' ? 'clarification' : ($status === 'done' ? 'resolution' : 'status');
-        $this->addUpdate($id, (int) ($user['id'] ?? 0) ?: null, $updateType, $status, $message ?: ($resolution ?: 'Status changed to ' . $this->humanStatus($status) . '.'));
-        $this->audit((int) ($user['id'] ?? 0) ?: null, 'feedback.updated', $id, ['status' => $status, 'message' => $message, 'resolution' => $resolution]);
+        $updateMessage = $message ?: ($resolution ?: 'Status changed to ' . $this->humanStatus($status) . '.');
+        $this->addUpdate($id, $adminId, $updateType, $status, $updateMessage);
+        $this->audit($adminId, 'feedback.updated', $id, ['status' => $status, 'priority' => $priority, 'message' => $message, 'resolution' => $resolution]);
 
         $item = $this->find($id);
         $variables = $this->variables($item, ['clarificationMessage' => $message, 'resolution' => $resolution]);
         if ($status === 'clarification_requested') {
             $this->mailQueue->enqueue('feedback_clarification', $item['submitterEmail'], $variables);
+            $this->addUpdate($id, $adminId, 'note', $status, 'Clarification email queued to the client update address.', true);
         } elseif ($status === 'done') {
             $this->mailQueue->enqueue('feedback_completed', $item['submitterEmail'], $variables);
+            $this->addUpdate($id, $adminId, 'note', $status, 'Completion email queued to the client update address.', true);
         }
 
-        $this->syncGitHub($id, (int) ($user['id'] ?? 0) ?: null, true, $message ?: $resolution);
+        $this->syncGitHub($id, $adminId, true, $message ?: $resolution);
         return $this->detail($id);
     }
 
@@ -210,7 +213,10 @@ final class FeedbackService
         $token = (string) $this->settings->get('feedback.github_token', $_ENV['GITHUB_FEEDBACK_TOKEN'] ?? '');
         $repository = trim((string) $this->settings->get('feedback.github_repository', $_ENV['GITHUB_FEEDBACK_REPOSITORY'] ?? 'amitaxonsg/atomglobal-hhaa-v2'));
         if ($token === '' || !preg_match('/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/', $repository)) {
-            $this->db->execute('UPDATE client_feedback SET github_sync_status = ?, github_last_error = ?, updated_at = NOW() WHERE id = ?', ['not_configured', 'GitHub feedback token is not configured.', $id]);
+            $this->db->execute(
+                'UPDATE client_feedback SET github_sync_status = ?, github_last_error = ?, updated_at = NOW() WHERE id = ?',
+                ['not_configured', 'GitHub feedback token is not configured.', $id]
+            );
             $this->addUpdate($id, $adminId, 'github_sync', $item['status'], 'Saved locally. GitHub integration is not configured.');
             return;
         }
@@ -234,7 +240,7 @@ final class FeedbackService
                     'UPDATE client_feedback SET github_issue_number = ?, github_issue_url = ?, github_sync_status = ?, github_last_error = NULL, updated_at = NOW() WHERE id = ?',
                     [$number, $url, 'synced', $id]
                 );
-                $this->addUpdate($id, $adminId, 'github_sync', $item['status'], 'Created GitHub issue #' . $number, true);
+                $this->addUpdate($id, $adminId, 'github_sync', $item['status'], 'Created GitHub issue #' . $number, false, true);
                 return;
             }
 
@@ -246,7 +252,7 @@ final class FeedbackService
                 $state = in_array($item['status'], ['done', 'declined'], true) ? 'closed' : 'open';
                 $this->githubRequest('PATCH', 'https://api.github.com/repos/' . $repository . '/issues/' . $number, $token, ['state' => $state]);
                 $this->db->execute('UPDATE client_feedback SET github_sync_status = ?, github_last_error = NULL, updated_at = NOW() WHERE id = ?', ['synced', $id]);
-                $this->addUpdate($id, $adminId, 'github_sync', $item['status'], 'Updated GitHub issue #' . $number, true);
+                $this->addUpdate($id, $adminId, 'github_sync', $item['status'], 'Updated GitHub issue #' . $number, false, true);
             }
         } catch (\Throwable $error) {
             $message = mb_substr($error->getMessage(), 0, 1800);
@@ -258,6 +264,7 @@ final class FeedbackService
     private function githubRequest(string $method, string $url, string $token, array $payload): array
     {
         $curl = curl_init($url);
+        if ($curl === false) throw new \RuntimeException('Could not initialise the GitHub connection.');
         curl_setopt_array($curl, [
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_RETURNTRANSFER => true,
@@ -288,24 +295,25 @@ final class FeedbackService
             '## Client feedback',
             '',
             '- **Portal reference:** #' . $item['id'],
-            '- **Submitted by:** ' . $item['submitterName'] . ' <' . $item['submitterEmail'] . '>',
+            '- **Submitted by:** ' . $item['submitterName'],
             '- **Type:** ' . ucfirst($item['feedbackType']),
             '- **Module:** ' . $item['moduleName'],
             '- **Priority:** ' . ucfirst($item['priority']),
             '- **Status:** ' . $this->humanStatus($item['status']),
             '- **Page:** ' . ($item['pageUrl'] ?: 'Not supplied'),
-            '- **Attachment:** ' . ($item['attachmentUrl'] ?: 'Not supplied'),
+            '- **Attachment:** ' . ($item['attachmentUrl'] ? 'Available in the secure administration portal' : 'Not supplied'),
             '',
             '### Details',
-            $item['details'],
+            mb_substr($item['details'], 0, 12000),
         ];
         if ($item['expectedOutcome']) {
             $lines[] = '';
             $lines[] = '### Expected outcome';
-            $lines[] = $item['expectedOutcome'];
+            $lines[] = mb_substr($item['expectedOutcome'], 0, 8000);
         }
         $lines[] = '';
-        $lines[] = '_Created from the secure Head–Heart Alignment administration feedback workflow._';
+        $lines[] = '_The submitter email and attachment URL remain private in the administration portal._';
+        $lines[] = '_Created from the secure Head–Heart Alignment feedback workflow._';
         return implode("\n", $lines);
     }
 
@@ -343,11 +351,26 @@ final class FeedbackService
         return $row;
     }
 
-    private function addUpdate(int $feedbackId, ?int $adminId, string $type, ?string $status, string $message, bool $githubSynced = false): void
-    {
+    private function addUpdate(
+        int $feedbackId,
+        ?int $adminId,
+        string $type,
+        ?string $status,
+        string $message,
+        bool $emailed = false,
+        bool $githubSynced = false,
+    ): void {
         $this->db->execute(
-            'INSERT INTO client_feedback_updates (feedback_id, admin_user_id, update_type, status, message, github_synced_at, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-            [$feedbackId, $adminId, $type, $status, $message, $githubSynced ? date('Y-m-d H:i:s') : null]
+            'INSERT INTO client_feedback_updates (feedback_id, admin_user_id, update_type, status, message, emailed_at, github_synced_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+            [
+                $feedbackId,
+                $adminId,
+                $type,
+                $status,
+                mb_substr($message, 0, 10000),
+                $emailed ? date('Y-m-d H:i:s') : null,
+                $githubSynced ? date('Y-m-d H:i:s') : null,
+            ]
         );
     }
 
@@ -359,11 +382,24 @@ final class FeedbackService
         );
     }
 
-    private function safeUrl(string $value): ?string
+    private function safePageUrl(string $value): ?string
     {
         $value = trim($value);
-        if ($value === '') return null;
-        return filter_var($value, FILTER_VALIDATE_URL) ? mb_substr($value, 0, 1000) : null;
+        if ($value === '' || !filter_var($value, FILTER_VALIDATE_URL)) return null;
+        $parts = parse_url($value);
+        if (!is_array($parts) || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true) || empty($parts['host'])) return null;
+        $url = strtolower((string) $parts['scheme']) . '://' . $parts['host'];
+        if (isset($parts['port'])) $url .= ':' . (int) $parts['port'];
+        $url .= $parts['path'] ?? '/';
+        return mb_substr($url, 0, 1000);
+    }
+
+    private function safeAttachmentUrl(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '' || !filter_var($value, FILTER_VALIDATE_URL)) return null;
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+        return in_array($scheme, ['http', 'https'], true) ? mb_substr($value, 0, 1000) : null;
     }
 
     private function humanStatus(string $status): string
