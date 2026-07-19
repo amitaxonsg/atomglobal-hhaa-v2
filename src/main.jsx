@@ -5,6 +5,7 @@ import AppErrorBoundary from "./components/shared/AppErrorBoundary";
 import { BrandProvider } from "./branding/BrandContext";
 import "./styles.css";
 import "./brand-overrides.css";
+import "./theme-runtime.css";
 import "./admin-production.css";
 
 function ServiceWorkerUpdate() {
