@@ -27,10 +27,14 @@ final class ReportService
     {
         if (!preg_match('/^[a-f0-9]{64}$/', $token)) return null;
         $row = $this->db->fetch(
-            'SELECT id, is_unlocked, free_report_json, IF(is_unlocked = 1, paid_report_json, NULL) paid_report_json, token_expires_at, pdf_path, pdf_generated_at FROM generated_reports WHERE secure_token_hash = ? AND revoked_at IS NULL AND token_expires_at > NOW()',
+            'SELECT id, is_unlocked, free_report_json, IF(is_unlocked = 1, paid_report_json, NULL) paid_report_json, token_expires_at, (pdf_path IS NOT NULL) pdf_available, pdf_generated_at FROM generated_reports WHERE secure_token_hash = ? AND revoked_at IS NULL AND token_expires_at > NOW()',
             [hash('sha256', $token)]
         );
-        if ($row) $this->db->execute('UPDATE generated_reports SET view_count = view_count + 1, last_viewed_at = NOW() WHERE id = ?', [$row['id']]);
+        if ($row) {
+            $row['is_unlocked'] = (bool) $row['is_unlocked'];
+            $row['pdf_available'] = (bool) $row['pdf_available'];
+            $this->db->execute('UPDATE generated_reports SET view_count = view_count + 1, last_viewed_at = NOW() WHERE id = ?', [$row['id']]);
+        }
         return $row;
     }
 
