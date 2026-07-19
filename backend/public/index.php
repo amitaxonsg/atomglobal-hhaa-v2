@@ -142,8 +142,8 @@ $router->add('GET', '/api/admin/settings', function (Request $request) use ($aut
 $router->add('PUT', '/api/admin/settings/{group}', function (Request $request, array $params) use ($auth, $admin, $csrf) { $user = $auth->requirePermission('settings.manage'); $csrf($request); $admin->saveSettings($params['group'], $request->body, (int) $user['id']); return Response::json(['saved' => true]); });
 $router->add('GET', '/api/admin/audit-logs', function (Request $request) use ($auth, $admin) { $auth->requirePermission('audit.view'); return Response::json(['items' => $admin->auditLogs($request->query)]); });
 
-// Additional production routes: PDF, question/report editors, users, alerts, analytics and integration tests.
-require dirname(__DIR__) . '/src/extra-routes.php';
+// Additional production routes: PDF, question/report editors, users, alerts, analytics, attribution and password recovery.
+require dirname(__DIR__) . '/src/route-bundle.php';
 
 try {
     $router->dispatch($request);
