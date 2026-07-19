@@ -190,7 +190,7 @@ INSERT INTO global_settings (setting_key, setting_value, is_encrypted, updated_a
 ('security.login_window_seconds', '900', 0, NOW()),
 ('privacy.analytics_default', 'essential', 0, NOW()),
 ('seo.site_name', 'Head–Heart Alignment by Atom Global Consulting', 0, NOW())
-ON DUPLICATE KEY UPDATE setting_key = VALUES(setting_key);
+ON DUPLICATE KEY UPDATE updated_at = updated_at;
 
 INSERT INTO retention_policies (policy_key, retention_days, action, is_active, updated_at) VALUES
 ('incomplete_assessments', 365, 'anonymise', 1, NOW()),
@@ -198,7 +198,7 @@ INSERT INTO retention_policies (policy_key, retention_days, action, is_active, u
 ('email_logs', 730, 'delete', 1, NOW()),
 ('audit_logs', 2555, 'archive', 1, NOW()),
 ('analytics_events', 730, 'delete', 1, NOW())
-ON DUPLICATE KEY UPDATE policy_key = VALUES(policy_key);
+ON DUPLICATE KEY UPDATE updated_at = updated_at;
 
 INSERT INTO media_library (file_name, storage_path, mime_type, file_size, width, height, alt_text, focal_x, focal_y, variants_json, created_at, updated_at)
 SELECT 'reflection-portrait.png', '/media/stages/reflection-portrait.png', 'image/png', 0, NULL, NULL, 'A thoughtful professional pausing beside a window', 52, 50, JSON_OBJECT('source','repository'), NOW(), NOW()
@@ -208,8 +208,8 @@ INSERT INTO media_library (file_name, storage_path, mime_type, file_size, width,
 SELECT 'atom-global-wordmark.png', '/media/brand/atom-global-wordmark.png', 'image/png', 0, NULL, NULL, 'Atom Global Consulting', 50, 50, JSON_OBJECT('source','repository'), NOW(), NOW()
 WHERE NOT EXISTS (SELECT 1 FROM media_library WHERE storage_path = '/media/brand/atom-global-wordmark.png');
 
-INSERT INTO content_stages (stage_key, desktop_media_id, mobile_media_id, image_alt, focal_x, focal_y, overlay_strength, headline, supporting_text, is_active, display_order, updated_at)
-SELECT stage_key, media_id, NULL, image_alt, 52, 50, 40, headline, supporting_text, 1, display_order, NOW()
+INSERT IGNORE INTO content_stages (stage_key, desktop_media_id, mobile_media_id, image_alt, focal_x, focal_y, overlay_strength, headline, supporting_text, is_active, display_order, updated_at)
+SELECT defaults.stage_key, media.media_id, NULL, defaults.image_alt, 52, 50, 40, defaults.headline, defaults.supporting_text, 1, defaults.display_order, NOW()
 FROM (
   SELECT 'version' stage_key, 'A thoughtful professional pausing beside a window' image_alt, 'Pause.\nReflect.\nChoose wisely.' headline, 'Align what you feel with what you reason.' supporting_text, 1 display_order
   UNION ALL SELECT 'participant', 'A reflective moment before beginning', 'Begin with\nwhere you are.', 'Your context makes the reflection more useful.', 2
@@ -219,24 +219,13 @@ FROM (
   UNION ALL SELECT 'executive', 'An executive considering a complex decision', 'Hold the\nwhole picture.', 'Balance evidence, instinct and human consequence.', 6
   UNION ALL SELECT 'report', 'A participant reviewing a personal report', 'Turn insight\ninto action.', 'Your result is a starting point, not a label.', 7
 ) defaults
-CROSS JOIN (SELECT id media_id FROM media_library WHERE storage_path = '/media/stages/reflection-portrait.png' LIMIT 1) media
-ON DUPLICATE KEY UPDATE updated_at = content_stages.updated_at;
+CROSS JOIN (
+  SELECT id media_id
+  FROM media_library
+  WHERE storage_path = '/media/stages/reflection-portrait.png'
+  LIMIT 1
+) media;
 
-INSERT INTO assessment_track_settings (
-  track_id, public_title, short_title, audience_label, estimated_minutes_min, estimated_minutes_max,
-  average_seconds_per_question, average_seconds_per_participant_field, free_report_label, paid_report_label,
-  free_report_read_minutes, paid_report_read_minutes, question_count, section_count, show_remaining_time,
-  show_question_count, show_section_count, show_autosave, last_reviewed_date, updated_at
-)
-SELECT id, CONCAT('Head–Heart Alignment: ', name), name,
-  CASE track_key
-    WHEN 'personal' THEN 'Personal reflection'
-    WHEN 'newjoiner' THEN 'New joiners and early-career professionals'
-    WHEN 'manager' THEN 'People managers'
-    ELSE 'Senior leaders and executives'
-  END,
-  CASE WHEN track_key IN ('manager','executive') THEN 18 ELSE 15 END,
-  CASE WHEN track_key = 'manager' THEN 18 WHEN track_key = 'executive' THEN 20 ELSE 15 END,
-  18, 12, 'Lite Report Free', 'Full Report', 3, 12, 50, 10, 1, 1, 1, 1, CURDATE(), NOW()
-FROM assessment_tracks
-ON DUPLICATE KEY UPDATE track_id = VALUES(track_id);
+-- Assessment track rows are created by backend/bin/seed.php. The same seed command
+-- then inserts the timing, report labels and progress settings into
+-- assessment_track_settings after the referenced tracks exist.
