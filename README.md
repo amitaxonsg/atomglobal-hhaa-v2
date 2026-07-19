@@ -1,6 +1,6 @@
 # Head–Heart Alignment Digital Assessment Platform
 
-Self-hosted React, PHP and MariaDB assessment, reporting, payment, email and administration platform for Atom Global Consulting.
+Self-hosted React, PHP and MariaDB assessment, reporting, payment, email, feedback and administration platform for Atom Global Consulting.
 
 This is the independent V2 project. Do not reconnect it to the original repository or former Netlify project.
 
@@ -14,31 +14,54 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Development branch | `production-readiness-20260719` |
 | Pull request | Draft PR #5 |
 | Public mode | Real React frontend with PHP 8.3 and MariaDB production API |
-| Live deployed commit | `bc9e73ba97ad2f9709eab01fa05fd873eab8ff4e` |
-| Live release | `/var/www/head-heart.atomglobal.com/releases/20260719083359-bc9e73ba97ad` |
-| Production health | `status: ok`; database, migrations, storage, email and cron healthy |
-| Stripe | Not configured yet; checkout and webhook checks remain false by design |
+| Current live commit | `b5204caddfd9b93a3d3d532e38dfe385d071022c` |
+| Current live release | `/var/www/head-heart.atomglobal.com/releases/20260719103507-b5204caddfd9` |
+| Latest branch commit | `2d81daac28e853eb5da0592b597bb9bee6c07233` |
+| Production health | Database, migrations, storage, email and cron healthy |
+| Stripe | Not configured yet; checkout and signed-webhook acceptance remain pending |
 | Owner login | Confirmed for `amit@axon.com.sg` |
 | Deployment timer | Disabled and inactive |
 | Application cron | Installed and running every minute |
-| Stage 4 | Passed on private port `18088` |
 
-The production site is live for client testing. The automatic Git deployment timer remains disabled so later branch changes cannot alter production without an explicit reviewed deployment.
+The current production release is live for client testing. New branch changes never alter production automatically; `head-heart-v2-sync.timer` must remain disabled.
 
-## Final polish now on the branch
+## Feedback and client collaboration
 
-The branch contains a post-launch polish set that is not part of the currently deployed `bc9e73...` release until it is explicitly deployed:
+The latest branch includes a complete administration feedback workflow:
 
-- reflective login-page image using the existing stage artwork;
-- transparent browser logo without the white rectangle;
-- responsive login and dashboard refinements;
-- administrator password-request and password-reset screens;
-- role-aware navigation that hides modules the signed-in role cannot access;
-- registration of the complete route bundle, including password recovery and attribution routes;
-- migration `008_final_admin_polish.sql` for the browser logo setting;
-- read-only reboot readiness audit at `deploy/reboot-readiness-audit.sh`.
+- **Feedback** and **Help** sections in the secure admin portal.
+- Feedback type, module, priority, title, details, expected outcome, page and optional attachment link.
+- Searchable register with `New`, `Clarification requested`, `Accepted`, `In progress`, `Ready for review`, `Done` and `Declined` states.
+- Permanent change timeline and administrator audit entries.
+- Acknowledgement email to `sunil.setpaul@atomglobal.com`.
+- Internal notification to `amit@axon.com.sg`.
+- Clarification email instructing Sunil to reply by email with the feedback reference.
+- Completion email when an item is marked done.
+- Automatic GitHub issue creation, status comments and issue closure when a repository-scoped token is configured.
+- Owner-only GitHub/email routing configuration; the token is encrypted and never returned to the browser.
+- Global administration search includes feedback records.
 
-The PNG remains the default email and report asset because SVG support varies across email clients. The transparent SVG is used for browser pages only.
+GitHub synchronisation requires a fine-grained token restricted to `amitaxonsg/atomglobal-hhaa-v2` with **Issues: read and write**. Configure it under **Admin → Feedback → GitHub and email routing**. Never place the token in Git, chat, feedback text or screenshots.
+
+## Help and attribution
+
+The Help page explains dashboard graphs, participant search, assessments, content, branding, reports, payments, email templates, feedback and secure production operation. Public assessment and administration screens display **Powered by Axon 1Pro** linked to `https://axon.com.sg/`.
+
+## Administration coverage
+
+- Secure session login, logout, CSRF, rate limiting, roles and permissions.
+- Password reset request and confirmation.
+- Dashboard trends, conversion funnel, track progress, revenue, email health and alerts.
+- Global search across participants, reports, payments, email, affiliates and feedback.
+- Participant search, status/track filters, history, export and anonymisation.
+- Assessment clone, draft editing and controlled publishing.
+- Question, timing, Lite Report and Full Report editors.
+- Stage content, media and branding draft/publish workflow.
+- Report unlock, lock, revoke, link rotation/resend and PDF regeneration.
+- Payments and Stripe webhook records.
+- Editable email templates, sandboxed preview, selected-template test, queue, retry and provider IDs.
+- Affiliates, attribution, analytics, SEO/AEO/GEO, settings, administrators and audit logs.
+- Feedback register, email updates, GitHub Issues synchronisation and searchable help.
 
 ## VPS layout
 
@@ -56,59 +79,47 @@ The PNG remains the default email and report asset because SVG support varies ac
 /var/backups/head-heart-alignment-staging
 ```
 
-## Production verification already completed
+## Reboot persistence and production audit
 
-- Private staging marker returned HTTP 200.
-- Private staging `/api/health` returned `status: ok`.
-- Production-mode private preflight returned HTTP 200.
-- Public Home and Admin return HTTP 200 with valid SSL.
-- Signed-out `/api/admin/session` returns the expected HTTP 401.
-- Public `/api/health` returns HTTP 200 in the production environment.
-- Production owner login succeeds.
-- PHP syntax, Composer dependencies, migrations, seed, scoring tests, JavaScript tests and Vite production build passed for the currently deployed release.
-- Production cron recorded a recent run.
-- Live deployment uses an immutable release directory.
+The application uses persistent Nginx configuration, immutable releases, a protected environment, persistent storage, MariaDB, PHP-FPM and `/etc/cron.d/head-heart-alignment`. It does not depend on an interactive shell or a temporary development process.
 
-## Reboot persistence
-
-The application uses persistent Nginx configuration, a persistent immutable-release symlink, protected environment and storage paths, MariaDB, PHP-FPM and `/etc/cron.d/head-heart-alignment`. It does not depend on an interactive shell or a temporary development process.
-
-Run the following after deployment and after any planned reboot:
+After deployment and after a planned reboot, run:
 
 ```bash
 cd /srv/head-heart.atomglobal.com/source
-bash deploy/reboot-readiness-audit.sh
+bash deploy/final-production-audit.sh
 ```
 
-The audit requires Nginx, PHP 8.3 FPM, MariaDB and cron to be enabled and active; verifies Nginx syntax, persistent paths, environment permissions, writable storage, application cron, disabled Git timer and live HTTP/API behaviour.
+The audit checks boot services, Nginx, immutable paths, environment permissions, cron, public HTTP/API health, four assessment tracks, published versions/questions, owner account, email templates, feedback tables/permissions/templates, Sunil's feedback address, GitHub feedback configuration, failed queues/webhooks and database backup freshness.
 
-## Implemented administration coverage
+## Production verification
 
-- Secure session login, logout, CSRF, login rate limiting, roles and permissions.
-- Password reset request and confirmation flow.
-- Dashboard metrics, recent participants, failures and alert acknowledgement.
-- Participant search, status/track filters, detail history, export and anonymisation.
-- Assessment version clone, draft edit and publish controls.
-- Question, track timing, free-report and paid-report editors.
-- Stage content and media uploads.
-- Branding draft, preview and publish workflow.
-- Reports: unlock, lock, revoke, rotate/resend and PDF regeneration.
-- Payments and Stripe webhook status records.
-- Email templates, queue, retries, provider test and administrator alerts.
-- Affiliates, attribution, analytics funnel/drop-off, SEO/AEO/GEO, settings, administrators and audit logs.
+Automated integration tests cover:
 
-## Client testing status
+- administrator authentication and permissions;
+- four configured assessment tracks;
+- 50 questions and 10 sections;
+- secure session creation, autosave and resume;
+- completion, scoring, Lite Report and Full Report protection;
+- PDF generation and secure access;
+- branding draft/publish;
+- transactional email queueing and selected-template testing;
+- dashboard graphs and global search;
+- feedback creation, timeline, search, completion and client emails;
+- audit history.
 
-Client testing may proceed on the live site now. Use Stripe only after test credentials, test Price IDs and the webhook signing secret are configured. The previously exposed SMTP2GO key must be revoked and replaced through the protected Settings screen or environment file before final delivery testing.
+## Remaining external acceptance
 
-The remaining acceptance work is operational rather than a claim that every external integration is already complete:
+Before final operational sign-off:
 
-- deploy and visually verify the final polish branch after CI passes;
-- rotate SMTP2GO credentials and confirm a delivered test message;
-- configure Stripe test mode and verify signed webhook processing and refund events;
+- rotate the previously exposed SMTP2GO credential and send a real selected-template test;
+- configure the repository-scoped GitHub Issues token and submit one harmless test feedback item;
+- confirm that the GitHub issue is created and its URL appears in the feedback register;
+- move the test item through clarification, in progress, ready for review and done, confirming the expected emails;
+- configure Stripe test credentials, four Price IDs and the signed webhook secret;
+- complete one Stripe test purchase and refund;
 - complete all four assessment tracks and review scoring, Lite/Full reports and PDFs;
-- test secure resume, password reset, privacy export/anonymisation and retention;
-- run the reboot readiness audit and record its output;
+- run `deploy/final-production-audit.sh` and retain its output;
 - merge PR #5 only after client acceptance.
 
 ## Safe deployment rule
