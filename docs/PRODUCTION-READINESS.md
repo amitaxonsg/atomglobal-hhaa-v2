@@ -1,168 +1,193 @@
-# Head–Heart Alignment production-readiness programme
+# Head–Heart Alignment production-readiness status
 
-This document describes the implementation on branch `production-readiness-20260719` and the acceptance gates required before it is merged or deployed.
+Updated **19 July 2026** for branch `production-readiness-20260719` and draft PR #5.
 
-The existing live static frontend must remain untouched until staging has passed every mandatory gate below.
+## Current status
 
-## Delivery principles
+| Area | Status |
+|---|---|
+| Live public site | Working frontend preview |
+| Live `/admin` | **Mock/preview mode**, not MySQL authentication |
+| Production branch | `production-readiness-20260719` |
+| Verified CI commit | `b95afa14560a262708163230c234613be9866aa9` |
+| Frontend tests/build | **Passed** |
+| PHP lint/tests | **Passed** |
+| MySQL migrations/seed/integration | **Passed** |
+| PR #5 | Open, mergeable, still draft |
+| VPS backend deployment | Not started |
+| Production database | Not connected |
+| Five-minute Git timer | Must remain disabled |
 
-- Self-hosted on the Atom Global VPS using Nginx, PHP 8.2+, MySQL/MariaDB and Node 22 for builds.
-- No runtime dependency on Netlify.
-- Git contains source and non-secret defaults only. Production credentials live in `/etc/head-heart-alignment/app.env` or encrypted settings.
-- All database changes use ordered migrations and a pre-migration database backup.
-- Participant sessions, reports and payment unlocks are server-authoritative.
-- Published assessment versions are immutable; changes are made by cloning a draft.
-- The five-minute Git deployment timer remains disabled. Production deployment is deliberate and manual.
+The screenshot showing `preview@atomglobal.com` and **Enter preview CMS** confirms that the currently deployed frontend was built with `VITE_API_MODE=mock`. It is not yet authenticating against PHP/MySQL.
 
-## Phase A — staging infrastructure and deployment safety
+## CI evidence
 
-Implemented in this branch:
+GitHub Actions run **#88** completed successfully after correcting the legacy seed migration so it can run safely alongside the production-readiness migration.
 
-- MySQL schema extensions for branding revisions, track timing, alerts, notification events, retention, integration tests and report delivery.
-- Node 22, PHP 8.2 and MySQL CI checks.
-- `deploy/phase-a-staging.sh` for prerequisites, protected environment creation, build checks, database backup, migrations, seed and tests without switching production.
-- Atomic `deploy/update-vps.sh` with database backup, Composer/npm validation, migration, versioned release, health check and rollback.
-- Hardened Nginx example for `/api`, persistent media, CSP, rate limits and no-cache HTML.
+The successful database job now verifies:
 
-Acceptance gate:
+- ordered MySQL migrations;
+- seed data;
+- required schema tables;
+- four assessment tracks;
+- assessment settings and questions;
+- email templates and content stages;
+- PHP/MySQL integration flow;
+- secure participant session, resume, completion and report generation;
+- administrator authentication and branding persistence.
 
-- [ ] Separate staging database and restricted database user created.
-- [ ] `/etc/head-heart-alignment/app.env` completed with test-only Stripe and email credentials.
-- [ ] Phase A script passes without changing the current production symlink.
-- [ ] `/api/health` returns `status: ok` on staging.
-- [ ] Database backup can be restored to a fresh empty database.
+CI proves the code works against a clean MySQL 8 database. It does **not** prove the VPS environment, credentials, SMTP2GO, Stripe, DNS, storage permissions or rollback procedure are ready.
 
-## Phase B — secure administration
+## Completed implementation
 
-Implemented in this branch:
+### Phase A — infrastructure and deployment safety
 
-- Real PHP session login, logout and session restoration.
-- Secure HttpOnly/SameSite cookies, CSRF on state-changing admin requests and login rate limiting.
-- Owner, administrator, editor, finance and viewer roles with permission checks.
-- Admin user creation/update, session-version invalidation and Argon2id password hashing.
-- Audit records for login and administration changes.
-- React administration shell connected to production APIs.
+- [x] Ordered MySQL migrations.
+- [x] Idempotent seed data.
+- [x] Frontend, PHP and MySQL CI.
+- [x] Protected external environment-file design.
+- [x] Pre-migration database backup in deployment scripts.
+- [x] Versioned releases and atomic symlink switch.
+- [x] Automatic code rollback when deployment health checks fail.
+- [x] Persistent media/report storage outside release folders.
+- [x] Cron definitions for email, reminders, PDFs and retention.
 
-Acceptance gate:
+### Phase B — secure administration
 
-- [ ] Create first owner interactively; no password appears in shell history.
-- [ ] Test every role against allowed and forbidden endpoints.
-- [ ] Test login lockout, logout, expired session and CSRF rejection.
-- [ ] Add and test password-reset delivery before launch.
-- [ ] Decide whether two-factor authentication is mandatory for owner/administrator roles.
+- [x] Real PHP login/logout/session restoration.
+- [x] Secure HttpOnly/SameSite cookies.
+- [x] CSRF validation on state-changing admin APIs.
+- [x] Login rate limiting and temporary lockout.
+- [x] Owner, administrator, editor, finance and viewer permissions.
+- [x] Argon2id password hashing.
+- [x] Administrator management and session invalidation.
+- [x] Password-reset token foundation.
+- [x] Login and administration audit records.
 
-## Phase C — participants, assessment sessions and CMS
+### Phase C — participants and assessments
 
-Implemented in this branch:
+- [x] Participant identity and consent records.
+- [x] Server-side autosave to MySQL.
+- [x] Secure 256-bit resume tokens stored as hashes.
+- [x] Immutable assessment/question/scoring snapshots.
+- [x] Participant search, details, export and anonymisation.
+- [x] Assessment clone, draft, question editing and publishing.
+- [x] Exactly 50 active questions across ten sections required for publication.
+- [x] Track duration, labels and report-reading settings.
 
-- Participant registration, required privacy/transactional consent and optional marketing consent.
-- Secure 256-bit resume tokens stored only as hashes.
-- Server-side answer autosave and duplicate-safe answer upserts.
-- Immutable question/scoring snapshot per session.
-- UTM, first/last affiliate attribution and essential analytics events.
-- Participant search, detail, answers, reports, payments, email history, export and anonymisation.
-- Assessment clone, draft question editing, report-template editing and controlled publication requiring exactly 50 active questions across 10 sections.
-- CMS-managed track labels, durations, reading times and progress display settings.
+### Phase D — branding and CMS
 
-Acceptance gate:
+- [x] Shared participant/admin branding configuration.
+- [x] Logo, banner, stage image, email logo, report logo and favicon upload controls.
+- [x] Colour, font, radius and interface settings.
+- [x] Branding draft, preview, restore and publish workflow.
+- [x] Persistent media storage and upload validation.
+- [x] Compact admin typography and responsive layouts.
 
-- [ ] Complete all four 50-question tracks in staging and compare scores against preserved reference cases.
-- [ ] Resume links work, expire and become invalid when rotated.
-- [ ] Concurrent autosave does not lose or duplicate answers.
-- [ ] Published sessions remain linked to their original assessment version after a new version is published.
-- [ ] Privacy export contains all expected records; anonymisation removes direct identifiers without breaking financial/audit records.
+### Phase E — reports, Stripe and email
 
-## Phase D — branding, media and content
+- [x] Lite and Full report data separation.
+- [x] Secure report links and private PDF endpoint.
+- [x] Report lock, unlock, revoke, rotate, resend and regenerate.
+- [x] Stripe Checkout and signed webhook processing.
+- [x] Idempotent webhook-event records.
+- [x] Refund handling and paid-report relocking.
+- [x] SMTP2GO API and authenticated SMTP providers.
+- [x] Editable email templates and test-email queueing.
+- [x] Retry queue, delivery logs and failure notifications.
+- [x] Configurable abandoned-assessment reminders.
 
-Implemented in this branch:
+### Phase F — affiliates, analytics, privacy and operations
 
-- Central published branding configuration used by participant and admin interfaces.
-- Default Atom palette, Georgia headings and Arial/Helvetica body typography.
-- Draft, preview, restore-default and publish workflow.
-- Uploads for public logo, banner, stage images, email logo, report logo and favicon.
-- MIME/size validation, safe SVG checks and persistent media storage outside releases.
-- Stage headline, supporting text, alt text, focal point, overlay, active state and order.
-- Compact admin typography and responsive workspaces.
-- Latest transparent Atom Global wordmark remains the repository default.
+- [x] Affiliate codes, first/last attribution and UTM capture.
+- [x] Conversion, revenue and commission records.
+- [x] Funnel/drop-off analytics.
+- [x] Notification centre and admin alert recipients.
+- [x] SEO/AEO/GEO page settings.
+- [x] Audit, retention and privacy jobs.
+- [x] Database/storage/Stripe/email/cron health checks.
 
-Acceptance gate:
+## VPS deployment gate — must be completed next
 
-- [ ] Transparent logo verified on dark photograph, cream page, email and PDF.
-- [ ] Image uploads survive a versioned deployment and rollback.
-- [ ] Colour contrast reviewed for body text, controls, focus states and buttons.
-- [ ] Branding draft does not affect public pages until publish.
-- [ ] Restore-default and rollback procedures tested.
+### 1. Read-only server verification
 
-## Phase E — reports, payments and email automation
+- [ ] Confirm operating system, Nginx and PHP-FPM service names.
+- [ ] Confirm PHP CLI is 8.2 or newer and required extensions are present.
+- [ ] Confirm Node 22 and Composer 2.
+- [ ] Confirm `/srv/head-heart.atomglobal.com/source` is clean.
+- [ ] Confirm the deployment timer is disabled and inactive.
+- [ ] Record the current deployed commit and active release path.
+- [ ] Record disk space, memory and current website health.
 
-Implemented in this branch:
+### 2. Database and environment preparation
 
-- Immediate Lite Report and gated Full Report data.
-- Stripe Checkout with track price IDs and verified signed webhook processing.
-- Payment success, failure, abandonment and refund states.
-- Full report unlock only after verified webhook or authorised admin action.
-- Affiliate commission creation and voiding on refund.
-- Secure report link rotation, resend, revoke, lock/unlock and PDF regeneration.
-- Branded server-side PDF generation and private PDF delivery endpoint.
-- SMTP2GO API and SMTP delivery providers.
-- Editable email templates, test email, retryable queue, exponential backoff, suppression-ready logs and failure alerts.
-- Registration, resume, abandoned survey, completion, payment and report messages.
-- Three configurable abandonment reminder intervals.
+- [ ] Create a separate restricted MySQL database and user.
+- [ ] Store credentials only in `/etc/head-heart-alignment/app.env` with mode `0600`.
+- [ ] Configure `APP_ENV=staging` initially.
+- [ ] Configure `VITE_API_MODE=production` only for the staged backend build.
+- [ ] Generate a new application encryption key.
+- [ ] Confirm persistent storage ownership and write access.
+- [ ] Do not add real Stripe or SMTP secrets to Git.
 
-Acceptance gate:
+### 3. Phase A staging acceptance
 
-- [ ] SMTP2GO sender/domain authentication passes and test email is delivered.
-- [ ] Email rendering reviewed in major clients; unsubscribe wording added to optional marketing messages.
-- [ ] Stripe test checkout completes and only a verified webhook unlocks the report.
-- [ ] Duplicate webhooks are idempotent.
-- [ ] Failed, expired and refunded payment cases update reports and commissions correctly.
-- [ ] Lite and Full PDFs are visually reviewed and do not expose private storage paths.
-- [ ] Secure report links expire, rotate, revoke and resist guessing.
+- [ ] Pull branch `production-readiness-20260719` into a controlled staging checkout.
+- [ ] Run `deploy/phase-a-staging.sh` without changing the live symlink.
+- [ ] Confirm all migrations and seeds pass on the VPS database.
+- [ ] Confirm `/api/health` reports database, migrations and storage healthy.
+- [ ] Create the first owner account securely.
+- [ ] Confirm `/admin` displays a real login and no preview credentials.
+- [ ] Confirm participant registration, autosave, resume and completion use MySQL.
+- [ ] Confirm Lite Report and private PDF generation.
 
-## Phase F — marketing, analytics, security and operations
+### 4. External service acceptance
 
-Implemented in this branch:
+- [ ] Configure SMTP2GO staging credentials and authenticated sender.
+- [ ] Deliver and inspect a real test email.
+- [ ] Configure Stripe test keys, webhook secret and four test Price IDs.
+- [ ] Test payment success, cancellation, failure, duplicate webhook and refund.
+- [ ] Verify Full Report unlock happens only after a verified webhook.
+- [ ] Verify refund relocks the report and voids commission.
 
-- Affiliate links, UTM capture, first/last attribution, conversion and commission reporting.
-- Funnel events and abandoned-section reporting.
-- Admin alert recipients and notification centre.
-- SEO/AEO/GEO page settings, Open Graph and structured-data storage.
-- Audit log, retention policies, privacy processing and scheduled workers.
-- Health checks for database, migrations, storage, Stripe, email and cron heartbeat.
-- Daily retention and PDF jobs plus five-minute reminder/email worker.
+### 5. Production switch and rollback
 
-Acceptance gate:
+- [ ] Back up the existing live release.
+- [ ] Back up the production database immediately before migration.
+- [ ] Run the atomic deployment script.
+- [ ] Verify `/`, `/admin`, `/api/health`, registration, autosave, completion, email and Stripe.
+- [ ] Keep the previous release and SQL backup available.
+- [ ] Confirm the rollback command restores the former symlink and website.
+- [ ] Monitor PHP, Nginx, queue, email, payment and storage logs after launch.
 
-- [ ] Independent security review of authentication, session, upload, token and webhook handling.
-- [ ] Nginx CSP tested against Stripe and application assets without unsafe production exceptions.
-- [ ] Database user privileges restricted to the application database only.
-- [ ] Backups encrypted/off-server and restore drill completed.
-- [ ] Error logs, disk/storage alerts, failed webhook/email alerts and cron heartbeat monitored.
-- [ ] Retention periods approved by Atom Global and legal/privacy adviser.
-- [ ] Terms, privacy notice, refund policy and report disclaimer approved.
-- [ ] Load and concurrency tests completed.
-- [ ] Staging acceptance signed before production switch.
+## Go/no-go decision
 
-## Production activation sequence
+### Code status: **GO for VPS staging**
 
-1. Freeze content and scoring changes.
-2. Back up the current live release and production database.
-3. Pull the approved merge commit to the VPS source directory.
-4. Configure the protected production environment file.
-5. Run `deploy/phase-a-staging.sh` against staging first.
-6. Execute full acceptance tests.
-7. Run `deploy/update-vps.sh` for an atomic production release.
-8. Confirm `/`, `/admin`, `/api/health`, registration, autosave, completion, email and Stripe webhook.
-9. Keep the prior release and database backup available for rollback.
-10. Monitor logs, queue, payments, email and storage closely after launch.
+The repository code, frontend build, PHP tests and clean MySQL integration tests are green.
 
-## Not acceptable as proof of production readiness
+### Production status: **NO-GO until VPS staging passes**
 
-- A successful frontend build alone.
-- The admin pages loading with mock data.
-- Stripe redirecting without a verified webhook test.
-- An email entering the queue without confirmed provider delivery.
-- A database migration succeeding without restore testing.
-- A single happy-path assessment completion.
+Do not merge PR #5 or replace the live release merely because CI is green. The live server still needs environment validation, a restricted database, real owner authentication, external-service tests and a rollback drill.
 
-Production readiness requires CI, staging, security, integration and rollback evidence—not only source-code completion.
+## Safe activation sequence
+
+1. Run a read-only VPS audit.
+2. Back up the current source/release configuration.
+3. Prepare a separate MySQL database and protected environment file.
+4. Pull the production-readiness branch into staging.
+5. Run `deploy/phase-a-staging.sh`.
+6. Complete local PHP/MySQL acceptance.
+7. Test SMTP2GO and Stripe in test mode.
+8. Approve the production switch.
+9. Merge PR #5 to `main`.
+10. Run the atomic production deployment with rollback protection.
+11. Verify and monitor.
+
+## Important rules
+
+- Never edit the active release directory.
+- Never store secrets in Git or browser JavaScript.
+- Never run destructive MySQL commands without a fresh backup.
+- Never enable the five-minute deployment timer for this release.
+- Never call the preview admin proof that MySQL is connected.
+- Never remove the previous working release until the new release has passed verification.
