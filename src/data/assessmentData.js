@@ -2152,7 +2152,7 @@ var assessmentTracks = {
     hasLeadershipImpact: false,
     hasCultureFit: false,
     priceLabel: "$4.99",
-    stripePaymentLink: "https://buy.stripe.com/REPLACE_WITH_YOUR_PERSONAL_LINK"
+    stripePaymentLink: null
   },
   newjoiner: {
     key: "newjoiner",
@@ -2168,7 +2168,7 @@ var assessmentTracks = {
     leadershipImpactLabel: "How You're Coming Across",
     cultureFitLabel: "Culture Fit Reflection",
     priceLabel: "$19",
-    stripePaymentLink: "https://buy.stripe.com/REPLACE_WITH_YOUR_NEWJOINER_LINK"
+    stripePaymentLink: null
   },
   manager: {
     key: "manager",
@@ -2184,7 +2184,7 @@ var assessmentTracks = {
     leadershipImpactLabel: "Leadership Impact",
     cultureFitLabel: "Culture Fit Reflection",
     priceLabel: "$29",
-    stripePaymentLink: "https://buy.stripe.com/REPLACE_WITH_YOUR_MANAGER_LINK"
+    stripePaymentLink: null
   },
   executive: {
     key: "executive",
@@ -2200,7 +2200,7 @@ var assessmentTracks = {
     leadershipImpactLabel: "Leadership Impact",
     cultureFitLabel: "Culture Fit Reflection",
     priceLabel: "$99",
-    stripePaymentLink: "https://buy.stripe.com/REPLACE_WITH_YOUR_EXECUTIVE_LINK"
+    stripePaymentLink: null
   }
 };
 Object.values(assessmentTracks).forEach(e => {

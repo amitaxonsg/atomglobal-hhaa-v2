@@ -1,0 +1,2 @@
+# Run the application queue and reminder scheduler every five minutes.
+*/5 * * * * www-data /usr/bin/php /var/www/head-heart.atomglobal.com/current/backend/bin/cron.php >> /var/log/head-heart-cron.log 2>&1
