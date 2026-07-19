@@ -7,6 +7,7 @@ import "./styles.css";
 import "./brand-overrides.css";
 import "./theme-runtime.css";
 import "./admin-production.css";
+import "./admin-extended.css";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
