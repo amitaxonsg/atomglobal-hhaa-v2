@@ -17,9 +17,13 @@ function expectQuestionnaire(bool $condition, string $message): void
 
 $configuration = $container['assessmentExperience']->publicConfiguration();
 expectQuestionnaire(count($configuration['tracks'] ?? []) === 4, 'Questionnaire experience does not expose four tracks.');
+expectQuestionnaire(($configuration['landing']['title'] ?? '') === 'Head–Heart Alignment', 'Latest questionnaire landing title is missing.');
+expectQuestionnaire(str_contains((string) ($configuration['landing']['primaryCopy'] ?? ''), 'two votes'), 'Latest questionnaire landing copy is missing.');
 
 $track = $db->fetch('SELECT id, track_key FROM assessment_tracks WHERE track_key = ? LIMIT 1', ['personal']);
 expectQuestionnaire((bool) $track, 'Personal track is missing.');
+$managerTrack = $db->fetch('SELECT id, track_key FROM assessment_tracks WHERE track_key = ? LIMIT 1', ['manager']);
+expectQuestionnaire((bool) $managerTrack, 'Manager track is missing.');
 
 $ownerRole = $db->fetch('SELECT id FROM roles WHERE role_key = ?', ['owner']);
 expectQuestionnaire((bool) $ownerRole, 'Owner role is missing.');
@@ -28,6 +32,17 @@ $ownerId = $owner ? (int) $owner['id'] : $db->insert(
     'INSERT INTO admin_users (role_id, email, display_name, password_hash, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, NOW(), NOW())',
     [$ownerRole['id'], 'questionnaire-owner@example.test', 'Questionnaire Owner', password_hash('Questionnaire-Test-Password-2026!', PASSWORD_ARGON2ID)]
 );
+
+$savedLanding = $container['assessmentExperience']->saveLanding([
+    'title' => 'Head–Heart Alignment',
+    'primaryCopy' => 'Every choice you make is cast by two votes: what you feel and what you reason.',
+    'secondaryCopy' => 'Answer 50 statements across 10 areas and choose the version that fits you.',
+    'cardTitlePrefix' => 'Head-Heart Alignment:',
+    'showBrandName' => true,
+], $ownerId);
+expectQuestionnaire($savedLanding['cardTitlePrefix'] === 'Head-Heart Alignment:', 'Latest landing card prefix was not saved.');
+$configuration = $container['assessmentExperience']->publicConfiguration();
+expectQuestionnaire(($configuration['landing']['showBrandName'] ?? false) === true, 'Latest landing logo setting was not returned publicly.');
 
 $intake = [
     'whoLabel' => 'Which best describes your current situation? *',
@@ -40,9 +55,11 @@ $intake = [
     'whyOptions' => ['Self-understanding', 'Curiosity'],
     'howLabel' => 'How would you describe this current chapter of your life? *',
     'howOptions' => ['Building & establishing myself', 'Reflecting & reassessing'],
+    'hasCompanyFields' => false,
 ];
 
 $savedExperience = $container['assessmentExperience']->save((int) $track['id'], [
+    'tagline' => 'For anyone who wants to understand how they lead their own life.',
     'introBody' => 'Every choice you make is cast by two votes: what you feel and what you reason.',
     'introOffer' => 'Take the full 50-question assessment free and get your Lite Report instantly.',
     'heartLabel' => 'Heart',
@@ -55,6 +72,41 @@ $savedExperience = $container['assessmentExperience']->save((int) $track['id'], 
 ], $ownerId);
 expectQuestionnaire($savedExperience['allowNotApplicable'] === true, 'N/A setting was not saved.');
 expectQuestionnaire(($savedExperience['intake']['whereOptions'][1] ?? '') === 'Philippines', 'CMS intake options were not saved.');
+expectQuestionnaire(str_starts_with($savedExperience['tagline'], 'For anyone'), 'Track card description was not saved.');
+
+$workIntake = [
+    'whoLabel' => 'Which best describes you? *',
+    'whoOptions' => ['Individual Contributor', 'People Manager', 'Senior Executive / Leadership'],
+    'whatLabel' => 'What industry do you work in? *',
+    'whatOptions' => ['Technology', 'Consulting'],
+    'whereLabel' => 'Where are you based? *',
+    'whereOptions' => ['Singapore', 'Philippines'],
+    'whyLabel' => 'What brings you to this assessment? *',
+    'whyOptions' => ['Personal growth / curiosity', 'Team or leadership development'],
+    'howLabel' => 'How long have you been in your current role? *',
+    'howOptions' => ['Less than 6 months', '3–5 years'],
+    'hasCompanyFields' => true,
+    'companyRoleTriggers' => ['People Manager', 'Senior Executive / Leadership'],
+    'departmentLabel' => 'Department *',
+    'departmentOptions' => ['Operations', 'HR / People'],
+    'levelLabel' => 'Level *',
+    'levelOptions' => ['Manager', 'Senior Manager / Director'],
+];
+$managerExperience = $container['assessmentExperience']->save((int) $managerTrack['id'], [
+    'tagline' => 'For people managers — how you lead your team, not just yourself.',
+    'introBody' => 'Every choice you make is cast by two votes.',
+    'introOffer' => 'Take the full assessment free.',
+    'heartLabel' => 'Heart',
+    'heartDescription' => 'Feeling and intuition',
+    'headLabel' => 'Head',
+    'headDescription' => 'Logic and analysis',
+    'intake' => $workIntake,
+    'allowNotApplicable' => true,
+    'allowAnswerNotes' => true,
+], $ownerId);
+expectQuestionnaire(($managerExperience['intake']['hasCompanyFields'] ?? false) === true, 'Conditional company fields were not saved.');
+expectQuestionnaire(($managerExperience['intake']['departmentOptions'][0] ?? '') === 'Operations', 'Department options were not saved.');
+expectQuestionnaire(($managerExperience['intake']['companyRoleTriggers'][1] ?? '') === 'Senior Executive / Leadership', 'Company role triggers were not saved.');
 
 $email = 'questionnaire-' . bin2hex(random_bytes(4)) . '@example.test';
 $participant = [
