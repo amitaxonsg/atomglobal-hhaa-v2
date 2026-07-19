@@ -19,6 +19,7 @@ $configuration = $container['assessmentExperience']->publicConfiguration();
 expectQuestionnaire(count($configuration['tracks'] ?? []) === 4, 'Questionnaire experience does not expose four tracks.');
 expectQuestionnaire(($configuration['landing']['title'] ?? '') === 'Head–Heart Alignment', 'Latest questionnaire landing title is missing.');
 expectQuestionnaire(str_contains((string) ($configuration['landing']['primaryCopy'] ?? ''), 'two votes'), 'Latest questionnaire landing copy is missing.');
+expectQuestionnaire(($configuration['liveTrackKey'] ?? '') === 'personal', 'Default live assessment is not Personal.');
 
 $track = $db->fetch('SELECT id, track_key FROM assessment_tracks WHERE track_key = ? LIMIT 1', ['personal']);
 expectQuestionnaire((bool) $track, 'Personal track is missing.');
@@ -107,6 +108,30 @@ $managerExperience = $container['assessmentExperience']->save((int) $managerTrac
 expectQuestionnaire(($managerExperience['intake']['hasCompanyFields'] ?? false) === true, 'Conditional company fields were not saved.');
 expectQuestionnaire(($managerExperience['intake']['departmentOptions'][0] ?? '') === 'Operations', 'Department options were not saved.');
 expectQuestionnaire(($managerExperience['intake']['companyRoleTriggers'][1] ?? '') === 'Senior Executive / Leadership', 'Company role triggers were not saved.');
+
+$liveManager = $container['assessmentExperience']->saveLiveTrack('manager', $ownerId);
+expectQuestionnaire(($liveManager['liveTrackKey'] ?? '') === 'manager', 'Manager could not be selected as the single live assessment.');
+$configuration = $container['assessmentExperience']->publicConfiguration();
+expectQuestionnaire(($configuration['liveTrackKey'] ?? '') === 'manager', 'Public configuration did not expose the selected live assessment.');
+
+$blockedParticipant = [
+    'name' => 'Blocked Personal Start',
+    'email' => 'blocked-personal@example.test',
+    'privacyConsent' => true,
+    'transactionalConsent' => true,
+];
+$blocked = false;
+try {
+    $container['surveys']->create(['trackKey' => 'personal', 'participant' => $blockedParticipant]);
+} catch (InvalidArgumentException $error) {
+    $blocked = str_contains($error->getMessage(), 'not currently open');
+}
+expectQuestionnaire($blocked, 'A non-live assessment incorrectly accepted a new participant.');
+
+$livePersonal = $container['assessmentExperience']->saveLiveTrack('personal', $ownerId);
+expectQuestionnaire(($livePersonal['liveTrackKey'] ?? '') === 'personal', 'Personal could not be restored as the single live assessment.');
+$audit = $db->fetch('SELECT COUNT(*) count FROM audit_logs WHERE action = ?', ['assessment.live_track_changed']);
+expectQuestionnaire((int) ($audit['count'] ?? 0) >= 2, 'Live assessment changes were not recorded in the audit log.');
 
 $email = 'questionnaire-' . bin2hex(random_bytes(4)) . '@example.test';
 $participant = [
