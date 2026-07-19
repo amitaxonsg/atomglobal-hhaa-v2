@@ -8,6 +8,7 @@ use AtomGlobal\Database;
 final class AssessmentExperienceService
 {
     private const LANDING_KEY = 'questionnaire.landing';
+    private const LIVE_TRACK_KEY = 'questionnaire.live_track';
 
     public function __construct(private Database $db, private SettingsService $settings) {}
 
@@ -27,7 +28,11 @@ final class AssessmentExperienceService
         foreach ($rows as $row) {
             $tracks[$row['trackKey']] = $this->normalise($row);
         }
-        return ['landing' => $this->landing(), 'tracks' => $tracks];
+        return [
+            'landing' => $this->landing(),
+            'liveTrackKey' => $this->liveTrackKey(),
+            'tracks' => $tracks,
+        ];
     }
 
     public function administrationConfiguration(): array
@@ -53,6 +58,69 @@ final class AssessmentExperienceService
             [$adminId, 'questionnaire_landing.saved', 'global_setting', self::LANDING_KEY, json_encode($landing, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]
         );
         return $landing;
+    }
+
+    public function saveLiveTrack(string $trackKey, int $adminId): array
+    {
+        $trackKey = strtolower(trim($trackKey));
+        $track = $this->db->fetch(
+            'SELECT t.id, t.track_key trackKey, t.name trackName, v.id versionId, v.version_number versionNumber, '
+            . 'COUNT(DISTINCT q.id) questionCount, COUNT(DISTINCT s.id) sectionCount '
+            . 'FROM assessment_tracks t '
+            . 'JOIN assessment_versions v ON v.track_id = t.id AND v.status = ? '
+            . 'LEFT JOIN questions q ON q.assessment_version_id = v.id AND q.is_active = 1 '
+            . 'LEFT JOIN assessment_sections s ON s.assessment_version_id = v.id AND s.is_active = 1 '
+            . 'WHERE t.track_key = ? AND t.is_active = 1 GROUP BY t.id, v.id LIMIT 1',
+            ['published', $trackKey]
+        );
+        if (!$track) throw new \InvalidArgumentException('Choose an active assessment with a published version.');
+        if ((int) ($track['questionCount'] ?? 0) !== 50 || (int) ($track['sectionCount'] ?? 0) !== 10) {
+            throw new \InvalidArgumentException('The live assessment must have exactly 50 active questions across 10 active sections.');
+        }
+
+        $before = $this->liveTrackKey();
+        $this->settings->set(self::LIVE_TRACK_KEY, $trackKey);
+        $this->db->execute(
+            'INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, before_json, after_json, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+            [
+                $adminId,
+                'assessment.live_track_changed',
+                'assessment_track',
+                (string) $track['id'],
+                json_encode(['liveTrackKey' => $before], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                json_encode([
+                    'liveTrackKey' => $trackKey,
+                    'trackName' => $track['trackName'],
+                    'versionId' => (int) $track['versionId'],
+                    'versionNumber' => $track['versionNumber'],
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]
+        );
+
+        return [
+            'liveTrackKey' => $trackKey,
+            'trackName' => $track['trackName'],
+            'versionId' => (int) $track['versionId'],
+            'versionNumber' => $track['versionNumber'],
+        ];
+    }
+
+    public function liveTrackKey(): string
+    {
+        $configured = strtolower(trim((string) $this->settings->get(self::LIVE_TRACK_KEY, 'personal')));
+        $available = $this->db->fetch(
+            'SELECT t.track_key FROM assessment_tracks t JOIN assessment_versions v ON v.track_id = t.id AND v.status = ? '
+            . 'WHERE t.track_key = ? AND t.is_active = 1 LIMIT 1',
+            ['published', $configured]
+        );
+        if ($available) return $configured;
+
+        $fallback = $this->db->fetch(
+            'SELECT t.track_key FROM assessment_tracks t JOIN assessment_versions v ON v.track_id = t.id AND v.status = ? '
+            . 'WHERE t.is_active = 1 ORDER BY t.display_order LIMIT 1',
+            ['published']
+        );
+        return (string) ($fallback['track_key'] ?? 'personal');
     }
 
     public function byTrackId(int $trackId): array
