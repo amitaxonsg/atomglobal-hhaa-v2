@@ -6,7 +6,7 @@ const sections = ["Dashboard", "Participants", "Assessments", "Content", "Email"
 
 function AdminLogin({ onLogin }) {
   return <main className="admin-login"><div className="admin-login__card">
-    <img src="/media/brand/atom-global-wordmark.png" alt="Atom Global Consulting" />
+    <img src="/media/brand/atom-global-wordmark.png?v=20260719-direct-1" alt="Atom Global Consulting" />
     <p className="eyebrow">Head–Heart Alignment</p><h1>Administration</h1>
     <label>Email<input type="email" defaultValue={isMockMode ? "preview@atomglobal.com" : ""} /></label>
     <label>Password<input type="password" defaultValue={isMockMode ? "preview-only" : ""} /></label>
@@ -48,6 +48,6 @@ export default function AdminApp() {
   const [data, setData] = React.useState(null);
   React.useEffect(() => { if (authenticated) api.adminDashboard().then(setData); }, [authenticated]);
   if (!authenticated) return <AdminLogin onLogin={() => setAuthenticated(true)} />;
-  return <div className="admin-shell"><aside className="admin-sidebar"><a href="/" className="admin-brand"><img src="/media/brand/atom-global-wordmark.png" alt="Atom Global Consulting"/><span>Assessment CMS</span></a><nav>{sections.map(section => <button className={section === active ? "active" : ""} onClick={() => setActive(section)} key={section}>{section}</button>)}</nav><div className="admin-user"><i>AO</i><span>Alex Morgan<small>Owner · Preview</small></span></div></aside><main className="admin-main">{active === "Dashboard" && data && <Dashboard data={data} />}{active === "Content" && <ContentManager />}{!['Dashboard','Content'].includes(active) && <PlaceholderPage section={active} />}</main></div>;
+  return <div className="admin-shell"><aside className="admin-sidebar"><a href="/" className="admin-brand"><img src="/media/brand/atom-global-wordmark.png?v=20260719-direct-1" alt="Atom Global Consulting"/><span>Assessment CMS</span></a><nav>{sections.map(section => <button className={section === active ? "active" : ""} onClick={() => setActive(section)} key={section}>{section}</button>)}</nav><div className="admin-user"><i>AO</i><span>Alex Morgan<small>Owner · Preview</small></span></div></aside><main className="admin-main">{active === "Dashboard" && data && <Dashboard data={data} />}{active === "Content" && <ContentManager />}{!['Dashboard','Content'].includes(active) && <PlaceholderPage section={active} />}</main></div>;
 }
 
