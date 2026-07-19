@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 use AtomGlobal\Database;
 use AtomGlobal\Env;
+use AtomGlobal\Mail\MailDeliveryService;
 use AtomGlobal\Mail\MailQueue;
 use AtomGlobal\Security\Crypto;
 use AtomGlobal\Services\AdminService;
 use AtomGlobal\Services\HealthService;
 use AtomGlobal\Services\MediaService;
+use AtomGlobal\Services\PdfService;
 use AtomGlobal\Services\PrivacyService;
 use AtomGlobal\Services\ReportService;
 use AtomGlobal\Services\ScoringService;
@@ -33,6 +35,8 @@ return [
     'surveys' => new SurveyService($db, new ScoringService(), $reports, $mailQueue, $config),
     'health' => new HealthService($db, $config, $settings),
     'mailQueue' => $mailQueue,
+    'mailDelivery' => new MailDeliveryService($db, $settings),
+    'pdf' => new PdfService($db, $settings, $config),
     'media' => new MediaService($db, $config),
     'admin' => new AdminService($db, $settings, $mailQueue),
 ];
