@@ -1,7 +1,8 @@
 SET NAMES utf8mb4;
 
 ALTER TABLE assessment_track_settings
-  ADD COLUMN intro_offer TEXT NULL AFTER introductory_note,
+  ADD COLUMN intro_headline VARCHAR(255) NULL AFTER introductory_note,
+  ADD COLUMN intro_offer TEXT NULL AFTER intro_headline,
   ADD COLUMN heart_label VARCHAR(100) NOT NULL DEFAULT 'Heart' AFTER intro_offer,
   ADD COLUMN heart_description VARCHAR(255) NOT NULL DEFAULT 'Feeling, intuition, connection, meaning' AFTER heart_label,
   ADD COLUMN head_label VARCHAR(100) NOT NULL DEFAULT 'Head' AFTER heart_description,
