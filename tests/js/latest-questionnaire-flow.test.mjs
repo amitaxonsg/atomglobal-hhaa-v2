@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const layout = readFileSync(new URL("../../src/components/assessment/AssessmentLayout.jsx", import.meta.url), "utf8");
+const experience = readFileSync(new URL("../../src/data/assessmentExperience.js", import.meta.url), "utf8");
 const app = readFileSync(new URL("../../src/components/AssessmentAppProduction.jsx", import.meta.url), "utf8");
 const admin = readFileSync(new URL("../../src/components/admin/QuestionnairePage.jsx", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../../backend/src/assessment-experience-routes.php", import.meta.url), "utf8");
@@ -11,7 +12,7 @@ const main = readFileSync(new URL("../../src/main.jsx", import.meta.url), "utf8"
 
 test("public questionnaire uses the latest single-column track selection", () => {
   assert.match(layout, /latest-questionnaire-shell/);
-  assert.match(layout, /Every choice you make is cast by two votes/);
+  assert.match(experience, /Every choice you make is cast by two votes/);
   assert.match(layout, /latest-track-card/);
   assert.match(layout, /Begin the free assessment/);
   assert.doesNotMatch(layout, /className="visual-panel"/);
