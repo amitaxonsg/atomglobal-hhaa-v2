@@ -38,6 +38,7 @@ $adminUser = $auth->attempt($email, $password);
 expect((bool) $adminUser, 'Admin authentication failed.');
 expect($adminUser['roleKey'] === 'owner', 'Owner role was not returned.');
 expect(in_array('branding.manage', $adminUser['permissions'], true), 'Owner permissions are incomplete.');
+expect((int) $auth->requirePermission('settings.manage')['id'] === $userId, 'Owner permission shortcut failed.');
 
 $configuration = $container['admin']->publicConfiguration();
 expect(($configuration['branding']['logoUrl'] ?? '') !== '', 'Published/default logo is missing.');
@@ -61,6 +62,10 @@ $created = $container['surveys']->create([
 ]);
 expect((int) $created['id'] > 0, 'Survey session was not created.');
 expect((bool) preg_match('/^[a-f0-9]{64}$/', $created['resumeToken']), 'Resume token is not 256-bit hexadecimal.');
+expect(count($created['assessment']['questions'] ?? []) === 50, 'Published questions were not returned to the participant frontend.');
+expect(count($created['assessment']['sections'] ?? []) === 10, 'Published sections were not returned to the participant frontend.');
+expect(count($created['assessment']['answerChoices'] ?? []) === 5, 'Published answer choices were not returned to the participant frontend.');
+expect(($created['assessment']['questions'][0]['text'] ?? '') !== '', 'Published question text is empty.');
 
 $answers = array_fill(0, 50, ['value' => 3, 'note' => '']);
 $answers[0] = ['value' => 5, 'note' => 'Integration note'];
@@ -74,6 +79,7 @@ expect((int) $saved['completionPercentage'] === 100, 'Autosave completion percen
 $resumed = $container['surveys']->resume($created['resumeToken']);
 expect((int) $resumed['answers'][0]['value'] === 5, 'Saved answer was not restored.');
 expect($resumed['participant']['email'] === $participant['email'], 'Participant was not restored.');
+expect(count($resumed['assessment']['questions'] ?? []) === 50, 'Resume did not restore the published question snapshot.');
 
 $completed = $container['surveys']->complete((int) $created['id'], [
     'resumeToken' => $created['resumeToken'],
@@ -87,10 +93,18 @@ $report = $container['reports']->byToken($completed['reportToken']);
 expect((bool) $report, 'Secure report could not be loaded.');
 expect($report['is_unlocked'] === false, 'New report should begin as Lite/locked.');
 expect($report['paid_report_json'] === null, 'Paid report content leaked before unlock.');
+expect($report['participantEmail'] === $participant['email'], 'Report participant metadata is missing.');
+expect($report['trackKey'] === 'personal', 'Report track metadata is missing.');
 
 $pdfPath = $container['pdf']->generate((int) $completed['reportId']);
 expect(is_file($pdfPath) && filesize($pdfPath) > 1000, 'PDF generation failed.');
-expect($container['reports']->pdfByToken($completed['reportToken']) === $pdfPath, 'Secure PDF lookup failed.');
+expect($container['reports']->pdfByToken($completed['reportToken']) === null, 'Locked report exposed a paid PDF.');
+
+$container['reports']->unlockBySession((int) $created['id'], 'integration_test');
+$unlocked = $container['reports']->byToken($completed['reportToken']);
+expect($unlocked['is_unlocked'] === true, 'Report did not unlock.');
+expect($unlocked['paid_report_json'] !== null, 'Unlocked paid report content is missing.');
+expect($container['reports']->pdfByToken($completed['reportToken']) === $pdfPath, 'Unlocked secure PDF lookup failed.');
 
 $draftBranding = $configuration['branding'];
 $draftBranding['cta'] = '#C9A15A';
@@ -102,8 +116,23 @@ expect($container['settings']->get('branding.cta') === '#C9A15A', 'Published bra
 $queued = $db->fetch('SELECT COUNT(*) count FROM email_queue WHERE recipient_email = ?', [$participant['email']]);
 expect((int) ($queued['count'] ?? 0) >= 4, 'Registration, resume, completion and report emails were not queued.');
 
+$templateTest = $container['adminInsights']->queueTemplateTest('participant_registration', 'template-test@example.test', ['participantName' => 'Template Test'], $userId);
+expect((int) $templateTest['queueId'] > 0, 'Selected email template test was not queued.');
+$testQueue = $db->fetch('SELECT template_key, recipient_email FROM email_queue WHERE id = ?', [$templateTest['queueId']]);
+expect($testQueue['template_key'] === 'participant_registration', 'Template test queued the wrong template.');
+expect($testQueue['recipient_email'] === 'template-test@example.test', 'Template test queued the wrong recipient.');
+
+$insights = $container['adminInsights']->dashboard();
+expect(count($insights['daily'] ?? []) === 14, 'Dashboard trend does not contain fourteen days.');
+expect(count($insights['funnel'] ?? []) === 4, 'Dashboard funnel is incomplete.');
+expect(count($insights['trackProgress'] ?? []) === 4, 'Dashboard track progress is incomplete.');
+
+$search = $container['adminInsights']->search('participant-integration', $adminUser['permissions']);
+expect(count($search) >= 1, 'Global admin search did not find the participant.');
+expect($search[0]['module'] === 'Participants', 'Global admin search returned the wrong module first.');
+
 $logs = $db->fetch('SELECT COUNT(*) count FROM audit_logs WHERE admin_user_id = ?', [$userId]);
-expect((int) ($logs['count'] ?? 0) >= 1, 'Audit log was not written.');
+expect((int) ($logs['count'] ?? 0) >= 2, 'Audit log did not record administration actions.');
 
 $auth->logout();
 echo "Production integration tests passed.\n";
