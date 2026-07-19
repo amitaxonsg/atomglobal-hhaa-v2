@@ -12,8 +12,8 @@ const defaults = {
     head: "#6C8FAE", accent: "#C9A15A", navy: "#14141C",
     headingFont: 'Georgia, "Times New Roman", serif', bodyFont: "Arial, Helvetica, sans-serif",
     baseFontSize: "16", cardRadius: "8", buttonRadius: "8",
-    logoUrl: transparentLogoUrl, emailLogoUrl: transparentLogoUrl,
-    reportLogoUrl: transparentLogoUrl, faviconUrl: "/icon-192.png", bannerUrl: "",
+    logoUrl: transparentLogoUrl, emailLogoUrl: legacyLogoUrl,
+    reportLogoUrl: legacyLogoUrl, faviconUrl: "/icon-192.png", bannerUrl: "",
   },
   stages: stageContent,
   tracks: {},
@@ -21,7 +21,7 @@ const defaults = {
 
 const BrandContext = React.createContext(defaults);
 
-function normaliseLogoUrl(value) {
+function normalisePublicLogoUrl(value) {
   return !value || value === legacyLogoUrl ? transparentLogoUrl : value;
 }
 
@@ -62,9 +62,7 @@ export function BrandProvider({ children }) {
         const nextBranding = {
           ...defaults.branding,
           ...remoteBranding,
-          logoUrl: normaliseLogoUrl(remoteBranding.logoUrl),
-          emailLogoUrl: normaliseLogoUrl(remoteBranding.emailLogoUrl),
-          reportLogoUrl: normaliseLogoUrl(remoteBranding.reportLogoUrl),
+          logoUrl: normalisePublicLogoUrl(remoteBranding.logoUrl),
         };
         const next = {
           branding: nextBranding,
@@ -88,7 +86,7 @@ export function useBranding() {
 
 export function BrandLogo({ className = "", alt = "Atom Global Consulting" }) {
   const { branding } = useBranding();
-  return <img className={className} src={normaliseLogoUrl(branding.logoUrl)} alt={alt} />;
+  return <img className={className} src={normalisePublicLogoUrl(branding.logoUrl)} alt={alt} />;
 }
 
 export { defaults as defaultConfiguration, transparentLogoUrl };
