@@ -2,17 +2,16 @@
 <?php
 declare(strict_types=1);
 
-if (($_ENV['APP_ENV'] ?? getenv('APP_ENV') ?: '') !== 'testing') {
-    fwrite(STDERR, "Integration tests may run only with APP_ENV=testing.\n");
-    exit(1);
-}
-
 session_name('hhaa_test_admin');
 session_start();
 $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
 $_SERVER['HTTP_USER_AGENT'] = 'HeadHeartIntegrationTest/1.0';
 
 $container = require dirname(__DIR__, 2) . '/backend/src/bootstrap.php';
+if (($container['config']['env'] ?? '') !== 'testing') {
+    fwrite(STDERR, "Integration tests may run only with APP_ENV=testing.\n");
+    exit(1);
+}
 $db = $container['db'];
 
 function expect(bool $condition, string $message): void
