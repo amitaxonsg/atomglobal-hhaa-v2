@@ -50,6 +50,7 @@ const mockAdmin = {
   seo: [],
   users: [],
   feedback: [],
+  feedbackConfig: { githubRepository: "amitaxonsg/atomglobal-hhaa-v2", githubTokenConfigured: false, clientEmail: "sunil.setpaul@atomglobal.com", internalEmail: "amit@axon.com.sg", supportEmail: "amit@axon.com.sg", issuePrefix: "Client feedback" },
 };
 
 function mockFeedbackDetail(item) {
@@ -112,9 +113,11 @@ const mock = {
     return { items, summary: { total: items.length, new: items.filter(item => item.status === "new").length, clarification: items.filter(item => item.status === "clarification_requested").length, active: items.filter(item => ["accepted", "in_progress"].includes(item.status)).length, review: items.filter(item => item.status === "ready_for_review").length, done: items.filter(item => item.status === "done").length } };
   },
   async adminFeedbackDetail(id) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); if (!item) throw new Error("Feedback record not found."); return mockFeedbackDetail(item); },
-  async submitFeedback(payload) { const item = { id: Date.now(), status: "new", githubSyncStatus: "not_configured", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...payload }; mockAdmin.feedback.unshift(item); return mockFeedbackDetail(item); },
+  async submitFeedback(payload) { const item = { id: Date.now(), status: "new", githubSyncStatus: mockAdmin.feedbackConfig.githubTokenConfigured ? "synced" : "not_configured", githubIssueNumber: mockAdmin.feedbackConfig.githubTokenConfigured ? 101 : null, githubIssueUrl: mockAdmin.feedbackConfig.githubTokenConfigured ? "https://github.com/amitaxonsg/atomglobal-hhaa-v2/issues/101" : null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), ...payload }; mockAdmin.feedback.unshift(item); return mockFeedbackDetail(item); },
   async updateFeedback(id, payload) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); Object.assign(item, payload, { updatedAt: new Date().toISOString() }); item.updates = [{ id: Date.now(), updateType: "status", status: item.status, message: payload.message || payload.resolution || "Status updated.", adminName: "Preview Owner", createdAt: item.updatedAt }, ...(item.updates || [])]; return mockFeedbackDetail(item); },
-  async syncFeedbackGitHub(id) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); item.githubSyncStatus = "not_configured"; return mockFeedbackDetail(item); },
+  async syncFeedbackGitHub(id) { const item = mockAdmin.feedback.find(row => Number(row.id) === Number(id)); item.githubSyncStatus = mockAdmin.feedbackConfig.githubTokenConfigured ? "synced" : "not_configured"; return mockFeedbackDetail(item); },
+  async feedbackConfiguration() { return mockAdmin.feedbackConfig; },
+  async saveFeedbackConfiguration(payload) { mockAdmin.feedbackConfig = { ...mockAdmin.feedbackConfig, ...payload, githubTokenConfigured: mockAdmin.feedbackConfig.githubTokenConfigured || Boolean(payload.githubToken) }; return { saved: true, githubTokenConfigured: mockAdmin.feedbackConfig.githubTokenConfigured }; },
 };
 
 const production = {
@@ -178,6 +181,8 @@ const production = {
   submitFeedback: payload => request("/admin/feedback", { method: "POST", body: JSON.stringify(payload) }),
   updateFeedback: (id, payload) => request(`/admin/feedback/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   syncFeedbackGitHub: id => request(`/admin/feedback/${id}/sync-github`, { method: "POST", body: "{}" }),
+  feedbackConfiguration: () => request("/admin/feedback-configuration"),
+  saveFeedbackConfiguration: payload => request("/admin/feedback-configuration", { method: "PUT", body: JSON.stringify(payload) }),
 };
 
 export const api = mode === "mock" ? mock : production;
