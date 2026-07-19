@@ -3,11 +3,11 @@ import { assessmentTracks } from "../data/assessmentData";
 import { buildRuntimeTrack } from "../data/runtimeAssessment";
 import { api, isMockMode } from "../api/client";
 import AdminApp from "./admin/AdminApp";
-import { ParticipantDetails, Questions, SelectVersion, StageShell, blankParticipant } from "./assessment/AssessmentLayout";
+import { ParticipantDetails, Questions, SelectVersion, StageShell, TrackIntroduction, blankParticipant } from "./assessment/AssessmentLayout";
 import ReportView from "./assessment/ReportView";
 
 function PaymentStatus({ cancelled = false }) {
-  return <StageShell stageKey="report" current={4}>
+  return <StageShell stageKey="report" current={5} total={5}>
     <p className="eyebrow">Secure checkout</p>
     <h1>{cancelled ? "Payment not completed" : "Payment received"}</h1>
     <p className="lead">{cancelled
@@ -27,8 +27,8 @@ function RemoteReport({ token }) {
     return () => { active = false; };
   }, [token]);
 
-  if (state.loading) return <StageShell stageKey="report" current={4}><p className="lead">Loading your private report…</p></StageShell>;
-  if (state.error) return <StageShell stageKey="report" current={4}><p className="eyebrow">Private report</p><h1>Link unavailable</h1><p className="lead">This link is invalid, expired or revoked. Request a refreshed link from Atom Global support.</p></StageShell>;
+  if (state.loading) return <StageShell stageKey="report" current={5} total={5}><p className="lead">Loading your private report…</p></StageShell>;
+  if (state.error) return <StageShell stageKey="report" current={5} total={5}><p className="eyebrow">Private report</p><h1>Link unavailable</h1><p className="lead">This link is invalid, expired or revoked. Request a refreshed link from Atom Global support.</p></StageShell>;
   return <ReportView payload={state.report} token={token} />;
 }
 
@@ -50,17 +50,19 @@ function attributionFromLocation() {
 function mockReport(track, answers, participant, session) {
   const totals = track.subscales.map(() => ({ score: 0, count: 0 }));
   let score = 0;
+  let scored = 0;
   track.allItems.forEach((item, index) => {
     const raw = answers[index]?.value;
-    if (!raw) return;
+    if (!Number.isInteger(raw) || raw < 1 || raw > 5) return;
     const value = item.d === "K" ? 6 - raw : raw;
     score += value;
+    scored += 1;
     totals[item.subIndex].score += value;
     totals[item.subIndex].count += 1;
   });
-  const total = Math.round(score / Math.max(1, answers.length) * 50);
+  const total = Math.round(score / Math.max(1, scored) * 50);
   const profile = track.getProfileFn(total);
-  const subscales = Object.fromEntries(track.subscales.map((item, index) => [item.code, Math.round(totals[index].score / Math.max(1, totals[index].count) * 5)]));
+  const subscales = Object.fromEntries(track.subscales.map((item, index) => [item.code, totals[index].count ? Math.round(totals[index].score / totals[index].count * 5) : 0]));
   return {
     id: 1,
     sessionId: session.id,
@@ -96,12 +98,22 @@ export default function AssessmentAppProduction() {
   const [section, setSection] = React.useState(0);
   const [session, setSession] = React.useState(null);
   const [report, setReport] = React.useState(null);
+  const [experience, setExperience] = React.useState({ tracks: {} });
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [saveState, setSaveState] = React.useState("");
 
   const fallbackTrack = trackKey ? assessmentTracks[trackKey] : null;
   const track = buildRuntimeTrack(fallbackTrack, session?.assessment);
+  const remoteExperience = trackKey ? experience.tracks?.[trackKey] || {} : {};
+
+  React.useEffect(() => {
+    let active = true;
+    api.publicAssessmentExperience()
+      .then(data => { if (active) setExperience(data || { tracks: {} }); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   React.useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("resume")) {
@@ -114,7 +126,7 @@ export default function AssessmentAppProduction() {
         if (!saved?.trackKey || saved.status === "completed") return;
         setSession(saved);
         setTrackKey(saved.trackKey);
-        setParticipant(saved.participant || blankParticipant);
+        setParticipant({ ...blankParticipant, ...(saved.participant || {}) });
         setAnswers(saved.answers || []);
         setSection(saved.section || 0);
         setStage("questions");
@@ -147,7 +159,7 @@ export default function AssessmentAppProduction() {
     setError("");
     setTrackKey(key);
     setAnswers(assessmentTracks[key].allItems.map(() => ({ value: null, note: "" })));
-    setStage("details");
+    setStage("intro");
   };
 
   const begin = async () => {
@@ -197,9 +209,13 @@ export default function AssessmentAppProduction() {
     window.history.replaceState({}, "", "/");
   };
 
+  const updateAnswer = (index, value) => setAnswers(current => current.map((answer, answerIndex) => answerIndex === index ? { ...answer, value } : answer));
+  const updateNote = (index, note) => setAnswers(current => current.map((answer, answerIndex) => answerIndex === index ? { ...answer, note } : answer));
+
   if (stage === "select") return <SelectVersion onSelect={selectTrack} />;
-  if (stage === "details") return <ParticipantDetails track={fallbackTrack} participant={participant} setParticipant={setParticipant} onBack={() => setStage("select")} onContinue={begin} error={error} busy={busy} />;
-  if (stage === "questions" && track) return <Questions track={track} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={(index, value) => setAnswers(current => current.map((answer, answerIndex) => answerIndex === index ? { ...answer, value } : answer))} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
+  if (stage === "intro" && fallbackTrack) return <TrackIntroduction track={fallbackTrack} remoteExperience={remoteExperience} onBack={() => setStage("select")} onContinue={() => setStage("details")} />;
+  if (stage === "details" && fallbackTrack) return <ParticipantDetails track={fallbackTrack} remoteExperience={remoteExperience} participant={participant} setParticipant={setParticipant} onBack={() => setStage("intro")} onContinue={begin} error={error} busy={busy} />;
+  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
   if (stage === "report" && report) return <ReportView payload={report} token={session?.reportToken} onReset={reset} />;
-  return <StageShell stageKey="report" current={4}><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
+  return <StageShell stageKey="report" current={5} total={5}><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
 }
