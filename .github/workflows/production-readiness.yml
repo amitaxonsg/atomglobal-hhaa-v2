@@ -82,10 +82,19 @@ jobs:
           sed -i 's#^DB_PASSWORD=.*#DB_PASSWORD=test-password#' backend/.env
           sed -i "s#^STORAGE_PATH=.*#STORAGE_PATH=${RUNNER_TEMP}/head-heart-storage#" backend/.env
           mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports" "${RUNNER_TEMP}/head-heart-storage/tmp"
-      - run: php backend/bin/migrate.php
-      - run: php backend/bin/seed.php
+      - name: Run database migrations
+        run: |
+          set -o pipefail
+          php backend/bin/migrate.php 2>&1 | tee database-migration.log
+      - name: Seed assessment and settings
+        run: |
+          set -o pipefail
+          php backend/bin/seed.php 2>&1 | tee database-seed.log
       - run: php tests/php/run.php
-      - run: php tests/php/integration.php
+      - name: Run MySQL integration acceptance tests
+        run: |
+          set -o pipefail
+          php tests/php/integration.php 2>&1 | tee database-integration.log
       - name: Verify critical tables and seed records
         env:
           MYSQL_PWD: test-password
@@ -99,4 +108,13 @@ jobs:
             SELECT COUNT(*) stages FROM content_stages;
             SELECT COUNT(*) permissions_count FROM permissions;
             SELECT COUNT(*) migrations_count FROM migrations;
-          "
+          " | tee database-verification.log
+      - name: Upload database diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-diagnostics-${{ github.run_id }}
+          path: |
+            database-*.log
+          if-no-files-found: ignore
+          retention-days: 7
