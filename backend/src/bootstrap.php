@@ -9,6 +9,7 @@ use AtomGlobal\Security\Crypto;
 use AtomGlobal\Services\AdminInsightsService;
 use AtomGlobal\Services\AdminService;
 use AtomGlobal\Services\AttributionService;
+use AtomGlobal\Services\FeedbackService;
 use AtomGlobal\Services\HealthService;
 use AtomGlobal\Services\MediaService;
 use AtomGlobal\Services\PasswordResetService;
@@ -48,4 +49,5 @@ return [
     'attribution' => new AttributionService($db, $config),
     'admin' => new AdminService($db, $settings, $mailQueue),
     'adminInsights' => new AdminInsightsService($db, $mailQueue, $config),
+    'feedback' => new FeedbackService($db, $settings, $mailQueue, $config),
 ];
