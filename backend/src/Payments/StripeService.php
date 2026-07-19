@@ -89,26 +89,51 @@ final class StripeService
         if (!$payment) throw new \RuntimeException('Stripe checkout payment record was not found.');
         if ($payment['status'] === 'paid') return;
 
-        $this->db->execute('UPDATE payments SET status = ?, stripe_payment_intent_id = ?, stripe_customer_id = ?, amount = ?, currency = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ?', ['paid', $checkout->payment_intent ?? null, $checkout->customer ?? null, (int) ($checkout->amount_total ?? 0), strtoupper((string) ($checkout->currency ?? 'USD')), $payment['id']]);
+        $amount = (int) ($checkout->amount_total ?? 0);
+        $currency = strtoupper((string) ($checkout->currency ?? 'USD'));
+        $this->db->execute('UPDATE payments SET status = ?, stripe_payment_intent_id = ?, stripe_customer_id = ?, amount = ?, currency = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ?', ['paid', $checkout->payment_intent ?? null, $checkout->customer ?? null, $amount, $currency, $payment['id']]);
         $this->reports->unlockBySession($sessionId, 'stripe_webhook');
+        $reportAccess = $this->rotateReportAccess($sessionId);
         $this->db->execute('UPDATE affiliate_attributions SET conversion_at = COALESCE(conversion_at, NOW()) WHERE survey_session_id = ?', [$sessionId]);
 
         if ($payment['affiliate_id']) {
             $affiliate = $this->db->fetch('SELECT * FROM affiliates WHERE id = ?', [$payment['affiliate_id']]);
             if ($affiliate) {
-                $amount = (int) ($checkout->amount_total ?? 0);
                 $commission = $affiliate['commission_type'] === 'fixed'
                     ? (int) round((float) $affiliate['commission_value'] * 100)
                     : (int) round($amount * ((float) $affiliate['commission_value'] / 100));
-                $this->db->execute('INSERT INTO affiliate_commissions (affiliate_id, payment_id, survey_session_id, amount_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE amount_minor = VALUES(amount_minor), currency = VALUES(currency), updated_at = NOW()', [$affiliate['id'], $payment['id'], $sessionId, max(0, $commission), strtoupper((string) ($checkout->currency ?? 'USD')), 'pending']);
+                $this->db->execute('INSERT INTO affiliate_commissions (affiliate_id, payment_id, survey_session_id, amount_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE amount_minor = VALUES(amount_minor), currency = VALUES(currency), updated_at = NOW()', [$affiliate['id'], $payment['id'], $sessionId, max(0, $commission), $currency, 'pending']);
             }
         }
 
         $participant = $this->db->fetch('SELECT p.name, p.email, t.name track_name FROM survey_sessions s JOIN participants p ON p.id = s.participant_id JOIN assessment_tracks t ON t.id = s.track_id WHERE s.id = ?', [$sessionId]);
         if ($participant) {
-            $this->enqueue('payment_successful', $participant['email'], ['participantName' => $participant['name'], 'trackName' => $participant['track_name'], 'amount' => (int) ($checkout->amount_total ?? 0), 'currency' => strtoupper((string) ($checkout->currency ?? 'USD'))]);
-            $this->enqueue('paid_report_ready', $participant['email'], ['participantName' => $participant['name'], 'trackName' => $participant['track_name']]);
+            $variables = [
+                'participantName' => $participant['name'],
+                'trackName' => $participant['track_name'],
+                'amount' => number_format($amount / 100, 2),
+                'currency' => $currency,
+                'reportUrl' => $reportAccess['reportUrl'],
+                'paidReportUrl' => $reportAccess['reportUrl'],
+            ];
+            $this->enqueue('payment_successful', $participant['email'], $variables);
+            $this->enqueue('paid_report_ready', $participant['email'], $variables);
         }
+    }
+
+    private function rotateReportAccess(int $sessionId): array
+    {
+        $report = $this->db->fetch('SELECT id FROM generated_reports WHERE survey_session_id = ? FOR UPDATE', [$sessionId]);
+        if (!$report) throw new \RuntimeException('Generated report was not found after payment.');
+        $token = bin2hex(random_bytes(32));
+        $days = max(1, (int) ($this->config['report_token_days'] ?? 30));
+        $this->db->execute('UPDATE secure_report_tokens SET revoked_at = NOW() WHERE generated_report_id = ? AND revoked_at IS NULL', [$report['id']]);
+        $this->db->execute('INSERT INTO secure_report_tokens (generated_report_id, token_hash, expires_at, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW())', [$report['id'], hash('sha256', $token), $days]);
+        $this->db->execute('UPDATE generated_reports SET secure_token_hash = ?, token_expires_at = DATE_ADD(NOW(), INTERVAL ? DAY), revoked_at = NULL, updated_at = NOW() WHERE id = ?', [hash('sha256', $token), $days, $report['id']]);
+        return [
+            'reportId' => (int) $report['id'],
+            'reportUrl' => rtrim((string) $this->config['url'], '/') . '/report/' . rawurlencode($token),
+        ];
     }
 
     private function failed(object $checkout, string $status): void
@@ -123,9 +148,11 @@ final class StripeService
         if ($paymentIntent === '') return;
         $payment = $this->db->fetch('SELECT * FROM payments WHERE stripe_payment_intent_id = ? FOR UPDATE', [$paymentIntent]);
         if (!$payment) return;
+        $report = $this->db->fetch('SELECT id, pdf_path FROM generated_reports WHERE survey_session_id = ? FOR UPDATE', [$payment['survey_session_id']]);
         $this->db->execute('UPDATE payments SET status = ?, refunded_at = NOW(), updated_at = NOW() WHERE id = ?', ['refunded', $payment['id']]);
-        $this->db->execute('UPDATE generated_reports SET is_unlocked = 0, unlock_reason = ?, unlocked_at = NULL, updated_at = NOW() WHERE survey_session_id = ?', ['stripe_refund', $payment['survey_session_id']]);
+        $this->db->execute('UPDATE generated_reports SET is_unlocked = 0, unlock_reason = ?, unlocked_at = NULL, pdf_path = NULL, pdf_generated_at = NULL, updated_at = NOW() WHERE survey_session_id = ?', ['stripe_refund', $payment['survey_session_id']]);
         $this->db->execute('UPDATE affiliate_commissions SET status = ?, adjustment_note = ?, updated_at = NOW() WHERE payment_id = ?', ['void', 'Payment refunded', $payment['id']]);
+        if (!empty($report['pdf_path']) && is_file($report['pdf_path'])) @unlink($report['pdf_path']);
     }
 
     private function enqueue(string $template, string $recipient, array $variables): void
