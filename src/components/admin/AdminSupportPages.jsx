@@ -79,7 +79,7 @@ function FeedbackDrawer({ item, canManage, onClose, onChanged }) {
       <div><dt>Submitted</dt><dd>{dateTime(item.createdAt)}</dd></div>
       <div><dt>Page</dt><dd>{item.pageUrl ? <a href={item.pageUrl} target="_blank" rel="noreferrer">Open page</a> : "—"}</dd></div>
       <div><dt>Attachment</dt><dd>{item.attachmentUrl ? <a href={item.attachmentUrl} target="_blank" rel="noreferrer">Open attachment</a> : "—"}</dd></div>
-      <div><dt>GitHub</dt><dd>{item.githubIssueUrl ? <a href={item.githubIssueUrl} target="_blank" rel="noreferrer">Issue #{item.githubIssueNumber}</a> : statusLabels[item.githubSyncStatus] || item.githubSyncStatus}</dd></div>
+      <div><dt>GitHub</dt><dd>{item.githubIssueUrl ? <a href={item.githubIssueUrl} target="_blank" rel="noreferrer">Issue #{item.githubIssueNumber}</a> : String(item.githubSyncStatus || "pending").replaceAll("_", " ")}</dd></div>
     </dl>
     {item.githubLastError && <Notice type="error">GitHub sync: {item.githubLastError}</Notice>}
     <Notice>{notice}</Notice>
@@ -102,13 +102,57 @@ function FeedbackDrawer({ item, canManage, onClose, onChanged }) {
   </div></div>;
 }
 
+function FeedbackConfiguration({ loader, onSaved }) {
+  const [form, setForm] = React.useState({ githubRepository: "amitaxonsg/atomglobal-hhaa-v2", githubToken: "", clientEmail: "sunil.setpaul@atomglobal.com", internalEmail: "amit@axon.com.sg", supportEmail: "amit@axon.com.sg", issuePrefix: "Client feedback" });
+  const [busy, setBusy] = React.useState(false);
+  const [notice, setNotice] = React.useState("");
+
+  React.useEffect(() => {
+    if (!loader.data) return;
+    setForm(current => ({ ...current, ...loader.data, githubToken: "" }));
+  }, [loader.data]);
+
+  const save = async () => {
+    setBusy(true);
+    setNotice("");
+    try {
+      const result = await api.saveFeedbackConfiguration(form);
+      setNotice(`Feedback routing saved. GitHub token ${result.githubTokenConfigured ? "is configured" : "is still missing"}.`);
+      setForm(current => ({ ...current, githubToken: "" }));
+      await loader.refresh();
+      onSaved(loader.data?.clientEmail || form.clientEmail);
+    } catch (error) {
+      setNotice(error.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <section className="admin-card editor-form feedback-configuration">
+    <div className="card-heading"><div><h2>GitHub and email routing</h2><small>Owner/administrator only</small></div><span className={`status ${loader.data?.githubTokenConfigured ? "status--sent" : "status--retry"}`}>{loader.data?.githubTokenConfigured ? "GitHub connected" : "Token required"}</span></div>
+    <Notice>{notice}</Notice><Notice type="error">{loader.error}</Notice>
+    <div className="form-grid">
+      <label>GitHub repository<input value={form.githubRepository} onChange={event => setForm(current => ({ ...current, githubRepository: event.target.value }))} placeholder="owner/repository" /></label>
+      <label>Issue title prefix<input value={form.issuePrefix} onChange={event => setForm(current => ({ ...current, issuePrefix: event.target.value }))} /></label>
+      <label>Client update email<input type="email" value={form.clientEmail} onChange={event => setForm(current => ({ ...current, clientEmail: event.target.value }))} /></label>
+      <label>Internal notification email<input type="email" value={form.internalEmail} onChange={event => setForm(current => ({ ...current, internalEmail: event.target.value }))} /></label>
+      <label>Clarification/support email<input type="email" value={form.supportEmail} onChange={event => setForm(current => ({ ...current, supportEmail: event.target.value }))} /></label>
+      <label>New fine-grained GitHub token<input type="password" autoComplete="new-password" value={form.githubToken} onChange={event => setForm(current => ({ ...current, githubToken: event.target.value }))} placeholder={loader.data?.githubTokenConfigured ? "Leave blank to keep current token" : "Repository Issues: read and write"} /></label>
+    </div>
+    <p className="hint">Create a fine-grained token restricted to this repository with Issues read/write only. The token is encrypted in MariaDB and is never returned to the browser. Leaving the token blank keeps the current value.</p>
+    <button className="button button--primary" disabled={busy || loader.loading} onClick={save}>{busy ? "Saving…" : "Save feedback routing"}</button>
+  </section>;
+}
+
 export function FeedbackPage({ initialSearch = "", initialId = null, permissions = [], user }) {
+  const canManage = permissions.includes("*") || permissions.includes("feedback.manage");
   const [query, setQuery] = React.useState({ search: initialSearch || "", status: "", priority: "", limit: 250 });
   const loader = useLoader(() => api.adminFeedback(query), [query.search, query.status, query.priority]);
+  const configuration = useLoader(() => canManage ? api.feedbackConfiguration() : Promise.resolve(null), [canManage]);
   const [selected, setSelected] = React.useState(null);
   const [form, setForm] = React.useState({
-    submitterName: user?.displayName || "",
-    submitterEmail: user?.email || "sunil.setpaul@atomglobal.com",
+    submitterName: user?.displayName || "Sunil Setpaul",
+    submitterEmail: "sunil.setpaul@atomglobal.com",
     feedbackType: "improvement",
     moduleName: "General",
     priority: "normal",
@@ -120,9 +164,11 @@ export function FeedbackPage({ initialSearch = "", initialId = null, permissions
   });
   const [notice, setNotice] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const canManage = permissions.includes("*") || permissions.includes("feedback.manage");
 
   React.useEffect(() => setQuery(current => ({ ...current, search: initialSearch || "" })), [initialSearch]);
+  React.useEffect(() => {
+    if (configuration.data?.clientEmail) setForm(current => ({ ...current, submitterEmail: configuration.data.clientEmail }));
+  }, [configuration.data?.clientEmail]);
   React.useEffect(() => {
     if (!initialId) return;
     api.adminFeedbackDetail(initialId).then(setSelected).catch(error => setNotice(error.message));
@@ -135,7 +181,7 @@ export function FeedbackPage({ initialSearch = "", initialId = null, permissions
     try {
       const created = await api.submitFeedback(form);
       setSelected(created);
-      setNotice(`Feedback #${created.id} submitted. An acknowledgement email is queued and the GitHub status is ${created.githubSyncStatus.replaceAll("_", " ")}.`);
+      setNotice(`Feedback #${created.id} submitted. An acknowledgement email is queued and the GitHub status is ${String(created.githubSyncStatus || "pending").replaceAll("_", " ")}.`);
       setForm(current => ({ ...current, title: "", details: "", expectedOutcome: "", attachmentUrl: "", pageUrl: window.location.href }));
       loader.refresh();
     } catch (error) {
@@ -179,6 +225,7 @@ export function FeedbackPage({ initialSearch = "", initialId = null, permissions
       </section>
     </div>
 
+    {canManage && <FeedbackConfiguration loader={configuration} onSaved={clientEmail => setForm(current => ({ ...current, submitterEmail: clientEmail }))} />}
     {selected && <FeedbackDrawer item={selected} canManage={canManage} onClose={() => setSelected(null)} onChanged={changed} />}
   </>;
 }
