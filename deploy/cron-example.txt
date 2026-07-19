@@ -1,2 +1,11 @@
-# Run the application queue and reminder scheduler every five minutes.
-*/5 * * * * www-data /usr/bin/php /var/www/head-heart.atomglobal.com/current/backend/bin/cron.php >> /var/log/head-heart-cron.log 2>&1
+# Head–Heart Alignment background processing.
+# Install as /etc/cron.d/head-heart-alignment and ensure /var/log/head-heart-alignment exists.
+
+# Every five minutes: queue abandoned reminders, deliver due email, update health heartbeat.
+*/5 * * * * www-data /usr/bin/php /var/www/head-heart.atomglobal.com/current/backend/bin/cron.php >> /var/log/head-heart-alignment/cron.log 2>&1
+
+# Daily at 02:35: apply configured privacy and data-retention policies.
+35 2 * * * www-data /usr/bin/php /var/www/head-heart.atomglobal.com/current/backend/bin/process-retention.php >> /var/log/head-heart-alignment/retention.log 2>&1
+
+# Daily at 03:10: generate PDFs that are missing for completed reports.
+10 3 * * * www-data /usr/bin/php /var/www/head-heart.atomglobal.com/current/backend/bin/generate-report-pdfs.php >> /var/log/head-heart-alignment/pdf.log 2>&1
