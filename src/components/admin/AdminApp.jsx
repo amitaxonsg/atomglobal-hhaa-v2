@@ -6,7 +6,7 @@ import { Spinner, Notice } from "./AdminShared";
 import AdminDashboardPage from "./AdminDashboardPage";
 import AdminParticipantsPage from "./AdminParticipantsPage";
 import { AssessmentsPage, BrandingPage, ContentPage } from "./AdminCorePages";
-import { AffiliatesPage, AnalyticsPage, AuditPage, EmailPage, PaymentsPage, ReportsPage, SeoPage, SettingsPage } from "./AdminOperationsPages";
+import { AffiliatesPage, AnalyticsPage, AuditPage, EmailPage, PaymentsPage, ReportsPage, SeoPage, SettingsPage } from "./AdminOperationsEnhanced";
 
 const sections = [
   { label: "Dashboard", group: "Overview", permission: "dashboard.view" },
@@ -154,9 +154,7 @@ export default function AdminApp() {
     }
     setSearchState(current => ({ ...current, loading: true, error: "" }));
     const timer = window.setTimeout(() => {
-      api.adminSearch(term)
-        .then(result => setSearchState({ loading: false, items: result.items || [], error: "" }))
-        .catch(error => setSearchState({ loading: false, items: [], error: error.message }));
+      api.adminSearch(term).then(result => setSearchState({ loading: false, items: result.items || [], error: "" })).catch(error => setSearchState({ loading: false, items: [], error: error.message }));
     }, 250);
     return () => window.clearTimeout(timer);
   }, [search, user]);
