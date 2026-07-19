@@ -8,15 +8,17 @@ const app = readFileSync(new URL("../../src/components/AssessmentAppProduction.j
 const admin = readFileSync(new URL("../../src/components/admin/QuestionnairePage.jsx", import.meta.url), "utf8");
 const routes = readFileSync(new URL("../../backend/src/assessment-experience-routes.php", import.meta.url), "utf8");
 const service = readFileSync(new URL("../../backend/src/Services/AssessmentExperienceService.php", import.meta.url), "utf8");
+const survey = readFileSync(new URL("../../backend/src/Services/SurveyService.php", import.meta.url), "utf8");
 const main = readFileSync(new URL("../../src/main.jsx", import.meta.url), "utf8");
 
-test("public questionnaire uses the latest single-column track selection", () => {
+test("public questionnaire keeps the latest process inside the approved split branding", () => {
   assert.match(layout, /latest-questionnaire-shell/);
+  assert.match(layout, /latest-visual-panel/);
+  assert.match(layout, /reflection-portrait\.png/);
   assert.match(experience, /Every choice you make is cast by two votes/);
   assert.match(layout, /latest-track-card/);
   assert.match(layout, /Begin the free assessment/);
-  assert.doesNotMatch(layout, /className="visual-panel"/);
-  assert.doesNotMatch(layout, /className="assessment-shell"/);
+  assert.doesNotMatch(layout, /Powered by/);
   assert.match(main, /questionnaire-latest\.css/);
 });
 
@@ -33,7 +35,7 @@ test("latest participant and question process remains wired to the real backend"
 });
 
 test("landing, track cards and intake are editable from the admin CMS", () => {
-  assert.match(admin, /Latest public landing page/);
+  assert.match(admin, /Public landing content/);
   assert.match(admin, /Track-card description/);
   assert.match(admin, /Department options/);
   assert.match(admin, /Level options/);
@@ -41,4 +43,20 @@ test("landing, track cards and intake are editable from the admin CMS", () => {
   assert.match(service, /questionnaire\.landing/);
   assert.match(service, /questionnaire_landing\.saved/);
   assert.match(service, /UPDATE assessment_tracks SET description/);
+});
+
+test("only one published assessment is live for new participants", () => {
+  assert.match(admin, /Live assessment/);
+  assert.match(admin, /only assessment open to new participants/);
+  assert.match(routes, /\/api\/admin\/assessment-experience\/live-track/);
+  assert.match(service, /questionnaire\.live_track/);
+  assert.match(service, /assessment\.live_track_changed/);
+  assert.match(layout, /experience\?\.liveTrackKey/);
+  assert.match(survey, /This assessment is not currently open for new participants/);
+});
+
+test("admin warns that material question changes affect interpretation and history", () => {
+  assert.match(admin, /Do not replace a question with a different question/);
+  assert.match(admin, /full meaning change can invalidate comparisons and report interpretation/);
+  assert.match(admin, /published versions are immutable/);
 });
