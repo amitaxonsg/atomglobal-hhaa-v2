@@ -7,7 +7,7 @@ import { ParticipantDetails, Questions, SelectVersion, StageShell, TrackIntroduc
 import ReportView from "./assessment/ReportView";
 
 function PaymentStatus({ cancelled = false }) {
-  return <StageShell stageKey="report" current={5} total={5}>
+  return <StageShell>
     <p className="eyebrow">Secure checkout</p>
     <h1>{cancelled ? "Payment not completed" : "Payment received"}</h1>
     <p className="lead">{cancelled
@@ -27,8 +27,8 @@ function RemoteReport({ token }) {
     return () => { active = false; };
   }, [token]);
 
-  if (state.loading) return <StageShell stageKey="report" current={5} total={5}><p className="lead">Loading your private report…</p></StageShell>;
-  if (state.error) return <StageShell stageKey="report" current={5} total={5}><p className="eyebrow">Private report</p><h1>Link unavailable</h1><p className="lead">This link is invalid, expired or revoked. Request a refreshed link from Atom Global support.</p></StageShell>;
+  if (state.loading) return <StageShell><p className="lead">Loading your private report…</p></StageShell>;
+  if (state.error) return <StageShell><p className="eyebrow">Private report</p><h1>Link unavailable</h1><p className="lead">This link is invalid, expired or revoked. Request a refreshed link from Atom Global support.</p></StageShell>;
   return <ReportView payload={state.report} token={token} />;
 }
 
@@ -98,7 +98,7 @@ export default function AssessmentAppProduction() {
   const [section, setSection] = React.useState(0);
   const [session, setSession] = React.useState(null);
   const [report, setReport] = React.useState(null);
-  const [experience, setExperience] = React.useState({ tracks: {} });
+  const [experience, setExperience] = React.useState({ landing: null, tracks: {} });
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [saveState, setSaveState] = React.useState("");
@@ -110,7 +110,7 @@ export default function AssessmentAppProduction() {
   React.useEffect(() => {
     let active = true;
     api.publicAssessmentExperience()
-      .then(data => { if (active) setExperience(data || { tracks: {} }); })
+      .then(data => { if (active) setExperience(data || { landing: null, tracks: {} }); })
       .catch(() => {});
     return () => { active = false; };
   }, []);
@@ -160,6 +160,7 @@ export default function AssessmentAppProduction() {
     setTrackKey(key);
     setAnswers(assessmentTracks[key].allItems.map(() => ({ value: null, note: "" })));
     setStage("intro");
+    window.scrollTo(0, 0);
   };
 
   const begin = async () => {
@@ -172,6 +173,7 @@ export default function AssessmentAppProduction() {
       setSession(created);
       setStage("questions");
       window.history.replaceState({}, "", "/assessment");
+      window.scrollTo(0, 0);
     } catch (beginError) {
       setError(beginError.message);
     } finally {
@@ -207,15 +209,16 @@ export default function AssessmentAppProduction() {
     setReport(null);
     setError("");
     window.history.replaceState({}, "", "/");
+    window.scrollTo(0, 0);
   };
 
   const updateAnswer = (index, value) => setAnswers(current => current.map((answer, answerIndex) => answerIndex === index ? { ...answer, value } : answer));
   const updateNote = (index, note) => setAnswers(current => current.map((answer, answerIndex) => answerIndex === index ? { ...answer, note } : answer));
 
-  if (stage === "select") return <SelectVersion onSelect={selectTrack} />;
+  if (stage === "select") return <SelectVersion experience={experience} onSelect={selectTrack} />;
   if (stage === "intro" && fallbackTrack) return <TrackIntroduction track={fallbackTrack} remoteExperience={remoteExperience} onBack={() => setStage("select")} onContinue={() => setStage("details")} />;
   if (stage === "details" && fallbackTrack) return <ParticipantDetails track={fallbackTrack} remoteExperience={remoteExperience} participant={participant} setParticipant={setParticipant} onBack={() => setStage("intro")} onContinue={begin} error={error} busy={busy} />;
   if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
   if (stage === "report" && report) return <ReportView payload={report} token={session?.reportToken} onReset={reset} />;
-  return <StageShell stageKey="report" current={5} total={5}><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
+  return <StageShell><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
 }
