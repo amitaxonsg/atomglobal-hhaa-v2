@@ -62,6 +62,7 @@ export function StageShell({ stageKey, current, total = 4, label, onBack, childr
       <div className="desktop-topbar"><button className="back-link" onClick={onBack} disabled={!onBack}><ArrowLeft /> Back</button><Progress current={current} total={total} label={label} /></div>
       <main className="screen-content">{children}</main>
       {actions && <footer className="action-bar">{actions}</footer>}
+      <div className="application-powered-by">Powered by <a href="https://axon.com.sg/" target="_blank" rel="noreferrer">Axon 1Pro</a></div>
     </section>
   </div>;
 }
