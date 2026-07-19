@@ -14,7 +14,7 @@ final class HealthService
         $checks = [];
         try {
             $checks['database'] = (int) ($this->db->fetch('SELECT 1 ok')['ok'] ?? 0) === 1;
-            $checks['migrations'] = (bool) $this->db->fetch('SELECT 1 ok FROM migrations WHERE migration = ? LIMIT 1', ['007_admin_alert_defaults.sql']);
+            $checks['migrations'] = (bool) $this->db->fetch('SELECT 1 ok FROM migrations WHERE migration = ? LIMIT 1', ['009_production_search_indexes.sql']);
         } catch (\Throwable) {
             $checks['database'] = false;
             $checks['migrations'] = false;
