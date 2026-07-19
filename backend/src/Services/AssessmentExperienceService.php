@@ -13,7 +13,7 @@ final class AssessmentExperienceService
     {
         $rows = $this->db->fetchAll(
             'SELECT t.id trackId, t.track_key trackKey, t.name trackName, t.price_minor priceMinor, t.currency, '
-            . 's.intro_headline introHeadline, s.introductory_note introBody, s.intro_offer introOffer, s.heart_label heartLabel, '
+            . 's.intro_headline introHeadline, s.intro_body introBody, s.intro_offer introOffer, s.heart_label heartLabel, '
             . 's.heart_description heartDescription, s.head_label headLabel, s.head_description headDescription, '
             . 's.intake_configuration_json intakeConfiguration, s.allow_not_applicable allowNotApplicable, '
             . 's.allow_answer_notes allowAnswerNotes '
@@ -32,7 +32,7 @@ final class AssessmentExperienceService
     {
         $row = $this->db->fetch(
             'SELECT t.id trackId, t.track_key trackKey, t.name trackName, t.price_minor priceMinor, t.currency, '
-            . 's.intro_headline introHeadline, s.introductory_note introBody, s.intro_offer introOffer, s.heart_label heartLabel, '
+            . 's.intro_headline introHeadline, s.intro_body introBody, s.intro_offer introOffer, s.heart_label heartLabel, '
             . 's.heart_description heartDescription, s.head_label headLabel, s.head_description headDescription, '
             . 's.intake_configuration_json intakeConfiguration, s.allow_not_applicable allowNotApplicable, '
             . 's.allow_answer_notes allowAnswerNotes '
@@ -64,9 +64,9 @@ final class AssessmentExperienceService
 
         $this->db->execute(
             'INSERT INTO assessment_track_settings '
-            . '(track_id, public_title, short_title, estimated_minutes_min, estimated_minutes_max, free_report_label, paid_report_label, question_count, section_count, show_remaining_time, show_question_count, show_section_count, show_autosave, introductory_note, intro_headline, intro_offer, heart_label, heart_description, head_label, head_description, intake_configuration_json, allow_not_applicable, allow_answer_notes, updated_at) '
+            . '(track_id, public_title, short_title, estimated_minutes_min, estimated_minutes_max, free_report_label, paid_report_label, question_count, section_count, show_remaining_time, show_question_count, show_section_count, show_autosave, intro_headline, intro_body, intro_offer, heart_label, heart_description, head_label, head_description, intake_configuration_json, allow_not_applicable, allow_answer_notes, updated_at) '
             . 'VALUES (?, ?, ?, 15, 15, ?, ?, 50, 10, 1, 1, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()) '
-            . 'ON DUPLICATE KEY UPDATE introductory_note = VALUES(introductory_note), intro_headline = VALUES(intro_headline), intro_offer = VALUES(intro_offer), '
+            . 'ON DUPLICATE KEY UPDATE intro_headline = VALUES(intro_headline), intro_body = VALUES(intro_body), intro_offer = VALUES(intro_offer), '
             . 'heart_label = VALUES(heart_label), heart_description = VALUES(heart_description), head_label = VALUES(head_label), '
             . 'head_description = VALUES(head_description), intake_configuration_json = VALUES(intake_configuration_json), '
             . 'allow_not_applicable = VALUES(allow_not_applicable), allow_answer_notes = VALUES(allow_answer_notes), updated_at = NOW()',
@@ -76,8 +76,8 @@ final class AssessmentExperienceService
                 $track['name'],
                 'Lite Report Free',
                 'Full Report',
-                $values['introBody'] ?: null,
                 $values['introHeadline'] ?: null,
+                $values['introBody'] ?: null,
                 $values['introOffer'] ?: null,
                 $values['heartLabel'],
                 $values['heartDescription'],
