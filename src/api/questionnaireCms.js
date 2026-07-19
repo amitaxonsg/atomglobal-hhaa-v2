@@ -3,6 +3,7 @@ import { landingDefaults } from "../data/assessmentExperience";
 const mode = import.meta.env.VITE_API_MODE || "mock";
 const baseUrl = import.meta.env.VITE_API_BASE_URL || "/api";
 let mockLanding = { ...landingDefaults };
+let mockLiveTrackKey = "personal";
 
 async function jsonRequest(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -26,7 +27,7 @@ async function csrfToken() {
 }
 
 export async function adminQuestionnaireConfiguration() {
-  if (mode === "mock") return { landing: mockLanding, tracks: {} };
+  if (mode === "mock") return { landing: mockLanding, liveTrackKey: mockLiveTrackKey, tracks: {} };
   return jsonRequest("/admin/assessment-experience");
 }
 
@@ -40,5 +41,18 @@ export async function saveQuestionnaireLanding(payload) {
     method: "PUT",
     headers: { "X-CSRF-Token": token },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function saveLiveAssessment(trackKey) {
+  if (mode === "mock") {
+    mockLiveTrackKey = trackKey;
+    return { liveTrackKey: trackKey };
+  }
+  const token = await csrfToken();
+  return jsonRequest("/admin/assessment-experience/live-track", {
+    method: "PUT",
+    headers: { "X-CSRF-Token": token },
+    body: JSON.stringify({ trackKey }),
   });
 }
