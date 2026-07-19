@@ -8,14 +8,32 @@ use AtomGlobal\Database;
 final class HealthService
 {
     public function __construct(private Database $db, private array $config, private SettingsService $settings) {}
+
     public function check(): array
     {
         $checks = [];
-        try { $checks['database'] = (int) $this->db->fetch('SELECT 1 ok')['ok'] === 1; } catch (\Throwable) { $checks['database'] = false; }
+        try {
+            $checks['database'] = (int) ($this->db->fetch('SELECT 1 ok')['ok'] ?? 0) === 1;
+            $checks['migrations'] = (bool) $this->db->fetch('SELECT 1 ok FROM migrations WHERE migration = ? LIMIT 1', ['003_email_templates_and_seo.sql']);
+        } catch (\Throwable) {
+            $checks['database'] = false;
+            $checks['migrations'] = false;
+        }
         $checks['storage'] = is_dir($this->config['storage']) && is_writable($this->config['storage']);
-        $checks['stripe'] = (bool) ($this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? ''));
-        $checks['email'] = (bool) ($_ENV['SMTP_HOST'] ?? $_ENV['SMTP2GO_API_KEY'] ?? false);
-        $cron = $this->settings->get('system.cron_last_run'); $checks['cron'] = $cron && strtotime((string) $cron) > time() - 900;
-        return ['status' => !in_array(false, [$checks['database'], $checks['storage']], true) ? 'ok' : 'degraded', 'checks' => $checks, 'timestamp' => gmdate(DATE_ATOM)];
+        $checks['stripe'] = (bool) $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? '');
+        $checks['stripeWebhook'] = (bool) $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? '');
+        $checks['email'] = (bool) (
+            $this->settings->get('email.smtp2go_api_key', $_ENV['SMTP2GO_API_KEY'] ?? '')
+            ?: $this->settings->get('email.smtp_host', $_ENV['SMTP_HOST'] ?? '')
+        );
+        $cron = $this->settings->get('system.cron_last_run');
+        $checks['cron'] = $cron && strtotime((string) $cron) > time() - 900;
+        $essential = [$checks['database'], $checks['migrations'], $checks['storage']];
+        return [
+            'status' => !in_array(false, $essential, true) ? 'ok' : 'degraded',
+            'checks' => $checks,
+            'timestamp' => gmdate(DATE_ATOM),
+            'environment' => $this->config['env'],
+        ];
     }
 }
