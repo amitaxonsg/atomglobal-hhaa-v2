@@ -120,11 +120,16 @@ final class SurveyService
         if (!$session) throw new \RuntimeException('Resume link is invalid or expired.', 404);
 
         $snapshot = json_decode($session['question_snapshot_json'], true, 512, JSON_THROW_ON_ERROR);
-        $answerRows = $this->db->fetchAll('SELECT question_position, answer_value, note FROM survey_answers WHERE survey_session_id = ? ORDER BY question_position', [$session['id']]);
+        $answerRows = $this->db->fetchAll('SELECT question_position, answer_value, is_not_applicable, note FROM survey_answers WHERE survey_session_id = ? ORDER BY question_position', [$session['id']]);
         $answers = array_fill(0, count($snapshot['questions'] ?? []), ['value' => null, 'note' => '']);
         foreach ($answerRows as $answer) {
             $index = (int) $answer['question_position'] - 1;
-            if (isset($answers[$index])) $answers[$index] = ['value' => (int) $answer['answer_value'], 'note' => $answer['note'] ?? ''];
+            if (isset($answers[$index])) {
+                $answers[$index] = [
+                    'value' => !empty($answer['is_not_applicable']) ? 'NA' : (int) $answer['answer_value'],
+                    'note' => $answer['note'] ?? '',
+                ];
+            }
         }
 
         $this->db->execute('UPDATE survey_sessions SET last_activity_at = NOW(), updated_at = NOW() WHERE id = ?', [$session['id']]);
@@ -184,7 +189,7 @@ final class SurveyService
 
             $snapshot = json_decode($session['question_snapshot_json'], true, 512, JSON_THROW_ON_ERROR);
             $score = $this->scoring->score($snapshot['questions'], $payload['answers'] ?? [], $snapshot['profiles']);
-            $answerSnapshot = $this->db->fetchAll('SELECT question_position, answer_value, note, answered_at FROM survey_answers WHERE survey_session_id = ? ORDER BY question_position', [$id]);
+            $answerSnapshot = $this->db->fetchAll('SELECT question_position, answer_value, is_not_applicable, note, answered_at FROM survey_answers WHERE survey_session_id = ? ORDER BY question_position', [$id]);
             $scoreId = $this->db->insert(
                 'INSERT INTO score_snapshots (survey_session_id, assessment_version_id, total_score, subscale_scores_json, profile_key, scoring_rules_json, answers_snapshot_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
                 [$id, $session['assessment_version_id'], $score['total'], json_encode($score['subscales']), $score['profile']['profile_key'], json_encode($snapshot['scoring']), json_encode($answerSnapshot)]
@@ -221,12 +226,16 @@ final class SurveyService
     private function persistAnswers(int $id, array $payload): void
     {
         foreach ($payload['answers'] ?? [] as $index => $answer) {
-            if (($answer['value'] ?? null) === null) continue;
-            $value = (int) $answer['value'];
-            if ($value < 1 || $value > 5) throw new \InvalidArgumentException('Answer values must be between 1 and 5.');
+            $raw = $answer['value'] ?? null;
+            if ($raw === null) continue;
+            $notApplicable = $raw === 'NA';
+            $value = $notApplicable ? null : (int) $raw;
+            if (!$notApplicable && ($value < 1 || $value > 5)) {
+                throw new \InvalidArgumentException('Answer values must be between 1 and 5, or marked not applicable.');
+            }
             $this->db->execute(
-                'INSERT INTO survey_answers (survey_session_id, question_position, answer_value, note, answered_at) VALUES (?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE answer_value = VALUES(answer_value), note = VALUES(note), answered_at = NOW()',
-                [$id, $index + 1, $value, mb_substr((string) ($answer['note'] ?? ''), 0, 2000)]
+                'INSERT INTO survey_answers (survey_session_id, question_position, answer_value, is_not_applicable, note, answered_at) VALUES (?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE answer_value = VALUES(answer_value), is_not_applicable = VALUES(is_not_applicable), note = VALUES(note), answered_at = NOW()',
+                [$id, $index + 1, $value, $notApplicable ? 1 : 0, mb_substr((string) ($answer['note'] ?? ''), 0, 2000)]
             );
         }
         $this->db->execute(
@@ -238,19 +247,19 @@ final class SurveyService
     private function versionSnapshot(int $versionId): array
     {
         $questions = $this->db->fetchAll(
-            'SELECT q.id, q.position, q.question_text, q.scoring_direction direction, s.code subscale_code, s.name subscale_name, s.display_order section_order FROM questions q JOIN assessment_sections s ON s.id = q.section_id WHERE q.assessment_version_id = ? AND q.is_active = 1 ORDER BY q.position',
+            'SELECT q.id, q.position, q.question_text, q.scoring_direction direction, s.code subscale_code, s.name subscale_name, s.description subscale_description, s.display_order section_order FROM questions q JOIN assessment_sections s ON s.id = q.section_id WHERE q.assessment_version_id = ? AND q.is_active = 1 ORDER BY q.position',
             [$versionId]
         );
         if (count($questions) !== 50) throw new \RuntimeException('The published assessment does not contain exactly 50 active questions.');
         $profiles = $this->db->fetchAll('SELECT profile_key, profile_name, min_score, max_score, free_content_json, paid_content_json FROM report_templates WHERE assessment_version_id = ? ORDER BY min_score', [$versionId]);
         $options = $this->db->fetchAll('SELECT option_value value, label, display_order FROM answer_options WHERE assessment_version_id = ? ORDER BY display_order', [$versionId]);
-        if (count($options) !== 5) throw new \RuntimeException('The published assessment does not contain exactly five answer choices.');
+        if (count($options) !== 5) throw new \RuntimeException('The published assessment does not contain exactly five scored answer choices.');
         return [
             'version_id' => $versionId,
             'questions' => $questions,
             'profiles' => $profiles,
             'options' => $options,
-            'scoring' => ['scale_min' => 1, 'scale_max' => 5, 'reverse_formula' => '6 - answer', 'total_formula' => 'round(mean * 50)', 'subscale_formula' => 'round(mean * 5)'],
+            'scoring' => ['scale_min' => 1, 'scale_max' => 5, 'reverse_formula' => '6 - answer', 'not_applicable' => 'excluded from scoring', 'total_formula' => 'round(mean * 50)', 'subscale_formula' => 'round(mean * 5)'],
         ];
     }
 
@@ -264,6 +273,7 @@ final class SurveyService
                 $sections[$code] = [
                     'code' => $code,
                     'name' => (string) $question['subscale_name'],
+                    'description' => (string) ($question['subscale_description'] ?? ''),
                     'order' => (int) $question['section_order'],
                 ];
             }
@@ -274,6 +284,7 @@ final class SurveyService
                 'direction' => (string) $question['direction'],
                 'subscaleCode' => $code,
                 'subscaleName' => (string) $question['subscale_name'],
+                'subscaleDescription' => (string) ($question['subscale_description'] ?? ''),
                 'sectionOrder' => (int) $question['section_order'],
             ];
         }
