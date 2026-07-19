@@ -38,6 +38,7 @@ $adminUser = $auth->attempt($email, $password);
 expect((bool) $adminUser, 'Admin authentication failed.');
 expect($adminUser['roleKey'] === 'owner', 'Owner role was not returned.');
 expect(in_array('branding.manage', $adminUser['permissions'], true), 'Owner permissions are incomplete.');
+expect(in_array('feedback.manage', $adminUser['permissions'], true), 'Owner feedback permission is missing.');
 expect((int) $auth->requirePermission('settings.manage')['id'] === $userId, 'Owner permission shortcut failed.');
 
 $configuration = $container['admin']->publicConfiguration();
@@ -122,6 +123,36 @@ $testQueue = $db->fetch('SELECT template_key, recipient_email FROM email_queue W
 expect($testQueue['template_key'] === 'participant_registration', 'Template test queued the wrong template.');
 expect($testQueue['recipient_email'] === 'template-test@example.test', 'Template test queued the wrong recipient.');
 
+$feedback = $container['feedback']->create([
+    'submitterName' => 'Sunil Integration',
+    'submitterEmail' => 'sunil-feedback@example.test',
+    'feedbackType' => 'improvement',
+    'moduleName' => 'Dashboard',
+    'priority' => 'normal',
+    'title' => 'Improve progress graph labels',
+    'details' => 'The graph should explain the date range and the meaning of each series.',
+    'expectedOutcome' => 'A clear graph legend and date-range label.',
+    'pageUrl' => 'https://head-heart.atomglobal.com/admin',
+], $adminUser);
+expect((int) $feedback['id'] > 0, 'Client feedback was not created.');
+expect($feedback['status'] === 'new', 'New feedback status is incorrect.');
+expect(in_array($feedback['githubSyncStatus'], ['not_configured', 'synced'], true), 'Feedback GitHub status is invalid.');
+expect(count($feedback['updates'] ?? []) >= 1, 'Feedback change history was not created.');
+
+$feedbackDone = $container['feedback']->update((int) $feedback['id'], [
+    'status' => 'done',
+    'priority' => 'normal',
+    'message' => 'The graph labels were reviewed.',
+    'resolution' => 'Added a date-range label and a clear series legend.',
+], $adminUser);
+expect($feedbackDone['status'] === 'done', 'Feedback could not be marked done.');
+expect($feedbackDone['resolution'] !== '', 'Feedback completion note is missing.');
+$feedbackEmails = $db->fetch('SELECT COUNT(*) count FROM email_queue WHERE recipient_email = ? AND template_key IN (?, ?)', ['sunil-feedback@example.test', 'feedback_received', 'feedback_completed']);
+expect((int) ($feedbackEmails['count'] ?? 0) >= 2, 'Feedback acknowledgement and completion emails were not queued.');
+
+$feedbackList = $container['feedback']->list(['search' => 'progress graph']);
+expect(count($feedbackList['items'] ?? []) >= 1, 'Feedback search did not return the submitted item.');
+
 $insights = $container['adminInsights']->dashboard();
 expect(count($insights['daily'] ?? []) === 14, 'Dashboard trend does not contain fourteen days.');
 expect(count($insights['funnel'] ?? []) === 4, 'Dashboard funnel is incomplete.');
@@ -132,7 +163,7 @@ expect(count($search) >= 1, 'Global admin search did not find the participant.')
 expect($search[0]['module'] === 'Participants', 'Global admin search returned the wrong module first.');
 
 $logs = $db->fetch('SELECT COUNT(*) count FROM audit_logs WHERE admin_user_id = ?', [$userId]);
-expect((int) ($logs['count'] ?? 0) >= 2, 'Audit log did not record administration actions.');
+expect((int) ($logs['count'] ?? 0) >= 4, 'Audit log did not record administration and feedback actions.');
 
 $auth->logout();
 echo "Production integration tests passed.\n";
