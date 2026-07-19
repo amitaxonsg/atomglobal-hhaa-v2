@@ -10,6 +10,7 @@ use AtomGlobal\Services\AdminService;
 use AtomGlobal\Services\AttributionService;
 use AtomGlobal\Services\HealthService;
 use AtomGlobal\Services\MediaService;
+use AtomGlobal\Services\PasswordResetService;
 use AtomGlobal\Services\PdfService;
 use AtomGlobal\Services\PrivacyService;
 use AtomGlobal\Services\ReportAdminService;
@@ -39,6 +40,7 @@ return [
     'health' => new HealthService($db, $config, $settings),
     'mailQueue' => $mailQueue,
     'mailDelivery' => new MailDeliveryService($db, $settings),
+    'passwordReset' => new PasswordResetService($db, $mailQueue, $config),
     'pdf' => $pdf,
     'reportAdmin' => new ReportAdminService($db, $reports, $pdf, $mailQueue, $config),
     'media' => new MediaService($db, $config),
