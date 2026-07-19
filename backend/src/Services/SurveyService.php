@@ -13,15 +13,22 @@ final class SurveyService
         private ScoringService $scoring,
         private ReportService $reports,
         private MailQueue $mailQueue,
+        private SettingsService $settings,
         private array $config,
     ) {}
 
     public function create(array $payload): array
     {
         return $this->db->transaction(function () use ($payload) {
+            $requestedTrackKey = strtolower(trim((string) ($payload['trackKey'] ?? '')));
+            $liveTrackKey = strtolower(trim((string) $this->settings->get('questionnaire.live_track', 'personal')));
+            if ($requestedTrackKey === '' || $requestedTrackKey !== $liveTrackKey) {
+                throw new \InvalidArgumentException('This assessment is not currently open for new participants.');
+            }
+
             $track = $this->db->fetch(
                 'SELECT t.id, t.track_key, t.name, v.id version_id, v.version_number FROM assessment_tracks t JOIN assessment_versions v ON v.track_id = t.id AND v.status = ? WHERE t.track_key = ? AND t.is_active = 1 LIMIT 1',
-                ['published', $payload['trackKey'] ?? '']
+                ['published', $requestedTrackKey]
             );
             if (!$track) throw new \InvalidArgumentException('Assessment track is unavailable.');
 
