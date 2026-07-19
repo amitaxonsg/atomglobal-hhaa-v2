@@ -58,12 +58,23 @@ The final point deliberately differs from the static reference bundle: productio
 
 - immutable assessment versions;
 - 10 sections and 50 questions;
-- question wording and scoring direction;
-- the five scored answer labels;
+- carefully controlled question-text corrections;
 - profile score ranges;
 - Lite and Full report content.
 
-Published versions remain immutable. Editors clone a version, make changes in draft, review it and publish only after approval. Existing sessions and reports remain pinned to their original question/scoring snapshots.
+## Question editing policy
+
+Question administration is deliberately restricted to protect the assessment and historical reporting:
+
+- Published and archived versions cannot be edited.
+- A draft version may receive **text corrections only**.
+- Allowed corrections are spelling, grammar and clarity changes that do not alter meaning.
+- The stable question identity, section, position, required/active state and scoring direction are locked in both the interface and API.
+- An administrator must explicitly confirm that meaning and scoring intent remain unchanged before saving.
+- Every correction records the previous and revised wording in the audit log.
+- A genuinely different question must not replace an existing question. It requires a separately reviewed assessment-version change outside the text-correction workflow.
+
+Existing survey sessions store question and scoring snapshots, and completed assessments store answer, score and report snapshots. Historical reports therefore remain tied to the exact material used when they were generated. The restriction above adds an additional operational safeguard against accidental changes.
 
 ## Branding
 
