@@ -1,0 +1,93 @@
+name: Production readiness checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - production-readiness-*
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - run: test -s dist/index.html
+
+  php:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, json, mbstring, openssl, curl, dom, fileinfo
+          coverage: none
+      - uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+          composer-options: '--no-interaction --prefer-dist'
+      - run: composer lint
+        working-directory: backend
+      - run: composer test
+        working-directory: backend
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: head_heart_test
+          MYSQL_USER: head_heart
+          MYSQL_PASSWORD: test-password
+          MYSQL_ROOT_PASSWORD: root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, json, mbstring, openssl, curl, dom, fileinfo
+          coverage: none
+      - uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+      - name: Configure test environment
+        run: |
+          cp backend/.env.example backend/.env
+          sed -i 's#^APP_ENV=.*#APP_ENV=testing#' backend/.env
+          sed -i 's#^APP_DEBUG=.*#APP_DEBUG=true#' backend/.env
+          sed -i 's#^APP_KEY=.*#APP_KEY=base64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdA==#' backend/.env
+          sed -i 's#^DB_HOST=.*#DB_HOST=127.0.0.1#' backend/.env
+          sed -i 's#^DB_PORT=.*#DB_PORT=3306#' backend/.env
+          sed -i 's#^DB_DATABASE=.*#DB_DATABASE=head_heart_test#' backend/.env
+          sed -i 's#^DB_USERNAME=.*#DB_USERNAME=head_heart#' backend/.env
+          sed -i 's#^DB_PASSWORD=.*#DB_PASSWORD=test-password#' backend/.env
+          sed -i "s#^STORAGE_PATH=.*#STORAGE_PATH=${RUNNER_TEMP}/head-heart-storage#" backend/.env
+          mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports"
+      - run: php backend/bin/migrate.php
+      - run: php backend/bin/seed.php
+      - run: php tests/php/run.php
+      - name: Verify critical tables
+        env:
+          MYSQL_PWD: test-password
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e \
+            "SHOW TABLES; SELECT COUNT(*) tracks FROM assessment_tracks; SELECT COUNT(*) settings_count FROM global_settings;"
