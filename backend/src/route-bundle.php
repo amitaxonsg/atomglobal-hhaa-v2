@@ -27,6 +27,24 @@ $router->add('POST', '/api/admin/password-reset/confirm', function (Request $req
     return Response::json(['reset' => true]);
 });
 
+$router->add('GET', '/api/admin/search', function (Request $request) use ($auth, $container) {
+    $user = $auth->requirePermission('dashboard.view');
+    $term = trim((string) ($request->query['q'] ?? ''));
+    return Response::json(['items' => $container['adminInsights']->search($term, $user['permissions'] ?? [])]);
+});
+
+$router->add('POST', '/api/admin/email-templates/{key}/test', function (Request $request, array $params) use ($auth, $container, $csrf) {
+    $user = $auth->requirePermission('email.manage');
+    $csrf($request);
+    $variables = is_array($request->body['variables'] ?? null) ? $request->body['variables'] : [];
+    return Response::json($container['adminInsights']->queueTemplateTest(
+        (string) $params['key'],
+        (string) ($request->body['recipient'] ?? ''),
+        $variables,
+        (int) $user['id']
+    ), 201);
+});
+
 $router->add('GET', '/api/public/pages/{key}', function (Request $request, array $params) use ($db) {
     $page = $db->fetch('SELECT page_key pageKey, path, page_title pageTitle, meta_description metaDescription, canonical_url canonicalUrl, robots_setting robotsSetting, og_title ogTitle, og_description ogDescription, heading, introductory_content introductoryContent, faq_json faqJson, structured_data_json structuredDataJson, include_in_sitemap includeInSitemap, updated_at updatedAt FROM seo_pages WHERE page_key = ? LIMIT 1', [$params['key']]);
     if (!$page) return Response::error('Page not found.', 404);
