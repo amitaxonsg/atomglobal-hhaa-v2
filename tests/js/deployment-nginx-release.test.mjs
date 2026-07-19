@@ -14,9 +14,11 @@ test("deployment backs up and atomically repoints only the Head–Heart Nginx si
 });
 
 test("deployment will not report success while the old frontend or questionnaire API is served", () => {
+  assert.match(script, /latest-visual-panel/);
   assert.match(script, /latest-track-card/);
+  assert.match(script, /liveTrackKey/);
   assert.match(script, /Begin the free assessment/);
   assert.match(script, /api\/public\/assessment-experience/);
   assert.match(script, /Every choice you make is cast by two votes/);
-  assert.match(script, /Questionnaire API: latest landing and four-track configuration verified/);
+  assert.match(script, /landing, one live assessment and four managed tracks verified/);
 });
