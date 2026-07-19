@@ -1,9 +1,13 @@
 import React from "react";
-import { answerChoices, assessmentTracks, getIntakeConfiguration } from "../../data/assessmentData";
+import { answerChoices, assessmentTracks } from "../../data/assessmentData";
+import { participantBaseOptions, trackExperience } from "../../data/assessmentExperience";
 import { BrandLogo, useBranding } from "../../branding/BrandContext";
 import { ArrowLeft, ArrowRight } from "../shared/Icons";
 
-export const blankParticipant = { name: "", email: "", ageRange: "", gender: "", role: "", industry: "", region: "", purpose: "", tenure: "", privacyConsent: false, transactionalConsent: false, marketingConsent: false };
+export const blankParticipant = {
+  name: "", email: "", ageRange: "", gender: "", role: "", industry: "", region: "", purpose: "", tenure: "",
+  privacyConsent: false, transactionalConsent: false, marketingConsent: false,
+};
 
 const trackDescriptions = {
   personal: "For anyone who wants to understand how they lead their own life.",
@@ -49,7 +53,7 @@ function Progress({ current, total, label }) {
   return <div className="top-progress" aria-label={`${Math.round(percentage)}% complete`}><span>{label || `Step ${current} of ${total}`}</span><div><i style={{ width: `${percentage}%` }} /></div></div>;
 }
 
-export function StageShell({ stageKey, current, total = 4, label, onBack, children, actions }) {
+export function StageShell({ stageKey, current, total = 5, label, onBack, children, actions }) {
   const { stages } = useBranding();
   const stage = stages[stageKey] || stages.version;
   return <div className="assessment-shell">
@@ -70,7 +74,7 @@ export function StageShell({ stageKey, current, total = 4, label, onBack, childr
 export function SelectVersion({ onSelect }) {
   const [selected, setSelected] = React.useState("personal");
   const { tracks } = useBranding();
-  return <StageShell stageKey="version" current={1} actions={<><button className="button button--ghost" disabled><ArrowLeft /> Back</button><button className="button button--primary" onClick={() => onSelect(selected)}>Continue <ArrowRight /></button></>}>
+  return <StageShell stageKey="version" current={1} total={5} actions={<><button className="button button--ghost" disabled><ArrowLeft /> Back</button><button className="button button--primary" onClick={() => onSelect(selected)}>Continue <ArrowRight /></button></>}>
     <AssessmentMeta trackKey={selected} /><h1>Head–Heart Alignment</h1><p className="lead">Choose the version that fits you best.</p>
     <div className="choice-stack" role="radiogroup" aria-label="Assessment version">
       {Object.values(assessmentTracks).map(track => {
@@ -84,21 +88,54 @@ export function SelectVersion({ onSelect }) {
   </StageShell>;
 }
 
-export function ParticipantDetails({ track, participant, setParticipant, onBack, onContinue, error, busy }) {
-  const config = getIntakeConfiguration(track.key);
+export function TrackIntroduction({ track, remoteExperience, onBack, onContinue }) {
+  const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
+  return <StageShell stageKey={track.key} current={2} total={5} onBack={onBack} actions={<><button className="button button--ghost" onClick={onBack}><ArrowLeft /> Back</button><button className="button button--primary" onClick={onContinue}>Begin <ArrowRight /></button></>}>
+    <AssessmentMeta trackKey={track.key} />
+    <p className="eyebrow">How this assessment works</p>
+    <h1>{experience.introHeadline}</h1>
+    <p className="lead questionnaire-intro__body">{experience.introBody}</p>
+    <div className="head-heart-explainer">
+      <article><i className="assessment-meta__dot assessment-meta__dot--heart" /><div><strong>{experience.heartLabel}</strong><span>{experience.heartDescription}</span></div></article>
+      <article><i className="assessment-meta__dot assessment-meta__dot--head" /><div><strong>{experience.headLabel}</strong><span>{experience.headDescription}</span></div></article>
+    </div>
+    <section className="questionnaire-offer"><strong>50 reflective questions · 10 areas</strong><p>{experience.introOffer}</p></section>
+    <p className="hint">There are no right or wrong answers. Choose what is most true of you. Select “N/A” only when a question genuinely does not apply.</p>
+  </StageShell>;
+}
+
+function SelectField({ label, options = [], value, onChange }) {
+  return <label>{label}<select value={value} onChange={onChange} required><option value="">Select…</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>;
+}
+
+export function ParticipantDetails({ track, remoteExperience, participant, setParticipant, onBack, onContinue, error, busy }) {
+  const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
+  const config = experience.intake;
   const update = key => event => setParticipant(current => ({ ...current, [key]: event.target.type === "checkbox" ? event.target.checked : event.target.value }));
-  const valid = participant.name.trim() && /.+@.+\..+/.test(participant.email) && participant.privacyConsent && participant.transactionalConsent;
-  return <StageShell stageKey="participant" current={2} onBack={onBack} actions={<><button className="button button--ghost" onClick={onBack}><ArrowLeft /> Back</button><button className="button button--primary" disabled={!valid || busy} onClick={onContinue}>{busy ? "Creating secure session…" : "Continue"} <ArrowRight /></button></>}>
+  const contextComplete = [participant.ageRange, participant.gender, participant.role, participant.industry, participant.region, participant.purpose, participant.tenure].every(Boolean);
+  const valid = participant.name.trim() && /.+@.+\..+/.test(participant.email) && contextComplete && participant.privacyConsent && participant.transactionalConsent;
+  return <StageShell stageKey="participant" current={3} total={5} onBack={onBack} actions={<><button className="button button--ghost" onClick={onBack}><ArrowLeft /> Back</button><button className="button button--primary" disabled={!valid || busy} onClick={onContinue}>{busy ? "Creating secure session…" : "Continue"} <ArrowRight /></button></>}>
     <AssessmentMeta trackKey={track.key} /><p className="eyebrow">{track.label} assessment</p><h1>Before you begin</h1><p className="lead">A few details personalise your report and create your secure resume link.</p>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="form-grid participant-form"><label>Full name *<input autoComplete="name" value={participant.name} onChange={update("name")} placeholder="Your name" /></label><label>Email address *<input type="email" autoComplete="email" value={participant.email} onChange={update("email")} placeholder="you@example.com" /></label><label>{config.whoLabel}<select value={participant.role} onChange={update("role")}><option value="">Select…</option>{config.whoOptions.map(option => <option key={option}>{option}</option>)}</select></label><label>{config.whatLabel}<select value={participant.industry} onChange={update("industry")}><option value="">Select…</option>{config.whatOptions.map(option => <option key={option}>{option}</option>)}</select></label></div>
+    <div className="form-grid participant-form">
+      <label>Full name *<input autoComplete="name" value={participant.name} onChange={update("name")} placeholder="Your name" required /></label>
+      <label>Email address *<input type="email" autoComplete="email" value={participant.email} onChange={update("email")} placeholder="you@example.com" required /></label>
+      <SelectField label="Age range *" options={participantBaseOptions.ageRanges} value={participant.ageRange} onChange={update("ageRange")} />
+      <SelectField label="Gender *" options={participantBaseOptions.genderOptions} value={participant.gender} onChange={update("gender")} />
+      <SelectField label={config.whoLabel} options={config.whoOptions} value={participant.role} onChange={update("role")} />
+      <SelectField label={config.whatLabel} options={config.whatOptions} value={participant.industry} onChange={update("industry")} />
+      <SelectField label={config.whereLabel} options={config.whereOptions} value={participant.region} onChange={update("region")} />
+      <SelectField label={config.whyLabel} options={config.whyOptions} value={participant.purpose} onChange={update("purpose")} />
+      <SelectField label={config.howLabel} options={config.howOptions} value={participant.tenure} onChange={update("tenure")} />
+    </div>
     <fieldset className="consents"><legend>Privacy and communication</legend><label><input type="checkbox" checked={participant.privacyConsent} onChange={update("privacyConsent")} /><span>I have read the privacy notice and consent to my answers being processed for this assessment. *</span></label><label><input type="checkbox" checked={participant.transactionalConsent} onChange={update("transactionalConsent")} /><span>Send essential messages including my resume link and report. *</span></label><label><input type="checkbox" checked={participant.marketingConsent} onChange={update("marketingConsent")} /><span>Send occasional Atom Global insights. Optional and unchecked by default.</span></label></fieldset>
   </StageShell>;
 }
 
-export function Questions({ track, answers, onAnswer, section, setSection, onBack, onFinish, saveState, busy, error }) {
+export function Questions({ track, remoteExperience, answers, onAnswer, onNote, section, setSection, onBack, onFinish, saveState, busy, error }) {
   const { tracks } = useBranding();
   const meta = { ...fallbackMeta[track.key], ...(tracks[track.key] || {}) };
+  const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
   const subscale = track.subscales[section];
   const offset = section * 5;
   const canContinue = answers.slice(offset, offset + 5).every(answer => answer?.value != null);
@@ -107,8 +144,17 @@ export function Questions({ track, answers, onAnswer, section, setSection, onBac
   const saveLabel = saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved just now" : saveState === "error" ? "Save issue" : "";
   const continueFlow = () => section === track.subscales.length - 1 ? onFinish() : setSection(section + 1);
   return <StageShell stageKey={track.key} current={section + 1} total={track.subscales.length} label={`${answered} of ${meta.questionCount} · ${remainingTimeLabel(meta, answered)}${saveLabel ? ` · ${saveLabel}` : ""}`} onBack={section ? () => setSection(section - 1) : onBack} actions={<><button className="button button--ghost" onClick={section ? () => setSection(section - 1) : onBack}><ArrowLeft /> Back</button><button className="button button--primary" disabled={!canContinue || busy} onClick={continueFlow}>{busy ? "Preparing report…" : section === track.subscales.length - 1 ? "View result" : "Continue"} <ArrowRight /></button></>}>
-    <AssessmentMeta trackKey={track.key} /><p className="eyebrow">Section {section + 1} of {meta.sectionCount}</p><h1>{subscale.name}</h1><p className="lead">Choose the response that feels most true of you, not the one that sounds ideal.</p>
+    <AssessmentMeta trackKey={track.key} /><p className="eyebrow">Section {section + 1} of {meta.sectionCount}</p><h1>{subscale.name}</h1><p className="lead">{subscale.blurb || "Choose the response that feels most true of you, not the one that sounds ideal."}</p>
     {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="question-list">{subscale.items.map((item, itemIndex) => { const answerIndex = offset + itemIndex; return <fieldset className="question-card" key={item.id || item.t}><legend><span>{answerIndex + 1}</span>{item.t}</legend><div className="scale-options">{choices.map((choice, choiceIndex) => <label className={answers[answerIndex]?.value === choiceIndex + 1 ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} value={choiceIndex + 1} checked={answers[answerIndex]?.value === choiceIndex + 1} onChange={() => onAnswer(answerIndex, choiceIndex + 1)} /><i>{choiceIndex + 1}</i><span>{choice}</span></label>)}</div></fieldset>; })}</div>
+    <div className="question-list">{subscale.items.map((item, itemIndex) => {
+      const answerIndex = offset + itemIndex;
+      const current = answers[answerIndex] || { value: null, note: "" };
+      return <fieldset className="question-card" key={item.id || item.t}>
+        <legend><span>{answerIndex + 1}</span>{item.t}</legend>
+        <div className="scale-options">{choices.map((choice, choiceIndex) => <label className={current.value === choiceIndex + 1 ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} value={choiceIndex + 1} checked={current.value === choiceIndex + 1} onChange={() => onAnswer(answerIndex, choiceIndex + 1)} /><i>{choiceIndex + 1}</i><span>{choice}</span></label>)}</div>
+        {experience.allowNotApplicable && <label className={`not-applicable-answer ${current.value === "NA" ? "selected" : ""}`}><input type="radio" name={`question-${answerIndex}`} value="NA" checked={current.value === "NA"} onChange={() => onAnswer(answerIndex, "NA")} /><span>N/A — doesn’t apply / can’t answer</span></label>}
+        {experience.allowAnswerNotes && <label className="answer-note">Optional note<textarea rows="2" value={current.note || ""} onChange={event => onNote(answerIndex, event.target.value)} placeholder="Add context for your own record or coaching conversation" /></label>}
+      </fieldset>;
+    })}</div>
   </StageShell>;
 }
