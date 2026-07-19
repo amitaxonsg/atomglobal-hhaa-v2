@@ -304,3 +304,11 @@ textarea:focus-visible {
     max-height: 48px;
   }
 }
+
+/* Atom wordmark must remain transparent over photographs */
+.visual-logo,
+.mobile-header img,
+.admin-brand img,
+.admin-login__card > img {
+  background: transparent !important;
+}
