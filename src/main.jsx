@@ -1,6 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import AssessmentApp from "./components/AssessmentApp";
+import AssessmentAppProduction from "./components/AssessmentAppProduction";
 import AppErrorBoundary from "./components/shared/AppErrorBoundary";
 import { BrandProvider } from "./branding/BrandContext";
 import "./styles.css";
@@ -9,6 +9,7 @@ import "./theme-runtime.css";
 import "./admin-production.css";
 import "./admin-extended.css";
 import "./admin-final-polish.css";
+import "./production-final.css";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
@@ -62,7 +63,7 @@ createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <BrandProvider>
-        <AssessmentApp />
+        <AssessmentAppProduction />
         <ServiceWorkerUpdate />
       </BrandProvider>
     </AppErrorBoundary>
