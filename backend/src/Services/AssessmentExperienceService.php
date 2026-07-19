@@ -7,12 +7,14 @@ use AtomGlobal\Database;
 
 final class AssessmentExperienceService
 {
-    public function __construct(private Database $db) {}
+    private const LANDING_KEY = 'questionnaire.landing';
+
+    public function __construct(private Database $db, private SettingsService $settings) {}
 
     public function publicConfiguration(): array
     {
         $rows = $this->db->fetchAll(
-            'SELECT t.id trackId, t.track_key trackKey, t.name trackName, t.price_minor priceMinor, t.currency, '
+            'SELECT t.id trackId, t.track_key trackKey, t.name trackName, t.description tagline, t.price_minor priceMinor, t.currency, '
             . 's.intro_headline introHeadline, s.intro_body introBody, s.intro_offer introOffer, s.heart_label heartLabel, '
             . 's.heart_description heartDescription, s.head_label headLabel, s.head_description headDescription, '
             . 's.intake_configuration_json intakeConfiguration, s.allow_not_applicable allowNotApplicable, '
@@ -25,13 +27,38 @@ final class AssessmentExperienceService
         foreach ($rows as $row) {
             $tracks[$row['trackKey']] = $this->normalise($row);
         }
-        return ['tracks' => $tracks];
+        return ['landing' => $this->landing(), 'tracks' => $tracks];
+    }
+
+    public function administrationConfiguration(): array
+    {
+        return $this->publicConfiguration();
+    }
+
+    public function saveLanding(array $payload, int $adminId): array
+    {
+        $landing = [
+            'title' => $this->text($payload['title'] ?? '', 200),
+            'primaryCopy' => $this->text($payload['primaryCopy'] ?? '', 5000),
+            'secondaryCopy' => $this->text($payload['secondaryCopy'] ?? '', 5000),
+            'cardTitlePrefix' => $this->text($payload['cardTitlePrefix'] ?? 'Head-Heart Alignment:', 100),
+            'showBrandName' => !array_key_exists('showBrandName', $payload) || !empty($payload['showBrandName']),
+        ];
+        if ($landing['title'] === '' || $landing['primaryCopy'] === '' || $landing['secondaryCopy'] === '') {
+            throw new \InvalidArgumentException('Landing title and both introduction paragraphs are required.');
+        }
+        $this->settings->set(self::LANDING_KEY, $landing);
+        $this->db->execute(
+            'INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, after_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+            [$adminId, 'questionnaire_landing.saved', 'global_setting', self::LANDING_KEY, json_encode($landing, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]
+        );
+        return $landing;
     }
 
     public function byTrackId(int $trackId): array
     {
         $row = $this->db->fetch(
-            'SELECT t.id trackId, t.track_key trackKey, t.name trackName, t.price_minor priceMinor, t.currency, '
+            'SELECT t.id trackId, t.track_key trackKey, t.name trackName, t.description tagline, t.price_minor priceMinor, t.currency, '
             . 's.intro_headline introHeadline, s.intro_body introBody, s.intro_offer introOffer, s.heart_label heartLabel, '
             . 's.heart_description heartDescription, s.head_label headLabel, s.head_description headDescription, '
             . 's.intake_configuration_json intakeConfiguration, s.allow_not_applicable allowNotApplicable, '
@@ -45,11 +72,12 @@ final class AssessmentExperienceService
 
     public function save(int $trackId, array $payload, int $adminId): array
     {
-        $track = $this->db->fetch('SELECT id, track_key, name FROM assessment_tracks WHERE id = ?', [$trackId]);
+        $track = $this->db->fetch('SELECT id, track_key, name, description FROM assessment_tracks WHERE id = ?', [$trackId]);
         if (!$track) throw new \RuntimeException('Assessment track not found.', 404);
 
         $intake = $this->validateIntake($payload['intake'] ?? null);
         $values = [
+            'tagline' => $this->text($payload['tagline'] ?? $track['description'] ?? '', 500),
             'introHeadline' => $this->text($payload['introHeadline'] ?? ('Head–Heart Alignment: ' . $track['name']), 255),
             'introBody' => $this->text($payload['introBody'] ?? '', 5000),
             'introOffer' => $this->text($payload['introOffer'] ?? '', 5000),
@@ -62,6 +90,8 @@ final class AssessmentExperienceService
             'allowAnswerNotes' => !empty($payload['allowAnswerNotes']),
         ];
 
+        if ($values['tagline'] === '') throw new \InvalidArgumentException('Track card description is required.');
+        $this->db->execute('UPDATE assessment_tracks SET description = ?, updated_at = NOW() WHERE id = ?', [$values['tagline'], $trackId]);
         $this->db->execute(
             'INSERT INTO assessment_track_settings '
             . '(track_id, public_title, short_title, estimated_minutes_min, estimated_minutes_max, free_report_label, paid_report_label, question_count, section_count, show_remaining_time, show_question_count, show_section_count, show_autosave, intro_headline, intro_body, intro_offer, heart_label, heart_description, head_label, head_description, intake_configuration_json, allow_not_applicable, allow_answer_notes, updated_at) '
@@ -91,10 +121,23 @@ final class AssessmentExperienceService
 
         $this->db->execute(
             'INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, after_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
-            [$adminId, 'assessment_experience.saved', 'assessment_track', (string) $trackId, json_encode($values)]
+            [$adminId, 'assessment_experience.saved', 'assessment_track', (string) $trackId, json_encode($values, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)]
         );
 
         return $this->byTrackId($trackId);
+    }
+
+    private function landing(): array
+    {
+        $defaults = [
+            'title' => 'Head–Heart Alignment',
+            'primaryCopy' => 'Every choice you make is cast by two votes: what you feel and what you reason. This assessment maps which one you actually hand the deciding vote to — not which one you wish you did.',
+            'secondaryCopy' => "You'll answer 50 statements across 10 areas of life, get an instant free result, and can unlock a full in-depth report. Choose the version that fits you:",
+            'cardTitlePrefix' => 'Head-Heart Alignment:',
+            'showBrandName' => true,
+        ];
+        $stored = $this->settings->get(self::LANDING_KEY, []);
+        return is_array($stored) ? array_merge($defaults, $stored) : $defaults;
     }
 
     private function normalise(array $row): array
@@ -104,6 +147,7 @@ final class AssessmentExperienceService
             'trackId' => (int) $row['trackId'],
             'trackKey' => (string) $row['trackKey'],
             'trackName' => (string) $row['trackName'],
+            'tagline' => (string) ($row['tagline'] ?? ''),
             'priceMinor' => (int) ($row['priceMinor'] ?? 0),
             'currency' => (string) ($row['currency'] ?? 'USD'),
             'introHeadline' => (string) ($row['introHeadline'] ?? ''),
@@ -127,15 +171,38 @@ final class AssessmentExperienceService
             $labelKey = $prefix . 'Label';
             $optionsKey = $prefix . 'Options';
             $label = $this->text($value[$labelKey] ?? '', 255);
-            $options = is_array($value[$optionsKey] ?? null) ? $value[$optionsKey] : [];
-            $options = array_values(array_filter(array_map(fn($item) => $this->text($item, 200), $options)));
-            if ($label === '' || count($options) < 2 || count($options) > 300) {
+            $options = $this->options($value[$optionsKey] ?? null);
+            if ($label === '' || count($options) < 2) {
                 throw new \InvalidArgumentException('Each intake field requires a label and at least two options.');
             }
             $result[$labelKey] = $label;
             $result[$optionsKey] = $options;
         }
+
+        $result['hasCompanyFields'] = !empty($value['hasCompanyFields']);
+        if ($result['hasCompanyFields']) {
+            foreach (['department', 'level'] as $prefix) {
+                $labelKey = $prefix . 'Label';
+                $optionsKey = $prefix . 'Options';
+                $label = $this->text($value[$labelKey] ?? '', 255);
+                $options = $this->options($value[$optionsKey] ?? null);
+                if ($label === '' || count($options) < 2) {
+                    throw new \InvalidArgumentException('Department and level fields require labels and at least two options.');
+                }
+                $result[$labelKey] = $label;
+                $result[$optionsKey] = $options;
+            }
+            $triggers = $this->options($value['companyRoleTriggers'] ?? null, 20);
+            if (!$triggers) throw new \InvalidArgumentException('At least one role must trigger the company fields.');
+            $result['companyRoleTriggers'] = $triggers;
+        }
         return $result;
+    }
+
+    private function options(mixed $value, int $limit = 300): array
+    {
+        $options = is_array($value) ? $value : [];
+        return array_slice(array_values(array_filter(array_map(fn($item) => $this->text($item, 200), $options))), 0, $limit);
     }
 
     private function text(mixed $value, int $limit): string
