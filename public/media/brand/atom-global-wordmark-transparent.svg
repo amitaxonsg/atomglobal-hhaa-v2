@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1782" height="412" viewBox="0 0 1782 412" preserveAspectRatio="xMinYMid meet" role="img" aria-labelledby="title">
+  <title id="title">Atom Global Consulting</title>
+  <defs>
+    <filter id="remove-white" x="-2%" y="-5%" width="104%" height="110%" color-interpolation-filters="sRGB">
+      <feColorMatrix in="SourceGraphic" type="matrix" values="
+        1 0 0 0 0
+        0 1 0 0 0
+        0 0 1 0 0
+        -0.2126 -0.7152 -0.0722 0 1" result="white-removed" />
+      <feComponentTransfer in="white-removed">
+        <feFuncA type="discrete" tableValues="0 1 1 1 1 1 1 1 1 1" />
+      </feComponentTransfer>
+    </filter>
+  </defs>
+  <image href="/media/brand/atom-global-wordmark.png" x="0" y="0" width="1782" height="412" preserveAspectRatio="xMinYMid meet" filter="url(#remove-white)" />
+</svg>
