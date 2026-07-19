@@ -13,6 +13,7 @@ import "./production-final.css";
 import "./admin-security-polish.css";
 import "./admin-support.css";
 import "./questionnaire-process.css";
+import "./questionnaire-latest.css";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
