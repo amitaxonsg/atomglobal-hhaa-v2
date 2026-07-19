@@ -98,6 +98,11 @@ if grep -q '"stripe":true' <<<"$HEALTH" && grep -q '"stripeWebhook":true' <<<"$H
 else
   warn "Stripe or signed webhook is not configured; keep checkout out of client acceptance until test mode passes"
 fi
+if grep -q '"feedbackGitHub":true' <<<"$HEALTH"; then
+  pass "Feedback GitHub issue synchronisation is configured"
+else
+  warn "Feedback is saved and emailed, but a repository-scoped GitHub Issues token must be configured before automatic issue creation can pass"
+fi
 
 if [[ -n "$RELEASE" && -x "$PHP_BIN" ]]; then
   export RELEASE
@@ -108,12 +113,19 @@ if [[ -n "$RELEASE" && -x "$PHP_BIN" ]]; then
     $c = require $release . "/backend/src/bootstrap.php";
     $db = $c["db"];
     $cronLastRun = $c["settings"]->get("system.cron_last_run");
+    $feedbackToken = $c["settings"]->get("feedback.github_token", $_ENV["GITHUB_FEEDBACK_TOKEN"] ?? "");
+    $feedbackRepository = $c["settings"]->get("feedback.github_repository", $_ENV["GITHUB_FEEDBACK_REPOSITORY"] ?? "");
     $result = [
       "environment" => $c["config"]["env"] ?? null,
       "tracks" => (int) (($db->fetch("SELECT COUNT(*) value FROM assessment_tracks WHERE is_active = 1")["value"] ?? 0)),
       "publishedVersions" => (int) (($db->fetch("SELECT COUNT(*) value FROM assessment_versions WHERE status = ?", ["published"])["value"] ?? 0)),
       "publishedQuestions" => (int) (($db->fetch("SELECT COUNT(*) value FROM questions q JOIN assessment_versions v ON v.id = q.assessment_version_id WHERE v.status = ? AND q.is_active = 1", ["published"])["value"] ?? 0)),
       "activeTemplates" => (int) (($db->fetch("SELECT COUNT(*) value FROM email_templates WHERE is_active = 1")["value"] ?? 0)),
+      "feedbackTemplates" => (int) (($db->fetch("SELECT COUNT(*) value FROM email_templates WHERE template_key IN (?, ?, ?, ?) AND is_active = 1", ["feedback_received", "feedback_internal_notice", "feedback_clarification", "feedback_completed"])["value"] ?? 0)),
+      "feedbackTables" => (int) (($db->fetch("SELECT COUNT(*) value FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (?, ?)", ["client_feedback", "client_feedback_updates"])["value"] ?? 0)),
+      "feedbackPermissions" => (int) (($db->fetch("SELECT COUNT(*) value FROM permissions WHERE permission_key IN (?, ?)", ["feedback.submit", "feedback.manage"])["value"] ?? 0)),
+      "feedbackGithubConfigured" => (bool) ($feedbackToken && $feedbackRepository),
+      "feedbackClientEmail" => $c["settings"]->get("feedback.client_email", ""),
       "ownerUsers" => (int) (($db->fetch("SELECT COUNT(*) value FROM admin_users u JOIN roles r ON r.id = u.role_id WHERE r.role_key = ? AND u.is_active = 1", ["owner"])["value"] ?? 0)),
       "queuedEmail" => (int) (($db->fetch("SELECT COUNT(*) value FROM email_queue WHERE status IN (?, ?)", ["queued", "retry"])["value"] ?? 0)),
       "failedEmail" => (int) (($db->fetch("SELECT COUNT(*) value FROM email_queue WHERE status = ?", ["failed"])["value"] ?? 0)),
@@ -136,12 +148,19 @@ if [[ -n "$RELEASE" && -x "$PHP_BIN" ]]; then
     PUBLISHED="$(sed -n 's/.*"publishedVersions": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     QUESTIONS="$(sed -n 's/.*"publishedQuestions": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     TEMPLATES="$(sed -n 's/.*"activeTemplates": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
+    FEEDBACK_TEMPLATES="$(sed -n 's/.*"feedbackTemplates": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
+    FEEDBACK_TABLES="$(sed -n 's/.*"feedbackTables": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
+    FEEDBACK_PERMISSIONS="$(sed -n 's/.*"feedbackPermissions": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     OWNERS="$(sed -n 's/.*"ownerUsers": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     FAILED_EMAIL="$(sed -n 's/.*"failedEmail": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     FAILED_WEBHOOKS="$(sed -n 's/.*"failedWebhooks": \([0-9][0-9]*\).*/\1/p' <<<"$AUDIT_JSON")"
     [[ "${PUBLISHED:-0}" -ge 4 ]] && pass "Published assessment versions are present" || fail "Expected at least four published assessment versions"
     [[ "${QUESTIONS:-0}" -ge 200 ]] && pass "Published question bank contains at least 200 questions" || fail "Published question bank is incomplete"
-    [[ "${TEMPLATES:-0}" -ge 12 ]] && pass "Client-editable email templates are present" || fail "Email template set is incomplete"
+    [[ "${TEMPLATES:-0}" -ge 16 ]] && pass "Client-editable email templates are present" || fail "Email template set is incomplete"
+    [[ "${FEEDBACK_TEMPLATES:-0}" -eq 4 ]] && pass "Feedback acknowledgement, internal, clarification and completion templates are active" || fail "Feedback email templates are incomplete"
+    [[ "${FEEDBACK_TABLES:-0}" -eq 2 ]] && pass "Feedback register and history tables exist" || fail "Feedback database tables are incomplete"
+    [[ "${FEEDBACK_PERMISSIONS:-0}" -eq 2 ]] && pass "Feedback submission and management permissions exist" || fail "Feedback permissions are incomplete"
+    grep -q '"feedbackClientEmail": "sunil.setpaul@atomglobal.com"' <<<"$AUDIT_JSON" && pass "Sunil feedback update email is configured" || warn "Review the configured feedback client email"
     [[ "${OWNERS:-0}" -ge 1 ]] && pass "Active owner account exists" || fail "Active owner account is missing"
     grep -q '"cronRecent": true' <<<"$AUDIT_JSON" && pass "Application cron recorded a recent successful run" || fail "Application cron has no recent successful run"
     [[ "${FAILED_EMAIL:-0}" -eq 0 ]] && pass "No failed email queue records" || warn "$FAILED_EMAIL failed email queue record(s) require review"
