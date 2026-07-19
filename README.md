@@ -16,7 +16,7 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Public mode | Real React frontend with PHP 8.3 and MariaDB production API |
 | Current live commit | `b5204caddfd9b93a3d3d532e38dfe385d071022c` |
 | Current live release | `/var/www/head-heart.atomglobal.com/releases/20260719103507-b5204caddfd9` |
-| Latest verified branch build | GitHub Actions run #270 passed |
+| Branch verification | A successful Production readiness checks workflow is required before deployment |
 | Production health | Database, migrations, storage, email and cron healthy |
 | Stripe | Not configured yet; checkout and signed-webhook acceptance remain pending |
 | Owner login | Confirmed for `amit@axon.com.sg` |
@@ -40,6 +40,8 @@ The latest branch includes a complete administration feedback workflow:
 - Automatic GitHub issue creation, status comments and issue closure when a repository-scoped token is configured.
 - Owner-only GitHub/email routing configuration; the token is encrypted and never returned to the browser.
 - Global administration search includes feedback records.
+- Client email and attachment URLs remain in the secure portal and are not copied into public GitHub issues.
+- Page URLs are stripped of query strings before GitHub synchronisation to avoid exposing private tokens.
 
 GitHub synchronisation requires a fine-grained token restricted to `amitaxonsg/atomglobal-hhaa-v2` with **Issues: read and write**. Configure it under **Admin → Feedback → GitHub and email routing**. Never place the token in Git, chat, feedback text or screenshots.
 
