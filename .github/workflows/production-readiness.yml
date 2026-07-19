@@ -81,13 +81,22 @@ jobs:
           sed -i 's#^DB_USERNAME=.*#DB_USERNAME=head_heart#' backend/.env
           sed -i 's#^DB_PASSWORD=.*#DB_PASSWORD=test-password#' backend/.env
           sed -i "s#^STORAGE_PATH=.*#STORAGE_PATH=${RUNNER_TEMP}/head-heart-storage#" backend/.env
-          mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports"
+          mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports" "${RUNNER_TEMP}/head-heart-storage/tmp"
       - run: php backend/bin/migrate.php
       - run: php backend/bin/seed.php
       - run: php tests/php/run.php
-      - name: Verify critical tables
+      - run: php tests/php/integration.php
+      - name: Verify critical tables and seed records
         env:
           MYSQL_PWD: test-password
         run: |
-          mysql -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e \
-            "SHOW TABLES; SELECT COUNT(*) tracks FROM assessment_tracks; SELECT COUNT(*) settings_count FROM global_settings;"
+          mysql -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "
+            SELECT COUNT(*) tracks FROM assessment_tracks;
+            SELECT COUNT(*) track_settings FROM assessment_track_settings;
+            SELECT COUNT(*) questions FROM questions;
+            SELECT COUNT(*) templates FROM email_templates;
+            SELECT COUNT(*) settings_count FROM global_settings;
+            SELECT COUNT(*) stages FROM content_stages;
+            SELECT COUNT(*) permissions_count FROM permissions;
+            SELECT COUNT(*) migrations_count FROM migrations;
+          "
