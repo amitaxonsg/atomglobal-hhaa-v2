@@ -1,6 +1,6 @@
 import React from "react";
 import { api } from "../../api/client";
-import { experienceDefaults, questionnaireReference, trackExperience } from "../../data/assessmentExperience";
+import { experienceDefaults, questionnaireReference } from "../../data/assessmentExperience";
 import { Notice, PageHeader, Spinner, useLoader } from "./AdminShared";
 
 const fieldDefinitions = [
@@ -13,11 +13,20 @@ const fieldDefinitions = [
 
 function normalise(item, trackKey) {
   const fallback = experienceDefaults[trackKey] || experienceDefaults.personal;
-  const resolved = trackExperience(trackKey, item || {});
+  const source = item || {};
   return {
-    ...(item || {}),
-    ...resolved,
-    intake: { ...fallback.intake, ...(resolved.intake || {}) },
+    ...fallback,
+    ...source,
+    introHeadline: source.introHeadline || fallback.introHeadline,
+    introBody: source.introBody || fallback.introBody,
+    introOffer: source.introOffer || fallback.introOffer,
+    heartLabel: source.heartLabel || fallback.heartLabel,
+    heartDescription: source.heartDescription || fallback.heartDescription,
+    headLabel: source.headLabel || fallback.headLabel,
+    headDescription: source.headDescription || fallback.headDescription,
+    intake: { ...fallback.intake, ...(source.intake || {}) },
+    allowNotApplicable: source.allowNotApplicable ?? fallback.allowNotApplicable,
+    allowAnswerNotes: source.allowAnswerNotes ?? fallback.allowAnswerNotes,
   };
 }
 
