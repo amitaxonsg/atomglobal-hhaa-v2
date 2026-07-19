@@ -13,17 +13,19 @@ This is the independent V2 project. Do not reconnect it to the original `atomglo
 | Repository | `amitaxonsg/atomglobal-hhaa-v2` |
 | Production-readiness branch | `production-readiness-20260719` |
 | Draft pull request | PR #5 |
-| Branch head after VPS adaptation | `7936453fa4281251360fe849e4b5642dc88f2cfc` |
-| Last complete green CI before server-specific script adaptation | Run #92: frontend, PHP and MySQL all passed |
+| GitHub CI | Frontend, PHP and clean-database integration passed |
 | Live frontend | Working preview |
 | Live `/admin` | **Preview/mock mode** |
-| Live MySQL backend | Not connected yet |
+| Live database backend | Not connected yet |
 | Live deployed application commit | `42744f41cd96d134ef0059f5175c890280f811f4` |
 | Active live release | `/var/www/head-heart.atomglobal.com/releases/20260719-063144-42744f41cd96` |
 | Five-minute deployment timer | **Disabled and inactive** |
+| Isolated VPS staging | **Phase A completed successfully** |
+| Staging source commit tested | `fc2135074ddd80fefcc2c6959cdc9eac7ea6a665` |
+| Staging database | `head_heart_staging` on MariaDB 10.11 |
 | Production deployment | Not started |
 
-The live `/admin` screen showing `preview@atomglobal.com` and **Enter preview CMS** proves only that the React preview loads. It does not prove PHP authentication or live database connectivity.
+The live `/admin` screen showing `preview@atomglobal.com` and **Enter preview CMS** proves only that the current React preview loads. It does not prove PHP authentication or live database connectivity.
 
 The production-readiness branch uses real PHP APIs when built with:
 
@@ -32,9 +34,41 @@ VITE_API_MODE=production
 VITE_API_BASE_URL=/api
 ```
 
-## Audited VPS specification
+## Phase A VPS staging result
 
-Read-only audit completed on 19 July 2026:
+Phase A completed successfully on 19 July 2026 using isolated staging paths.
+
+Verified:
+
+- Composer and the isolated Node 22 build runtime worked on the VPS;
+- a separate Git checkout was created at `/srv/head-heart.atomglobal.com/staging-source`;
+- a restricted MariaDB staging database and user were created;
+- `/etc/head-heart-alignment/staging.env` was created with mode `0600`;
+- ordered migrations and seed data completed on MariaDB 10.11;
+- PHP tests and the frontend production build passed;
+- a pre-migration database backup was created;
+- the live release, live commit marker and public website did not change;
+- the automatic five-minute deployment timer remained disabled and inactive.
+
+Phase A evidence:
+
+```text
+Staging source: /srv/head-heart.atomglobal.com/staging-source
+Staging commit: fc2135074ddd80fefcc2c6959cdc9eac7ea6a665
+Staging DB:     head_heart_staging
+Environment:    /etc/head-heart-alignment/staging.env
+Backups:        /var/backups/head-heart-alignment-staging
+Backup file:    head_heart_staging-before-phase-a-20260719T064824Z.sql.gz
+```
+
+The live application remained on:
+
+```text
+/var/www/head-heart.atomglobal.com/releases/20260719-063144-42744f41cd96
+42744f41cd96d134ef0059f5175c890280f811f4
+```
+
+## Audited VPS specification
 
 | Component | Audited result |
 |---|---|
@@ -45,22 +79,17 @@ Read-only audit completed on 19 July 2026:
 | PHP extensions | PDO, `pdo_mysql`, JSON, mbstring, OpenSSL, cURL, DOM and fileinfo present |
 | Database server/client | MariaDB 10.11.14 |
 | Default shell Node | 18.19.1 — not suitable for Vite 7 |
-| Isolated build Node | `/opt/node-v22/bin` must be used |
-| npm from default shell | 9.2.0 |
-| Composer | Not shown by the audit; verify before staging |
-| Protected environment | `/etc/head-heart-alignment/app.env` not created |
+| Isolated build Node | `/opt/node-v22/bin` |
+| Protected staging environment | `/etc/head-heart-alignment/staging.env`, mode `0600` |
 | Public site health | Home HTTP 200, Admin HTTP 200, SSL verified |
-| Git source branch | `main` at documentation commit `a3c87ef` |
 | Automatic Git timer | Disabled and inactive |
-
-The staging and production scripts now automatically prefer `/opt/node-v22/bin` and detect the active PHP-FPM service, including PHP 8.3. Environment files are parsed without executing shell commands.
 
 ## Verified implementation coverage
 
 The production-readiness branch includes:
 
 - real PHP administrator login, logout, secure sessions, CSRF, rate limiting and roles;
-- participant registration, consent, MySQL autosave and hashed secure resume tokens;
+- participant registration, consent, MariaDB autosave and hashed secure resume tokens;
 - four assessment tracks with 50 questions across ten sections;
 - versioned assessment clone, draft, edit and publish workflows;
 - participant search, details, export and anonymisation;
@@ -70,28 +99,24 @@ The production-readiness branch includes:
 - Stripe Checkout, signed webhooks, refunds and affiliate commissions;
 - SMTP2GO/SMTP settings, templates, test email, reminders and retry queue;
 - affiliate/UTM attribution, analytics, SEO/AEO/GEO, privacy, retention and alerts;
-- ordered MySQL migrations, seed data, integration tests and rollback-aware deployment scripts.
+- ordered migrations, seed data, integration tests and rollback-aware deployment scripts.
 
-GitHub Actions has passed the frontend, PHP and clean MySQL 8 integration jobs. MariaDB 10.11 compatibility must now be demonstrated on the VPS staging database before production activation.
+## Next controlled stage
 
-## Safe next stage
+Do not replace the live release yet. Stage 4 is now next:
 
-Do not replace the live release yet. The next controlled sequence is:
-
-1. Verify Composer 2 and `/opt/node-v22/bin/node`.
-2. Create a separate staging source checkout.
-3. Create a restricted MariaDB staging database and user.
-4. Create `/etc/head-heart-alignment/staging.env` with mode `0600`.
-5. Run `deploy/phase-a-staging.sh` against staging paths only.
-6. Confirm migrations, seed data, tests and backup output.
-7. Configure a separate staging Nginx/PHP-FPM endpoint.
-8. Create the first staging owner account.
-9. Test real admin login, participant registration, autosave, resume, completion and reports.
-10. Test SMTP2GO delivery and Stripe test webhooks.
+1. Build an isolated staging release with `VITE_API_MODE=production` and `/api` as the API base.
+2. Configure a loopback-only Nginx endpoint on `127.0.0.1:8088` using `php8.3-fpm`.
+3. Confirm `/api/health` returns `status: ok`.
+4. Create the first staging owner interactively; never place the password in shell history or Git.
+5. Test real admin login, logout, session restoration, expiry, lockout and CSRF.
+6. Test participant registration, autosave, secure resume, completion and Lite Report.
+7. Test branding draft, upload, publish and rollback.
+8. Add SMTP2GO test credentials and verify delivered email.
+9. Add Stripe test credentials and verify signed webhook processing.
+10. Restore the Phase A database backup into a fresh database as a recovery drill.
 11. Merge PR #5 only after staging acceptance.
-12. Run `deploy/update-vps.sh` for an atomic production release with automatic code rollback.
-
-The Phase A staging script does not switch the production `current` symlink.
+12. Run the atomic production deployment only after all gates pass.
 
 ## Source and release layout
 
@@ -100,7 +125,7 @@ The Phase A staging script does not switch the production `current` symlink.
     Current live Git working tree
 
 /srv/head-heart.atomglobal.com/staging-source
-    Recommended separate staging checkout
+    Isolated production-readiness staging checkout
 
 /var/www/head-heart.atomglobal.com/releases
     Immutable live releases
@@ -109,7 +134,7 @@ The Phase A staging script does not switch the production `current` symlink.
     Active live release symlink
 
 /var/www/head-heart-staging.atomglobal.com
-    Recommended staging application root
+    Isolated staging application root
 
 /etc/head-heart-alignment/staging.env
     Protected staging credentials
@@ -118,10 +143,10 @@ The Phase A staging script does not switch the production `current` symlink.
     Protected production credentials; create only for production activation
 
 /var/lib/head-heart-alignment-staging
-    Recommended persistent staging media/report storage
+    Persistent staging media and report storage
 
 /var/backups/head-heart-alignment-staging
-    Recommended staging database backups
+    Staging database backups
 ```
 
 ## Manual deployment policy
