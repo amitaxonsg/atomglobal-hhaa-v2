@@ -13,8 +13,8 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | VPS | `161.97.137.234` |
 | Development branch | `production-readiness-20260719` |
 | Pull request | Draft PR #5; open, mergeable and not merged |
-| Latest accepted code checkpoint | `0e045c3d14f24217d65f93bd54d8e1f0bf97d3ab` |
-| Code acceptance | Production readiness checks run #404 passed frontend, PHP, database, questionnaire integration and deployment-script validation |
+| Latest accepted feature checkpoint | `d3a1fef4d002976a330dc8ea079afd1f700c717e` |
+| Code acceptance | Production readiness checks run #414 passed frontend, PHP, database, questionnaire integration and deployment/final-audit script validation |
 | Public runtime | React frontend, PHP 8.3 API and MariaDB |
 | Last release confirmed in pasted VPS output | `/var/www/head-heart.atomglobal.com/releases/20260719224421-7568577dc195` |
 | Last marker confirmed in pasted VPS output | `7568577dc195e4e2e319cda6edf3be4c5822768d` |
@@ -121,10 +121,10 @@ The corrected `deploy/update-vps.sh` now:
 - backs up the Head–Heart Nginx site file;
 - backs up MariaDB;
 - builds and tests a new immutable release;
-- verifies latest frontend identifiers;
+- verifies the restored left-image frontend and live-assessment client;
 - atomically repoints the exact Nginx frontend and backend paths;
 - validates Nginx before reload;
-- verifies `/api/health` and `/api/public/assessment-experience`;
+- verifies `/api/health`, `/api/public/assessment-experience`, `liveTrackKey` and four managed tracks;
 - restores Nginx, symlink and markers on failure;
 - keeps unrelated Nginx sites untouched.
 
@@ -161,7 +161,7 @@ GitHub feedback synchronisation uses a fine-grained token restricted to `amitaxo
 
 ## Automated verification
 
-The latest accepted code checkpoint passed:
+The latest accepted feature checkpoint passed:
 
 - frontend tests and Vite production build;
 - responsive split-layout and no-public-attribution assertions;
@@ -173,7 +173,7 @@ The latest accepted code checkpoint passed:
 - production integration acceptance;
 - N/A persistence/exclusion, notes, autosave, resume, completion and scoring;
 - audit records;
-- deployment-script syntax validation.
+- deployment and final-production-audit script syntax validation.
 
 ## VPS layout
 
