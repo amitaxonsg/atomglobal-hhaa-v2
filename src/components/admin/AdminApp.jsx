@@ -7,6 +7,7 @@ import AdminDashboardPage from "./AdminDashboardPage";
 import AdminParticipantsPage from "./AdminParticipantsPage";
 import { AssessmentsPage, BrandingPage, ContentPage } from "./AdminCorePages";
 import { AffiliatesPage, AnalyticsPage, AuditPage, EmailPage, PaymentsPage, ReportsPage, SeoPage, SettingsPage } from "./AdminOperationsEnhanced";
+import { FeedbackPage, HelpPage } from "./AdminSupportPages";
 
 const sections = [
   { label: "Dashboard", group: "Overview", permission: "dashboard.view" },
@@ -22,7 +23,13 @@ const sections = [
   { label: "SEO", group: "Growth", permission: "seo.manage" },
   { label: "Settings", group: "System", permission: "settings.manage" },
   { label: "Audit", group: "System", permission: "audit.view" },
+  { label: "Feedback", group: "Support", permission: "feedback.submit" },
+  { label: "Help", group: "Support", permission: null },
 ];
+
+function PoweredBy({ className = "" }) {
+  return <a className={`powered-by-axon ${className}`} href="https://axon.com.sg/" target="_blank" rel="noreferrer">Powered by <strong>Axon 1Pro</strong></a>;
+}
 
 function AdminLogin({ onLogin }) {
   const { branding, stages } = useBranding();
@@ -84,7 +91,7 @@ function AdminLogin({ onLogin }) {
         <BrandLogo />
         <span className="admin-login__badge">Secure, self-hosted platform</span>
         <h1>Manage the complete assessment journey.</h1>
-        <p>Participants, assessments, reports, payments, email, affiliates and brand settings in one protected workspace.</p>
+        <p>Participants, assessments, reports, payments, email, feedback and brand settings in one protected workspace.</p>
         <div className="admin-login__assurance"><i aria-hidden="true" /><span>PHP sessions · MariaDB · role permissions · audit history</span></div>
       </div>
 
@@ -96,6 +103,7 @@ function AdminLogin({ onLogin }) {
         <button className="button button--primary admin-login__submit" disabled={state.busy}>{state.busy ? "Signing in…" : isMockMode ? "Open preview workspace" : "Sign in securely"}</button>
         {!isMockMode && <button className="admin-login__text-button" type="button" onClick={() => { setMode("forgot"); setState({ busy: false, error: "", message: "" }); }}>Forgot your password?</button>}
         <div className="admin-login__security"><span aria-hidden="true">●</span>{isMockMode ? "Preview data only. No live participant or payment records are used." : "Protected by secure sessions, CSRF validation, rate limits and role permissions."}</div>
+        <PoweredBy className="admin-login__powered" />
       </form>}
 
       {mode === "forgot" && <form className="admin-login__card" onSubmit={requestReset}>
@@ -104,6 +112,7 @@ function AdminLogin({ onLogin }) {
         <label>Email address<input type="email" autoComplete="email" value={form.email} onChange={event => setForm(current => ({ ...current, email: event.target.value }))} required /></label>
         <button className="button button--primary admin-login__submit" disabled={state.busy}>{state.busy ? "Requesting…" : "Send secure reset link"}</button>
         <button className="admin-login__text-button" type="button" onClick={showLogin}>Back to sign in</button>
+        <PoweredBy className="admin-login__powered" />
       </form>}
 
       {mode === "reset" && <form className="admin-login__card" onSubmit={confirmReset}>
@@ -113,6 +122,7 @@ function AdminLogin({ onLogin }) {
         <label>Confirm new password<input type="password" autoComplete="new-password" value={form.passwordConfirm} onChange={event => setForm(current => ({ ...current, passwordConfirm: event.target.value }))} required /></label>
         <button className="button button--primary admin-login__submit" disabled={state.busy}>{state.busy ? "Updating…" : "Update password"}</button>
         <button className="admin-login__text-button" type="button" onClick={showLogin}>Cancel and return to sign in</button>
+        <PoweredBy className="admin-login__powered" />
       </form>}
     </section>
   </main>;
@@ -132,6 +142,8 @@ const pages = {
   SEO: SeoPage,
   Settings: SettingsPage,
   Audit: AuditPage,
+  Feedback: FeedbackPage,
+  Help: HelpPage,
 };
 
 export default function AdminApp() {
@@ -163,7 +175,7 @@ export default function AdminApp() {
   if (!user) return <AdminLogin onLogin={setUser} />;
 
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
-  const allowed = permission => permissions.includes("*") || permissions.includes(permission);
+  const allowed = permission => !permission || permissions.includes("*") || permissions.includes(permission);
   const visibleSections = sections.filter(section => allowed(section.permission));
   const safeActive = visibleSections.some(section => section.label === active) ? active : visibleSections[0]?.label || "Dashboard";
   const ActivePage = pages[safeActive] || AdminDashboardPage;
@@ -172,7 +184,7 @@ export default function AdminApp() {
 
   const openResult = item => {
     setActive(item.module);
-    setTarget({ module: item.module, query: item.query || item.subtitle || "", id: item.type === "participant" ? item.id : null });
+    setTarget({ module: item.module, query: item.query || item.subtitle || "", id: ["participant", "feedback"].includes(item.type) ? item.id : null });
     setSearch("");
     setSearchState({ loading: false, items: [], error: "" });
   };
@@ -190,7 +202,10 @@ export default function AdminApp() {
           </React.Fragment>;
         })}
       </nav>
-      <div className="admin-user"><i>{user.displayName?.split(" ").map(part => part[0]).join("").slice(0, 2) || "AG"}</i><span>{user.displayName}<small>{user.roleName}</small></span><button type="button" onClick={logout}>Sign out</button></div>
+      <div className="admin-sidebar__footer">
+        <div className="admin-user"><i>{user.displayName?.split(" ").map(part => part[0]).join("").slice(0, 2) || "AG"}</i><span>{user.displayName}<small>{user.roleName}</small></span><button type="button" onClick={logout}>Sign out</button></div>
+        <PoweredBy />
+      </div>
     </aside>
 
     <main className="admin-main">
@@ -207,7 +222,7 @@ export default function AdminApp() {
         </div>
         <em>{isMockMode ? "Preview" : "Secure workspace"}</em>
       </div>
-      <ActivePage initialSearch={target.module === safeActive ? target.query : ""} initialId={target.module === safeActive ? target.id : null} permissions={permissions} />
+      <ActivePage initialSearch={target.module === safeActive ? target.query : ""} initialId={target.module === safeActive ? target.id : null} permissions={permissions} user={user} />
     </main>
   </div>;
 }
