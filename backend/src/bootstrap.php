@@ -51,5 +51,5 @@ return [
     'admin' => new AdminService($db, $settings, $mailQueue),
     'adminInsights' => new AdminInsightsService($db, $mailQueue, $config),
     'feedback' => new FeedbackService($db, $settings, $mailQueue, $config),
-    'assessmentExperience' => new AssessmentExperienceService($db),
+    'assessmentExperience' => new AssessmentExperienceService($db, $settings),
 ];
