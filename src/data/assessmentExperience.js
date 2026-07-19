@@ -15,6 +15,24 @@ import {
 const sharedIntro = "Every choice you make is cast by two votes: what you feel and what you reason. This assessment maps which one you actually hand the deciding vote to.";
 const sharedOffer = "Take the full 50-question assessment free and get your Lite Report instantly. Unlock the complete Full Report — development roadmap, working-style plan, and full breakdown — for {{price}}.";
 
+const departmentOptions = [
+  "Executive / C-Suite", "Sales", "Marketing", "Operations", "Finance", "HR / People", "Engineering / IT",
+  "Product", "Customer Success / Support", "Legal", "R&D", "Administration", "Other",
+];
+
+const levelOptions = [
+  "Entry-Level / Individual Contributor", "Senior Individual Contributor", "Team Lead / Supervisor", "Manager",
+  "Senior Manager / Director", "VP / Executive", "C-Suite / Founder",
+];
+
+export const landingDefaults = {
+  title: "Head–Heart Alignment",
+  primaryCopy: "Every choice you make is cast by two votes: what you feel and what you reason. This assessment maps which one you actually hand the deciding vote to — not which one you wish you did.",
+  secondaryCopy: "You'll answer 50 statements across 10 areas of life, get an instant free result, and can unlock a full in-depth report. Choose the version that fits you:",
+  cardTitlePrefix: "Head-Heart Alignment:",
+  showBrandName: true,
+};
+
 const personalIntake = {
   whoLabel: "Which best describes your current situation? *",
   whoOptions: personalSituationOptions,
@@ -26,6 +44,7 @@ const personalIntake = {
   whyOptions: personalPurposeOptions,
   howLabel: "How would you describe this current chapter of your life? *",
   howOptions: lifeChapterOptions,
+  hasCompanyFields: false,
 };
 
 const workIntake = {
@@ -39,6 +58,12 @@ const workIntake = {
   whyOptions: workPurposeOptions,
   howLabel: "How long have you been in your current role? *",
   howOptions: tenureOptions,
+  hasCompanyFields: true,
+  companyRoleTriggers: ["People Manager", "Senior Executive / Leadership"],
+  departmentLabel: "Department *",
+  departmentOptions,
+  levelLabel: "Level *",
+  levelOptions,
 };
 
 export const questionnaireReference = {
@@ -50,6 +75,7 @@ export const questionnaireReference = {
 
 export const experienceDefaults = {
   personal: {
+    tagline: "For anyone who wants to understand how they lead their own life.",
     introHeadline: "Head–Heart Alignment: Personal",
     introBody: sharedIntro,
     introOffer: sharedOffer,
@@ -62,6 +88,7 @@ export const experienceDefaults = {
     allowAnswerNotes: true,
   },
   newjoiner: {
+    tagline: "For new joinees and anyone in their first 1–2 years of work — not managing anyone yet.",
     introHeadline: "Head–Heart Alignment: New Joiner",
     introBody: sharedIntro,
     introOffer: sharedOffer,
@@ -74,6 +101,7 @@ export const experienceDefaults = {
     allowAnswerNotes: true,
   },
   manager: {
+    tagline: "For people managers — how you lead your team, not just yourself.",
     introHeadline: "Head–Heart Alignment: Manager",
     introBody: sharedIntro,
     introOffer: sharedOffer,
@@ -86,6 +114,7 @@ export const experienceDefaults = {
     allowAnswerNotes: true,
   },
   executive: {
+    tagline: "For senior leaders shaping strategy and culture at scale.",
     introHeadline: "Head–Heart Alignment: Executive",
     introBody: sharedIntro,
     introOffer: sharedOffer,
@@ -101,13 +130,18 @@ export const experienceDefaults = {
 
 export const participantBaseOptions = { ageRanges, genderOptions };
 
+export function landingExperience(remote = {}) {
+  return { ...landingDefaults, ...(remote || {}) };
+}
+
 export function trackExperience(trackKey, remote = {}, priceLabel = "") {
   const fallback = experienceDefaults[trackKey] || experienceDefaults.personal;
-  const intake = remote.intake && typeof remote.intake === "object" ? remote.intake : fallback.intake;
+  const intake = remote.intake && typeof remote.intake === "object" ? { ...fallback.intake, ...remote.intake } : fallback.intake;
   const resolvedPrice = priceLabel || remote.priceLabel || "the listed price";
   return {
     ...fallback,
     ...remote,
+    tagline: remote.tagline || fallback.tagline,
     introHeadline: remote.introHeadline || fallback.introHeadline,
     introBody: remote.introBody || fallback.introBody,
     introOffer: String(remote.introOffer || fallback.introOffer).replace("{{price}}", resolvedPrice),
