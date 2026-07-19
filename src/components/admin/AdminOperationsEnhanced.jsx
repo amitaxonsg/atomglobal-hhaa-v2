@@ -54,6 +54,10 @@ function renderTemplate(content, variables) {
   return Object.entries(variables).reduce((result, [key, value]) => result.replaceAll(`{{${key}}}`, value).replaceAll(`{{ ${key} }}`, value), content || "");
 }
 
+function emailPreviewDocument(content) {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:26px;background:#f4f0ea;color:#443c35;font:15px/1.65 Arial,Helvetica,sans-serif}.card{max-width:620px;margin:auto;background:#fff;border:1px solid #e5ddd3;border-top:4px solid #c8483f;border-radius:10px;overflow:hidden}.head{padding:28px 30px 14px;text-align:center}.head img{width:190px;max-width:70%;height:auto}.content{padding:10px 34px 32px}.content h1,.content h2,.content h3{font-family:Georgia,Times New Roman,serif;font-weight:400;color:#241f1b}.content a{display:inline-block;padding:10px 16px;border-radius:7px;background:#c8483f;color:#fff;text-decoration:none;font-weight:700}.foot{padding:20px 24px;background:#fbf8f4;border-top:1px solid #ece5dc;text-align:center;color:#7a7168;font-size:11px}</style></head><body><div class="card"><div class="head"><img src="/media/brand/atom-global-wordmark.png" alt="Atom Global"></div><div class="content">${content}</div><div class="foot">Head–Heart Alignment by Atom Global Consulting · Website · Privacy · Terms</div></div></body></html>`;
+}
+
 const sampleValue = key => ({
   participantName: "Sample Participant", adminName: "Sample Administrator", trackName: "Manager",
   resumeUrl: "https://head-heart.atomglobal.com/?resume=sample", reportUrl: "https://head-heart.atomglobal.com/report/sample",
@@ -109,7 +113,7 @@ export function EmailPage({ initialSearch = "" }) {
         <label>Plain-text fallback<textarea rows="8" value={selected.text_body} onChange={event => setSelected(current => ({ ...current, text_body: event.target.value }))} /></label>
         <label className="check-row"><input type="checkbox" checked={Boolean(selected.is_active)} onChange={event => setSelected(current => ({ ...current, is_active: event.target.checked ? 1 : 0 }))} /> Active template</label>
         <div className="email-variable-grid"><h3>Test variables</h3>{templateVariables(selected).length ? templateVariables(selected).map(key => <label key={key}>{`{{${key}}}`}<input value={variables[key] || ""} onChange={event => setVariables(current => ({ ...current, [key]: event.target.value }))} /></label>) : <p className="hint">This template has no variables.</p>}</div>
-        <div className="email-template-preview"><div className="email-template-preview__sheet"><img src="/media/brand/atom-global-wordmark.png" alt="Atom Global" /><div dangerouslySetInnerHTML={{ __html: previewHtml }} /><small>Head–Heart Alignment by Atom Global Consulting · Website · Privacy · Terms</small></div></div>
+        <div className="email-template-preview"><iframe title="Sandboxed email template preview" sandbox="" srcDoc={emailPreviewDocument(previewHtml)} /></div>
         <div className="email-test-bar"><input type="email" placeholder="Recipient for this template test" value={testRecipient} onChange={event => setTestRecipient(event.target.value)} /><button className="button button--primary" disabled={!testRecipient || !selected.is_active} onClick={sendSelectedTest}>Send selected template test</button></div>
       </> : <Empty />}</section>
     </div>
