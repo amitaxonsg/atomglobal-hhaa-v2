@@ -36,7 +36,23 @@ $router->add('GET', '/api/admin/insights', function () use ($auth, $container) {
 $router->add('GET', '/api/admin/search', function (Request $request) use ($auth, $container) {
     $user = $auth->requirePermission('dashboard.view');
     $term = trim((string) ($request->query['q'] ?? ''));
-    return Response::json(['items' => $container['adminInsights']->search($term, $user['permissions'] ?? [])]);
+    $items = $container['adminInsights']->search($term, $user['permissions'] ?? []);
+    $permissions = is_array($user['permissions'] ?? null) ? $user['permissions'] : [];
+    if (mb_strlen($term) >= 2 && (in_array('*', $permissions, true) || in_array('feedback.submit', $permissions, true))) {
+        $feedback = $container['feedback']->list(['search' => $term, 'limit' => 6]);
+        foreach ($feedback['items'] ?? [] as $item) {
+            $items[] = [
+                'type' => 'feedback',
+                'module' => 'Feedback',
+                'id' => (int) $item['id'],
+                'title' => $item['title'],
+                'subtitle' => $item['submitterEmail'],
+                'meta' => $item['moduleName'] . ' · ' . ucwords(str_replace('_', ' ', $item['status'])) . ' · ' . ucfirst($item['priority']),
+                'query' => $item['title'],
+            ];
+        }
+    }
+    return Response::json(['items' => array_slice($items, 0, 24)]);
 });
 
 $router->add('POST', '/api/admin/email-templates/{key}/test', function (Request $request, array $params) use ($auth, $container, $csrf) {
