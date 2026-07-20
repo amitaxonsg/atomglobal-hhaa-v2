@@ -87,13 +87,32 @@ jobs:
           This marker is written only after the complete workflow succeeds.
           MARKER
 
-          if git diff --quiet -- docs/verification/questionnaire-cms-reference.md && git ls-files --error-unmatch docs/verification/questionnaire-cms-reference.md >/dev/null 2>&1; then
-            echo "Verification marker is already current."
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('README.md')
+          text = path.read_text()
+          replacements = {
+              'Latest questionnaire copy/process is visible in the centred layout; the merged split layout and four public assessment choices remain pending deployment': 'The earlier one-card production release remains active; exact four-card frontend and CMS assessment version 2.0.0 are verified in Git and pending VPS deployment',
+              '## Merged production change awaiting VPS deployment': '## Verified production change awaiting VPS deployment',
+              '- verifies the restored left-image frontend and live-assessment client;': '- verifies the restored left-image frontend and four-card assessment client;',
+              '- one-live-assessment selection and server enforcement;': '- four public assessment choices and independent server-side track validation;',
+              '6. Confirm `/api/public/assessment-experience` returns `liveTrackKey` plus four managed tracks.\n7. Confirm only the selected live assessment appears publicly.\n8. Switch the live assessment in Admin → Questionnaire and confirm only new starts change.\n9. Confirm an older resume link still opens its original version.\n10. Test questionnaire CMS copy/intake changes.\n11. Complete the live assessment and verify dashboard, search, Lite Report, email and PDF.\n12. Rotate the previously exposed SMTP2GO credential and send a real template test.\n13. Configure and test Stripe test keys, Price ID and signed webhook for the live assessment.\n14. Run `deploy/final-production-audit.sh` and retain its output.\n15. Record Amit and client acceptance after production verification.': '6. Confirm `/api/public/assessment-experience` returns all four managed tracks.\n7. Confirm Personal, New Joiner, Manager and Executive appear together on the right.\n8. Confirm each card starts published CMS assessment version `2.0.0`.\n9. Confirm every track contains the exact attached 10 sections and 50 questions.\n10. Confirm an older resume link still opens its original immutable version.\n11. Test Questionnaire CMS landing, card, introduction and intake changes.\n12. Complete each assessment path and verify dashboard, search, Lite Report, email and PDF.\n13. Rotate the previously exposed SMTP2GO credential and send a real template test.\n14. Configure and test Stripe test keys, Price IDs and signed webhooks.\n15. Run `deploy/final-production-audit.sh` and retain its output.\n16. Record Amit and client acceptance after production verification.',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'Expected README text missing: {old[:80]}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+
+          if git diff --quiet -- README.md docs/verification/questionnaire-cms-reference.md && git ls-files --error-unmatch docs/verification/questionnaire-cms-reference.md >/dev/null 2>&1; then
+            echo "README and verification marker are already current."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/verification/questionnaire-cms-reference.md
+          git add README.md docs/verification/questionnaire-cms-reference.md
           git commit -m "Record verified questionnaire CMS reference"
           git push origin HEAD:main
