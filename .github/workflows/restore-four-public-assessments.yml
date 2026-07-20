@@ -55,9 +55,11 @@ jobs:
             </LatestPage>;
           }
           '''
+
           layout_new = '''export function SelectVersion({ experience, onSelect }) {
             const landing = landingExperience(experience?.landing);
-            const tracks = Object.values(assessmentTracks);
+            const trackOrder = ["personal", "newjoiner", "manager", "executive"];
+            const tracks = trackOrder.map(key => assessmentTracks[key]).filter(Boolean);
             return <LatestPage width="640" className="latest-track-selection" brandVisible={landing.showBrandName} stageKey="version">
               <h1>{landing.title}</h1>
               <p className="latest-copy"><VoteCopy text={landing.primaryCopy} /></p>
@@ -106,9 +108,18 @@ jobs:
           )
           if count != 1:
               raise SystemExit("LiveAssessmentControl block not found")
-          text = text.replace('Controls the active track card and the following introduction screen.', 'Controls this public track card and the following introduction screen.')
-          text = text.replace('Responsive left-image layout · one live assessment · 10 sections · 50 questions', 'Responsive left-image layout · four public assessment choices · 10 sections · 50 questions')
-          text = text.replace('    <LiveAssessmentControl tracks={rows} initialTrackKey={configuration.data?.liveTrackKey} onSaved={configuration.refresh} />\n', '')
+          text = text.replace(
+              'Controls the active track card and the following introduction screen.',
+              'Controls this public track card and the following introduction screen.'
+          )
+          text = text.replace(
+              'Responsive left-image layout · one live assessment · 10 sections · 50 questions',
+              'Responsive left-image layout · four public assessment choices · 10 sections · 50 questions'
+          )
+          text = text.replace(
+              '    <LiveAssessmentControl tracks={rows} initialTrackKey={configuration.data?.liveTrackKey} onSaved={configuration.refresh} />\n',
+              ''
+          )
           questionnaire.write_text(text)
 
           tests = Path("tests/js/latest-questionnaire-flow.test.mjs")
@@ -116,8 +127,9 @@ jobs:
           text, count = re.subn(
               r'test\("only one published assessment is live for new participants", \(\) => \{.*?\n\}\);',
               '''test("all four published assessments are offered to new participants", () => {
-            assert.match(layout, /Object\\.values\\(assessmentTracks\\)/);
-            assert.match(layout, /tracks\\.map/);
+            assert.match(layout, /trackOrder = \["personal", "newjoiner", "manager", "executive"\]/);
+            assert.match(layout, /tracks\.map/);
+            assert.match(layout, /experience\?\.tracks\?\.\[track\.key\]/);
             assert.doesNotMatch(survey, /This assessment is not currently open for new participants/);
             assert.match(admin, /four public assessment choices/);
           });''',
@@ -129,46 +141,45 @@ jobs:
               raise SystemExit("Single-assessment test block not found")
           tests.write_text(text)
 
-          deploy = Path("deploy/update-vps.sh")
-          text = deploy.read_text()
-          text = text.replace("grep -R --include='*.js' -Fq 'liveTrackKey' dist/assets\n", "")
-          text = text.replace("grep -q '\"liveTrackKey\"' <<<\"$EXPERIENCE\" || { echo \"Single live-assessment configuration is missing: $EXPERIENCE\" >&2; exit 1; }\n", "")
-          text = text.replace('echo "Questionnaire API: landing, one live assessment and four managed tracks verified."', 'echo "Questionnaire API: landing and all four public assessment tracks verified."')
-          deploy.write_text(text)
-
           readme = Path("README.md")
           text = readme.read_text()
-          text = text.replace('the merged split layout and one-live-assessment controls remain pending deployment', 'the merged split layout and four public assessment choices remain pending deployment')
-          text = text.replace('The public questionnaire displays exactly one live assessment card at a time. All four assessment families remain available and versioned in the administration system.', 'The public questionnaire displays all four approved assessment cards: Personal, New Joiner, Manager and Executive. Every card starts its own active published assessment version.')
+          text = text.replace(
+              'the merged split layout and one-live-assessment controls remain pending deployment',
+              'the merged split layout and four public assessment choices remain pending deployment'
+          )
+          text = text.replace(
+              'The public questionnaire displays exactly one live assessment card at a time. All four assessment families remain available and versioned in the administration system.',
+              'The public questionnaire displays all four approved assessment cards: Personal, New Joiner, Manager and Executive. Every card uses its own active published assessment version and CMS content.'
+          )
           text, count = re.subn(
               r'## One live assessment at a time\n.*?\n## Questionnaire process retained from the supplied `index\.html`',
               '''## Four public assessment choices
 
-The approved public landing displays Personal, New Joiner, Manager and Executive together in the right-hand content panel.
+          The approved public landing displays Personal, New Joiner, Manager and Executive together in the right-hand content panel.
 
-Each public card must:
+          Each card uses its own active published assessment version. Landing copy and card descriptions remain editable in Admin → Questionnaire, while questions, sections, scoring and reports remain versioned under Admin → Assessments.
 
-- map to an active assessment track;
-- use that track's published version;
-- contain exactly 50 active questions;
-- contain exactly 10 active sections;
-- preserve its own scoring, report and price configuration.
+          The legacy `liveTrackKey` remains available for backward compatibility and deployment verification, but it no longer hides the other three public choices.
 
-Existing secure resume links continue using their original assessment version. Completed answers, scoring, reports and PDFs stay tied to immutable snapshots.
+          Existing secure resume links continue using their original assessment version. Completed answers, scoring, reports and PDFs stay tied to immutable snapshots.
 
-## Questionnaire process retained from the supplied `index.html`''',
+          ## Questionnaire process retained from the supplied `index.html`''',
               text,
               count=1,
               flags=re.S,
           )
           if count != 1:
               raise SystemExit("README single-assessment section not found")
-          text = text.replace('1. Display the single assessment selected as live.', '1. Display all four approved assessment choices.')
+          text = text.replace(
+              '1. Display the single assessment selected as live.',
+              '1. Display all four approved assessment choices.'
+          )
           text = text.replace('- the single live assessment;\n', '')
-          text = text.replace('verifies `/api/health`, `/api/public/assessment-experience`, `liveTrackKey` and four managed tracks;', 'verifies `/api/health`, `/api/public/assessment-experience` and all four public tracks;')
-          text = text.replace('6. Confirm `/api/public/assessment-experience` returns `liveTrackKey` plus four managed tracks.\n7. Confirm only the selected live assessment appears publicly.\n8. Switch the live assessment in Admin → Questionnaire and confirm only new starts change.\n9. Confirm an older resume link still opens its original version.\n', '6. Confirm `/api/public/assessment-experience` returns all four public tracks.\n7. Confirm Personal, New Joiner, Manager and Executive all appear and can start.\n8. Confirm an older resume link still opens its original version.\n')
           readme.write_text(text)
           PY
+
+      - name: Check source formatting
+        run: git diff --check
 
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
@@ -186,6 +197,6 @@ Existing secure resume links continue using their original assessment version. C
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md deploy/update-vps.sh src/components/assessment/AssessmentLayout.jsx src/components/admin/QuestionnairePage.jsx backend/src/Services/SurveyService.php tests/js/latest-questionnaire-flow.test.mjs
-          git commit -m "Restore four public assessment choices"
+          git add README.md src/components/assessment/AssessmentLayout.jsx src/components/admin/QuestionnairePage.jsx backend/src/Services/SurveyService.php tests/js/latest-questionnaire-flow.test.mjs
+          git commit -m "Restore four CMS-linked public assessment choices"
           git push origin HEAD:main
