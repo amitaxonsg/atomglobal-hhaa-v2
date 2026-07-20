@@ -13,9 +13,10 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | VPS | `161.97.137.234` |
 | Git repository | `amitaxonsg/atomglobal-hhaa-v2` |
 | Default branch | `main` |
-| Production-ready merge | PR #5 merged into `main` on 20 July 2026 |
-| Current production baseline commit | `70bc001474fcdfec055bfc18eda416e31a4920f3` before the audit/branding release |
-| Code acceptance | Production readiness checks run #416 passed frontend, PHP, database, questionnaire integration and deployment/final-audit script validation |
+| Production-ready foundation | PR #5 merged into `main` on 20 July 2026 |
+| Branding and full-audit release | PR #7 merged into `main` as `11ceb442c97cd17ffc89219c0b5b8dec8952293f`; production deployment pending |
+| Current production baseline commit | `70bc001474fcdfec055bfc18eda416e31a4920f3` until the branding/audit release is deployed |
+| Code acceptance | Production readiness checks run #435 passed frontend, PHP, database, exact questionnaire flow, temporary submission, report, Admin visibility, four email queues and automatic test cleanup |
 | Public runtime | React frontend, PHP 8.3 API and MariaDB |
 | Last production release confirmed | `/var/www/head-heart.atomglobal.com/releases/20260720055557-70bc001474fc` |
 | Last production marker confirmed | `70bc001474fcdfec055bfc18eda416e31a4920f3` |
@@ -192,8 +193,11 @@ The merged production-ready commit passed:
 - clean MySQL migrations and seed;
 - production integration acceptance;
 - N/A persistence/exclusion, notes, autosave, resume, completion and scoring;
+- temporary participant creation, 50-answer persistence, score and report generation;
+- Admin participant-detail visibility and all four participant-flow email queues;
+- automatic removal of temporary smoke-test records;
 - audit records;
-- deployment and final-production-audit script syntax validation.
+- deployment and full-production-audit script syntax validation.
 
 ## VPS layout
 
