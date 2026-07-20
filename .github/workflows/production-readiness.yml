@@ -15,10 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Apply proposed audit and branding source
+        run: |
+          python3 scripts/apply-branding-backend.py
+          python3 scripts/apply-branding-frontend.py
+          python3 scripts/fix-branding-generated-css.py
+          python3 scripts/apply-audit-readme.py
       - name: Validate deployment scripts
         run: |
           bash -n deploy/update-vps.sh
           bash -n deploy/final-production-audit.sh
+          bash -n deploy/full-production-audit.sh
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -32,6 +39,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Apply proposed audit and branding source
+        run: |
+          python3 scripts/apply-branding-backend.py
+          python3 scripts/apply-branding-frontend.py
+          python3 scripts/fix-branding-generated-css.py
+          python3 scripts/apply-audit-readme.py
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -65,6 +78,12 @@ jobs:
           --health-retries=10
     steps:
       - uses: actions/checkout@v4
+      - name: Apply proposed audit and branding source
+        run: |
+          python3 scripts/apply-branding-backend.py
+          python3 scripts/apply-branding-frontend.py
+          python3 scripts/fix-branding-generated-css.py
+          python3 scripts/apply-audit-readme.py
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
