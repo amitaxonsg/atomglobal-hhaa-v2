@@ -19,7 +19,7 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Public runtime | React frontend, PHP 8.3 API and MariaDB |
 | Last release confirmed in pasted VPS output | `/var/www/head-heart.atomglobal.com/releases/20260719224421-7568577dc195` |
 | Last marker confirmed in pasted VPS output | `7568577dc195e4e2e319cda6edf3be4c5822768d` |
-| Current observed public screen | Latest questionnaire copy/process is visible in the centred layout; the merged split layout and four public assessment choices remain pending deployment |
+| Current observed public screen | The earlier one-card production release remains active; exact four-card frontend and CMS assessment version 2.0.0 are verified in Git and pending VPS deployment |
 | Production health in last output | Database, migrations, storage, email, GitHub feedback and cron healthy |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
 | Owner login | Confirmed for `amit@axon.com.sg` |
@@ -28,7 +28,7 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 
 The screenshot supplied after the corrected deployment confirms that the latest questionnaire process reached the public site. The exact active marker after that later deployment was not pasted; verify it from `/var/www/head-heart.atomglobal.com/deployed-commit.txt` before the next release.
 
-## Merged production change awaiting VPS deployment
+## Verified production change awaiting VPS deployment
 
 The `main` branch now combines the approved questionnaire process with the previously approved visual branding:
 
@@ -114,7 +114,7 @@ The corrected `deploy/update-vps.sh` now:
 - backs up the Head–Heart Nginx site file;
 - backs up MariaDB;
 - builds and tests a new immutable release;
-- verifies the restored left-image frontend and live-assessment client;
+- verifies the restored left-image frontend and four-card assessment client;
 - atomically repoints the exact Nginx frontend and backend paths;
 - validates Nginx before reload;
 - verifies `/api/health`, `/api/public/assessment-experience`, `liveTrackKey` and four managed tracks;
@@ -160,7 +160,7 @@ The merged production-ready commit passed:
 - responsive split-layout and no-public-attribution assertions;
 - questionnaire reference hashes;
 - CMS landing, intake and conditional fields;
-- one-live-assessment selection and server enforcement;
+- four public assessment choices and independent server-side track validation;
 - PHP lint and unit tests;
 - clean MySQL migrations and seed;
 - production integration acceptance;
@@ -191,16 +191,17 @@ The merged production-ready commit passed:
 3. Confirm mobile hides the image and shows the transparent logo.
 4. Confirm public pages do not show Powered by Axon 1Pro.
 5. Confirm admin login and sidebar still show Powered by Axon 1Pro.
-6. Confirm `/api/public/assessment-experience` returns `liveTrackKey` plus four managed tracks.
-7. Confirm only the selected live assessment appears publicly.
-8. Switch the live assessment in Admin → Questionnaire and confirm only new starts change.
-9. Confirm an older resume link still opens its original version.
-10. Test questionnaire CMS copy/intake changes.
-11. Complete the live assessment and verify dashboard, search, Lite Report, email and PDF.
-12. Rotate the previously exposed SMTP2GO credential and send a real template test.
-13. Configure and test Stripe test keys, Price ID and signed webhook for the live assessment.
-14. Run `deploy/final-production-audit.sh` and retain its output.
-15. Record Amit and client acceptance after production verification.
+6. Confirm `/api/public/assessment-experience` returns all four managed tracks.
+7. Confirm Personal, New Joiner, Manager and Executive appear together on the right.
+8. Confirm each card starts published CMS assessment version `2.0.0`.
+9. Confirm every track contains the exact attached 10 sections and 50 questions.
+10. Confirm an older resume link still opens its original immutable version.
+11. Test Questionnaire CMS landing, card, introduction and intake changes.
+12. Complete each assessment path and verify dashboard, search, Lite Report, email and PDF.
+13. Rotate the previously exposed SMTP2GO credential and send a real template test.
+14. Configure and test Stripe test keys, Price IDs and signed webhooks.
+15. Run `deploy/final-production-audit.sh` and retain its output.
+16. Record Amit and client acceptance after production verification.
 
 ## Safe deployment rule
 
