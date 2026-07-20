@@ -1,0 +1,44 @@
+.locked-preview--cms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.locked-preview__item,
+.full-report-feature {
+  padding: 18px;
+  border: 1px solid var(--border, #e4ddcf);
+  border-radius: var(--card-radius, 8px);
+  background: var(--surface, #fff);
+}
+
+.locked-preview__item h4,
+.full-report-feature h4,
+.full-report-copy h4 {
+  margin: 0 0 7px;
+}
+
+.locked-preview__item p,
+.full-report-feature p,
+.full-report-copy p {
+  margin: 0;
+}
+
+.full-report-copy {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0;
+}
+
+.full-report-copy article {
+  padding: 18px;
+  border: 1px solid var(--border, #e4ddcf);
+  border-radius: var(--card-radius, 8px);
+  background: var(--surface, #fff);
+}
+
+@media (max-width: 720px) {
+  .locked-preview--cms {
+    grid-template-columns: 1fr;
+  }
+}
