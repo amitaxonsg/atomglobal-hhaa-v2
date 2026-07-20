@@ -1,0 +1,61 @@
+name: Verify questionnaire reference CMS import
+
+on:
+  push:
+    paths:
+      - "scripts/export-assessment-reference.mjs"
+      - "backend/bin/seed.php"
+      - "tests/js/assessment-reference-export.test.mjs"
+      - ".github/workflows/questionnaire-reference-cms.yml"
+  pull_request:
+    paths:
+      - "scripts/export-assessment-reference.mjs"
+      - "backend/bin/seed.php"
+      - "tests/js/assessment-reference-export.test.mjs"
+      - ".github/workflows/questionnaire-reference-cms.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify exact assessment reference export
+        run: |
+          node scripts/export-assessment-reference.mjs /tmp/head-heart-reference.json
+          node - <<'NODE'
+          const reference = require('/tmp/head-heart-reference.json');
+          if (reference.reference.version !== '2.0.0') throw new Error('Wrong reference version');
+          if (reference.tracks.length !== 4) throw new Error('Expected four tracks');
+          for (const track of reference.tracks) {
+            if (track.subscales.length !== 10) throw new Error(`${track.key}: expected 10 sections`);
+            if (track.subscales.flatMap(section => section.items).length !== 50) throw new Error(`${track.key}: expected 50 questions`);
+          }
+          NODE
+
+      - name: Validate PHP importer
+        run: php -l backend/bin/seed.php
+
+      - name: Run tests and production build
+        run: |
+          npm test
+          npm run build
