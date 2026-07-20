@@ -20,6 +20,22 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: head_heart_test
+          MYSQL_USER: head_heart
+          MYSQL_PASSWORD: test-password
+          MYSQL_ROOT_PASSWORD: root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -36,7 +52,14 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
+          extensions: pdo_mysql, json, mbstring, openssl, curl, dom, fileinfo
           coverage: none
+
+      - name: Install PHP dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+          composer-options: "--no-interaction --prefer-dist"
 
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
@@ -60,7 +83,58 @@ jobs:
       - name: Validate PHP importer
         run: php -l backend/bin/seed.php
 
-      - name: Run tests and production build
+      - name: Configure clean MySQL test environment
+        run: |
+          cp backend/.env.example backend/.env
+          sed -i 's#^APP_ENV=.*#APP_ENV=testing#' backend/.env
+          sed -i 's#^APP_DEBUG=.*#APP_DEBUG=true#' backend/.env
+          sed -i 's#^APP_KEY=.*#APP_KEY=base64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdA==#' backend/.env
+          sed -i 's#^DB_HOST=.*#DB_HOST=127.0.0.1#' backend/.env
+          sed -i 's#^DB_PORT=.*#DB_PORT=3306#' backend/.env
+          sed -i 's#^DB_DATABASE=.*#DB_DATABASE=head_heart_test#' backend/.env
+          sed -i 's#^DB_USERNAME=.*#DB_USERNAME=head_heart#' backend/.env
+          sed -i 's#^DB_PASSWORD=.*#DB_PASSWORD=test-password#' backend/.env
+          sed -i "s#^STORAGE_PATH=.*#STORAGE_PATH=${RUNNER_TEMP}/head-heart-storage#" backend/.env
+          mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports" "${RUNNER_TEMP}/head-heart-storage/tmp"
+
+      - name: Migrate and import the attached questionnaire into CMS
+        run: |
+          set -Eeuo pipefail
+          php backend/bin/migrate.php
+          php backend/bin/seed.php | tee /tmp/first-seed.log
+          grep -Fq 'Assessment reference 2.0.0 imported and published for Personal, New Joiner, Manager and Executive.' /tmp/first-seed.log
+
+      - name: Verify four exact published CMS versions
+        env:
+          MYSQL_PWD: test-password
+        run: |
+          set -Eeuo pipefail
+          TRACKS="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT COUNT(*) FROM assessment_tracks WHERE track_key IN ('personal','newjoiner','manager','executive') AND is_active = 1;")"
+          VERSIONS="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT COUNT(*) FROM assessment_versions v JOIN assessment_tracks t ON t.id = v.track_id WHERE v.version_number = '2.0.0' AND v.status = 'published' AND t.track_key IN ('personal','newjoiner','manager','executive');")"
+          COMPLETE="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT COUNT(*) FROM (SELECT v.id FROM assessment_versions v JOIN assessment_tracks t ON t.id = v.track_id LEFT JOIN questions q ON q.assessment_version_id = v.id AND q.is_active = 1 LEFT JOIN assessment_sections s ON s.assessment_version_id = v.id AND s.is_active = 1 WHERE v.version_number = '2.0.0' AND v.status = 'published' AND t.track_key IN ('personal','newjoiner','manager','executive') GROUP BY v.id HAVING COUNT(DISTINCT q.id) = 50 AND COUNT(DISTINCT s.id) = 10) verified;")"
+          OPTIONS="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT COUNT(*) FROM (SELECT v.id FROM assessment_versions v JOIN assessment_tracks t ON t.id = v.track_id LEFT JOIN answer_options o ON o.assessment_version_id = v.id WHERE v.version_number = '2.0.0' AND v.status = 'published' AND t.track_key IN ('personal','newjoiner','manager','executive') GROUP BY v.id HAVING COUNT(DISTINCT o.id) = 5) verified;")"
+          MARKER="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT setting_value FROM global_settings WHERE setting_key = 'questionnaire.reference_version';")"
+          SOURCE_HASH="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT setting_value FROM global_settings WHERE setting_key = 'questionnaire.reference_source_sha256';")"
+          AGGREGATE_HASH="$(mysql -N -h 127.0.0.1 -P 3306 -u head_heart head_heart_test -e "SELECT setting_value FROM global_settings WHERE setting_key = 'questionnaire.reference_sha256';")"
+
+          test "$TRACKS" = 4
+          test "$VERSIONS" = 4
+          test "$COMPLETE" = 4
+          test "$OPTIONS" = 4
+          test "$MARKER" = '2.0.0'
+          test "$SOURCE_HASH" = '2626c5f1d1edaf50f4d140b0e93306700cac13c6fcefdff8a107e3b35966c7e8'
+          test "$AGGREGATE_HASH" = '379fdc28ddcbafab81af33f07cd8cd7a26364a68c98c5dab610c53087105741b'
+
+      - name: Prove repeat deployment preserves CMS content
+        run: |
+          set -Eeuo pipefail
+          php backend/bin/seed.php | tee /tmp/second-seed.log
+          grep -Fq 'Assessment reference 2.0.0 already imported; CMS content left unchanged.' /tmp/second-seed.log
+
+      - name: Run PHP database tests
+        run: php tests/php/run.php
+
+      - name: Run JavaScript tests and production build
         run: |
           npm test
           npm run build
@@ -80,7 +154,9 @@ jobs:
           - questionnaire aggregate SHA-256: `379fdc28ddcbafab81af33f07cd8cd7a26364a68c98c5dab610c53087105741b`
           - public tracks: Personal, New Joiner, Manager and Executive
           - each track: 10 sections, 50 questions and five scored choices
-          - PHP importer syntax
+          - clean MySQL migration and exact version `2.0.0` CMS import
+          - repeat-import idempotence: later deployments leave CMS content unchanged
+          - PHP database tests
           - full JavaScript test suite
           - production Vite build
 
@@ -100,9 +176,10 @@ jobs:
               '6. Confirm `/api/public/assessment-experience` returns `liveTrackKey` plus four managed tracks.\n7. Confirm only the selected live assessment appears publicly.\n8. Switch the live assessment in Admin → Questionnaire and confirm only new starts change.\n9. Confirm an older resume link still opens its original version.\n10. Test questionnaire CMS copy/intake changes.\n11. Complete the live assessment and verify dashboard, search, Lite Report, email and PDF.\n12. Rotate the previously exposed SMTP2GO credential and send a real template test.\n13. Configure and test Stripe test keys, Price ID and signed webhook for the live assessment.\n14. Run `deploy/final-production-audit.sh` and retain its output.\n15. Record Amit and client acceptance after production verification.': '6. Confirm `/api/public/assessment-experience` returns all four managed tracks.\n7. Confirm Personal, New Joiner, Manager and Executive appear together on the right.\n8. Confirm each card starts published CMS assessment version `2.0.0`.\n9. Confirm every track contains the exact attached 10 sections and 50 questions.\n10. Confirm an older resume link still opens its original immutable version.\n11. Test Questionnaire CMS landing, card, introduction and intake changes.\n12. Complete each assessment path and verify dashboard, search, Lite Report, email and PDF.\n13. Rotate the previously exposed SMTP2GO credential and send a real template test.\n14. Configure and test Stripe test keys, Price IDs and signed webhooks.\n15. Run `deploy/final-production-audit.sh` and retain its output.\n16. Record Amit and client acceptance after production verification.',
           }
           for old, new in replacements.items():
-              if old not in text:
+              if old in text:
+                  text = text.replace(old, new, 1)
+              elif new not in text:
                   raise SystemExit(f'Expected README text missing: {old[:80]}')
-              text = text.replace(old, new, 1)
           path.write_text(text)
           PY
 
