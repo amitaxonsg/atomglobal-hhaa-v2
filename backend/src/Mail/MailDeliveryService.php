@@ -29,7 +29,10 @@ final class MailDeliveryService
         $content = $this->render((string) $template['html_body'], $variables);
         $html = $this->brandHtml($content, $subject);
         $text = $this->render((string) $template['text_body'], $variables);
-        $provider = strtolower((string) $this->settings->get('email.provider', $_ENV['MAIL_PROVIDER'] ?? 'smtp2go'));
+        $provider = strtolower(trim((string) $this->settings->get('email.provider', '')));
+        if (!in_array($provider, ['smtp2go', 'smtp'], true)) {
+            throw new \RuntimeException('CMS email delivery provider is missing or invalid.');
+        }
 
         return $provider === 'smtp2go'
             ? $this->sendSmtp2Go($queue['recipient_email'], $subject, $html, $text)
@@ -38,19 +41,19 @@ final class MailDeliveryService
 
     private function sendSmtp2Go(string $recipient, string $subject, string $html, string $text): string
     {
-        $apiKey = $this->settings->get('email.smtp2go_api_key', $_ENV['SMTP2GO_API_KEY'] ?? '');
-        if (!$apiKey) throw new \RuntimeException('SMTP2GO API key is not configured.');
+        $apiKey = trim((string) $this->settings->get('email.smtp2go_api_key', ''));
+        if ($apiKey === '') throw new \RuntimeException('CMS SMTP2GO API key is not configured.');
         $endpoint = $_ENV['SMTP2GO_API_URL'] ?? 'https://api.smtp2go.com/v3/email/send';
         $payload = [
             'api_key' => $apiKey,
-            'sender' => $this->fromAddress(),
+            'sender' => $this->senderIdentity(),
             'to' => [$recipient],
             'subject' => $subject,
             'html_body' => $html,
             'text_body' => $text,
         ];
         $replyTo = $this->replyTo();
-        if ($replyTo) $payload['custom_headers'] = [['header' => 'Reply-To', 'value' => $replyTo]];
+        if ($replyTo !== '') $payload['custom_headers'] = [['header' => 'Reply-To', 'value' => $replyTo]];
 
         $curl = curl_init($endpoint);
         curl_setopt_array($curl, [
@@ -71,18 +74,25 @@ final class MailDeliveryService
 
     private function sendSmtp(string $recipient, string $subject, string $html, string $text): string
     {
+        $host = trim((string) $this->settings->get('email.smtp_host', ''));
+        $username = trim((string) $this->settings->get('email.smtp_username', ''));
+        $password = (string) $this->settings->get('email.smtp_password', '');
+        if ($host === '' || $username === '' || $password === '') {
+            throw new \RuntimeException('CMS SMTP host, username or password is missing.');
+        }
+
         $mail = new PHPMailer(true);
         $mail->isSMTP();
-        $mail->Host = (string) $this->settings->get('email.smtp_host', $_ENV['SMTP_HOST'] ?? '');
-        $mail->Port = (int) $this->settings->get('email.smtp_port', $_ENV['SMTP_PORT'] ?? 587);
+        $mail->Host = $host;
+        $mail->Port = (int) $this->settings->get('email.smtp_port', 587);
         $mail->SMTPAuth = true;
-        $mail->Username = (string) $this->settings->get('email.smtp_username', $_ENV['SMTP_USERNAME'] ?? '');
-        $mail->Password = (string) $this->settings->get('email.smtp_password', $_ENV['SMTP_PASSWORD'] ?? '');
-        $encryption = (string) $this->settings->get('email.smtp_encryption', $_ENV['SMTP_ENCRYPTION'] ?? 'tls');
+        $mail->Username = $username;
+        $mail->Password = $password;
+        $encryption = trim((string) $this->settings->get('email.smtp_encryption', 'tls'));
         if ($encryption !== '') $mail->SMTPSecure = $encryption;
         $mail->CharSet = 'UTF-8';
         $mail->setFrom($this->fromAddress(), $this->fromName());
-        if ($this->replyTo()) $mail->addReplyTo($this->replyTo());
+        if ($this->replyTo() !== '') $mail->addReplyTo($this->replyTo());
         $mail->addAddress($recipient);
         $mail->Subject = $subject;
         $mail->isHTML(true);
@@ -96,7 +106,7 @@ final class MailDeliveryService
     {
         if (stripos($content, '<html') !== false) return $content;
 
-        $baseUrl = rtrim((string) $this->settings->get('email.public_base_url', $_ENV['APP_URL'] ?? 'https://head-heart.atomglobal.com'), '/');
+        $baseUrl = rtrim((string) $this->settings->get('email.public_base_url', 'https://head-heart.atomglobal.com'), '/');
         $logo = (string) $this->settings->get('email.logo_url', $this->settings->get('branding.email_logo_url', '/media/brand/atom-global-wordmark.png'));
         $logo = $this->absoluteUrl($logo, $baseUrl);
         $websiteUrl = $this->absoluteUrl((string) $this->settings->get('email.website_url', '/'), $baseUrl);
@@ -168,7 +178,33 @@ final class MailDeliveryService
         return $content;
     }
 
-    private function fromAddress(): string { return (string) $this->settings->get('email.admin_from_address', $_ENV['MAIL_FROM_ADDRESS'] ?? 'amit@axon.com.sg'); }
-    private function fromName(): string { return (string) $this->settings->get('email.admin_from_name', $_ENV['MAIL_FROM_NAME'] ?? 'Atom Global'); }
-    private function replyTo(): string { return (string) $this->settings->get('email.reply_to', $_ENV['MAIL_REPLY_TO'] ?? ''); }
+    private function senderIdentity(): string
+    {
+        return $this->fromName() . ' <' . $this->fromAddress() . '>';
+    }
+
+    private function fromAddress(): string
+    {
+        $address = strtolower(trim((string) $this->settings->get('email.admin_from_address', '')));
+        if (!filter_var($address, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('CMS sender email is missing or invalid.');
+        }
+        return $address;
+    }
+
+    private function fromName(): string
+    {
+        $name = trim((string) $this->settings->get('email.admin_from_name', ''));
+        if ($name === '') throw new \RuntimeException('CMS sender name is missing.');
+        return $name;
+    }
+
+    private function replyTo(): string
+    {
+        $replyTo = strtolower(trim((string) $this->settings->get('email.reply_to', '')));
+        if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            throw new \RuntimeException('CMS reply-to email is invalid.');
+        }
+        return $replyTo;
+    }
 }
