@@ -34,6 +34,9 @@ test("questionnaire typography and colours use branding variables", () => {
   for (const token of ["--questionnaire-title-size", "--questionnaire-body-size", "--questionnaire-question-size", "--questionnaire-option-size", "--questionnaire-input-surface", "--questionnaire-selected-surface"]) {
     assert.match(css, new RegExp(token));
   }
+  assert.match(css, /\.latest-primary-button \{\s*background: var\(--gold, #c9a15a\);\s*color: #14141c;/s);
+  assert.match(css, /\.latest-scale-options label\.selected \{\s*background: var\(--questionnaire-selected-surface,/s);
+  assert.match(css, /color: var\(--questionnaire-selected-text, #14141c\);/);
 });
 
 test("email frame uses published branding values", () => {
