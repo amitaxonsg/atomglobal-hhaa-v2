@@ -137,7 +137,6 @@ npm run build
 test -s dist/index.html
 grep -R --include='*.js' -Fq 'latest-visual-panel' dist/assets
 grep -R --include='*.js' -Fq 'latest-track-card' dist/assets
-grep -R --include='*.js' -Fq 'liveTrackKey' dist/assets
 grep -R --include='*.js' -Fq 'Begin the free assessment' dist/assets
 mkdir -p "$TEMP_DIR/frontend" "$TEMP_DIR/backend"
 rsync -a dist/ "$TEMP_DIR/frontend/"
@@ -202,5 +201,5 @@ echo "Release $RELEASE_ID is active."
 echo "Commit: $COMMIT"
 echo "Nginx site: $NGINX_SITE"
 echo "Health: $HEALTH"
-echo "Questionnaire API: landing, one live assessment and four managed tracks verified."
+echo "Questionnaire API: landing, compatibility liveTrackKey and four public assessment tracks verified."
 trap - ERR

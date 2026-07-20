@@ -20,5 +20,5 @@ test("deployment will not report success while the old frontend or questionnaire
   assert.match(script, /Begin the free assessment/);
   assert.match(script, /api\/public\/assessment-experience/);
   assert.match(script, /Every choice you make is cast by two votes/);
-  assert.match(script, /landing, one live assessment and four managed tracks verified/);
+  assert.match(script, /compatibility liveTrackKey and four public assessment tracks verified/);
 });
