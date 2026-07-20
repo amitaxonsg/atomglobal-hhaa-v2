@@ -2,16 +2,6 @@ from pathlib import Path
 import re
 
 
-def replace_regex(path: str, pattern: str, replacement: str) -> None:
-    file = Path(path)
-    text = file.read_text()
-    updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
-    if count != 1:
-        raise SystemExit(f"Expected block not found in {path}")
-    file.write_text(updated)
-    print(f"Updated {path}")
-
-
 admin = Path("backend/src/Services/AdminService.php")
 text = admin.read_text()
 text, count = re.subn(
@@ -113,7 +103,7 @@ validation = r'''    private function validateBranding(array $payload): array
 '''
 text, count = re.subn(
     r"    private function validateBranding\(array \$payload\): array\n    \{.*?\n    private function audit\(",
-    validation + "\n    private function audit(",
+    lambda _match: validation + "\n    private function audit(",
     text,
     count=1,
     flags=re.S,
@@ -185,7 +175,7 @@ replacement = r'''    private function brandHtml(string $content, string $subjec
 '''
 text, count = re.subn(
     r"    private function brandHtml\(string \$content, string \$subject\): string\n    \{.*?\n    private function absoluteUrl",
-    replacement + "\n    private function absoluteUrl",
+    lambda _match: replacement + "\n    private function absoluteUrl",
     text,
     count=1,
     flags=re.S,
