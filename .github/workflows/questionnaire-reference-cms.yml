@@ -15,7 +15,7 @@ on:
       - ".github/workflows/questionnaire-reference-cms.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Node 22
         uses: actions/setup-node@v4
@@ -45,10 +47,13 @@ jobs:
           node - <<'NODE'
           const reference = require('/tmp/head-heart-reference.json');
           if (reference.reference.version !== '2.0.0') throw new Error('Wrong reference version');
+          if (reference.reference.sourceFileSha256 !== '2626c5f1d1edaf50f4d140b0e93306700cac13c6fcefdff8a107e3b35966c7e8') throw new Error('Wrong attached index.html hash');
+          if (reference.reference.questionnaireSha256 !== '379fdc28ddcbafab81af33f07cd8cd7a26364a68c98c5dab610c53087105741b') throw new Error('Wrong questionnaire aggregate hash');
           if (reference.tracks.length !== 4) throw new Error('Expected four tracks');
           for (const track of reference.tracks) {
             if (track.subscales.length !== 10) throw new Error(`${track.key}: expected 10 sections`);
             if (track.subscales.flatMap(section => section.items).length !== 50) throw new Error(`${track.key}: expected 50 questions`);
+            if (track.answerChoices.length !== 5) throw new Error(`${track.key}: expected five scored choices`);
           }
           NODE
 
@@ -59,3 +64,36 @@ jobs:
         run: |
           npm test
           npm run build
+
+      - name: Record successful reference verification
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          mkdir -p docs/verification
+          cat > docs/verification/questionnaire-cms-reference.md <<'MARKER'
+          # Questionnaire CMS reference verification
+
+          Automated verification passed for:
+
+          - CMS assessment version: `2.0.0`
+          - attached `index.html` SHA-256: `2626c5f1d1edaf50f4d140b0e93306700cac13c6fcefdff8a107e3b35966c7e8`
+          - questionnaire aggregate SHA-256: `379fdc28ddcbafab81af33f07cd8cd7a26364a68c98c5dab610c53087105741b`
+          - public tracks: Personal, New Joiner, Manager and Executive
+          - each track: 10 sections, 50 questions and five scored choices
+          - PHP importer syntax
+          - full JavaScript test suite
+          - production Vite build
+
+          This marker is written only after the complete workflow succeeds.
+          MARKER
+
+          if git diff --quiet -- docs/verification/questionnaire-cms-reference.md && git ls-files --error-unmatch docs/verification/questionnaire-cms-reference.md >/dev/null 2>&1; then
+            echo "Verification marker is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/verification/questionnaire-cms-reference.md
+          git commit -m "Record verified questionnaire CMS reference"
+          git push origin HEAD:main
