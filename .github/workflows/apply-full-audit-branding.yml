@@ -1,5 +1,7 @@
 name: Apply full audit and branding expansion
 
+# The workflow applies deterministic source patches, verifies the complete
+# questionnaire submission chain against MySQL, then commits only tested code.
 on:
   push:
     branches:
