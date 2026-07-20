@@ -19,7 +19,7 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Public runtime | React frontend, PHP 8.3 API and MariaDB |
 | Last release confirmed in pasted VPS output | `/var/www/head-heart.atomglobal.com/releases/20260719224421-7568577dc195` |
 | Last marker confirmed in pasted VPS output | `7568577dc195e4e2e319cda6edf3be4c5822768d` |
-| Current observed public screen | Latest questionnaire copy/process is visible in the centred layout; the merged split layout and one-live-assessment controls remain pending deployment |
+| Current observed public screen | Latest questionnaire copy/process is visible in the centred layout; the merged split layout and four public assessment choices remain pending deployment |
 | Production health in last output | Database, migrations, storage, email, GitHub feedback and cron healthy |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
 | Owner login | Confirmed for `amit@axon.com.sg` |
@@ -41,28 +41,21 @@ The `main` branch now combines the approved questionnaire process with the previ
 - no **Powered by Axon 1Pro** footer on participant or report pages;
 - Axon attribution retained only on admin login and the protected admin sidebar.
 
-The public questionnaire displays exactly one live assessment card at a time. All four assessment families remain available and versioned in the administration system.
+The public questionnaire displays all four approved assessment cards: Personal, New Joiner, Manager and Executive. Every card uses its own active published assessment version and CMS content.
 
-## One live assessment at a time
+## Four public assessment choices
 
-**Admin → Questionnaire → Live assessment** selects Personal, New Joiner, Manager or Executive for new public starts.
+The approved public landing displays Personal, New Joiner, Manager and Executive together in the right-hand content panel.
 
-The backend requires the selected track to:
+Each card uses its own active published assessment version. Landing copy and card descriptions remain editable in Admin → Questionnaire, while questions, sections, scoring and reports remain versioned under Admin → Assessments.
 
-- be active;
-- have a published version;
-- contain exactly 50 active questions;
-- contain exactly 10 active sections.
+The legacy `liveTrackKey` remains available for backward compatibility and deployment verification, but it no longer hides the other three public choices.
 
-The frontend shows only that assessment. The PHP API independently rejects a manually submitted hidden track, and every live-assessment change is audited.
-
-Changing the live assessment affects new starts only. Existing secure resume links continue using their original assessment version. Completed answers, scoring, reports and PDFs stay tied to their immutable snapshots.
-
-The default live assessment is Personal until an administrator changes it.
+Existing secure resume links continue using their original assessment version. Completed answers, scoring, reports and PDFs stay tied to immutable snapshots.
 
 ## Questionnaire process retained from the supplied `index.html`
 
-1. Display the single assessment selected as live.
+1. Display all four approved assessment choices.
 2. Show the track introduction and Heart/Head explanation.
 3. Collect name, email, age range and optional gender.
 4. Collect five assessment-specific context fields.
@@ -82,7 +75,6 @@ Reference hashes and ownership are documented in `docs/QUESTIONNAIRE-INDEX-REFER
 
 The Questionnaire workspace manages:
 
-- the single live assessment;
 - public landing heading and introduction paragraphs;
 - track-card title prefix and track description;
 - track introduction and Lite/Full Report offer text;

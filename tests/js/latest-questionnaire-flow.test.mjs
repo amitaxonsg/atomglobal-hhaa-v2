@@ -45,14 +45,12 @@ test("landing, track cards and intake are editable from the admin CMS", () => {
   assert.match(service, /UPDATE assessment_tracks SET description/);
 });
 
-test("only one published assessment is live for new participants", () => {
-  assert.match(admin, /Live assessment/);
-  assert.match(admin, /only assessment open to new participants/);
-  assert.match(routes, /\/api\/admin\/assessment-experience\/live-track/);
-  assert.match(service, /questionnaire\.live_track/);
-  assert.match(service, /assessment\.live_track_changed/);
-  assert.match(layout, /experience\?\.liveTrackKey/);
-  assert.match(survey, /This assessment is not currently open for new participants/);
+test("all four published assessments are offered to new participants", () => {
+  assert.match(layout, /trackOrder = \["personal", "newjoiner", "manager", "executive"\]/);
+  assert.match(layout, /tracks\.map/);
+  assert.match(layout, /experience\?\.tracks\?\.\[track\.key\]/);
+  assert.doesNotMatch(survey, /This assessment is not currently open for new participants/);
+  assert.match(admin, /four public assessment choices/);
 });
 
 test("admin warns that material question changes affect interpretation and history", () => {

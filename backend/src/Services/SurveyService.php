@@ -21,9 +21,8 @@ final class SurveyService
     {
         return $this->db->transaction(function () use ($payload) {
             $requestedTrackKey = strtolower(trim((string) ($payload['trackKey'] ?? '')));
-            $liveTrackKey = strtolower(trim((string) $this->settings->get('questionnaire.live_track', 'personal')));
-            if ($requestedTrackKey === '' || $requestedTrackKey !== $liveTrackKey) {
-                throw new \InvalidArgumentException('This assessment is not currently open for new participants.');
+            if ($requestedTrackKey === '') {
+                throw new \InvalidArgumentException('Choose an assessment to begin.');
             }
 
             $track = $this->db->fetch(

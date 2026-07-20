@@ -83,18 +83,22 @@ function VoteCopy({ text }) {
 
 export function SelectVersion({ experience, onSelect }) {
   const landing = landingExperience(experience?.landing);
-  const liveTrack = assessmentTracks[experience?.liveTrackKey] || assessmentTracks.personal;
-  const details = trackExperience(liveTrack.key, experience?.tracks?.[liveTrack.key] || {}, liveTrack.priceLabel);
+  const trackOrder = ["personal", "newjoiner", "manager", "executive"];
+  const tracks = trackOrder.map(key => assessmentTracks[key]).filter(Boolean);
   return <LatestPage width="640" className="latest-track-selection" brandVisible={landing.showBrandName} stageKey="version">
     <h1>{landing.title}</h1>
     <p className="latest-copy"><VoteCopy text={landing.primaryCopy} /></p>
     <p className="latest-copy latest-copy--last">{landing.secondaryCopy}</p>
-    <div className="latest-track-cards latest-track-cards--single">
-      <button className="latest-track-card" onClick={() => onSelect(liveTrack.key)}>
-        <strong>{landing.cardTitlePrefix} {liveTrack.label}</strong>
-        <span>{details.tagline}</span>
-        <small>{fallbackMeta[liveTrack.key].questionCount} questions · {fallbackMeta[liveTrack.key].sectionCount} sections · {durationLabel(fallbackMeta[liveTrack.key])}</small>
-      </button>
+    <div className="latest-track-cards">
+      {tracks.map(track => {
+        const details = trackExperience(track.key, experience?.tracks?.[track.key] || {}, track.priceLabel);
+        const meta = fallbackMeta[track.key];
+        return <button className="latest-track-card" key={track.key} onClick={() => onSelect(track.key)}>
+          <strong>{landing.cardTitlePrefix} {track.label}</strong>
+          <span>{details.tagline}</span>
+          <small>{meta.questionCount} questions · {meta.sectionCount} sections · {durationLabel(meta)}</small>
+        </button>;
+      })}
     </div>
   </LatestPage>;
 }
