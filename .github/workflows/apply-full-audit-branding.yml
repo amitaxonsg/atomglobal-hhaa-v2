@@ -1,0 +1,120 @@
+name: Apply full audit and branding expansion
+
+on:
+  push:
+    branches:
+      - full-audit-branding-20260720
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: ${{ !contains(github.event.head_commit.message, '[audit-branding-applied]') }}
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: head_heart_test
+          MYSQL_USER: head_heart
+          MYSQL_PASSWORD: test-password
+          MYSQL_ROOT_PASSWORD: root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: full-audit-branding-20260720
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_mysql, json, mbstring, openssl, curl, dom, fileinfo
+          coverage: none
+
+      - uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+
+      - name: Apply deterministic changes
+        run: |
+          python3 scripts/apply-branding-backend.py
+          python3 scripts/apply-branding-frontend.py
+          python3 scripts/apply-audit-readme.py
+          chmod +x deploy/full-production-audit.sh deploy/final-production-audit.sh backend/bin/production-submission-smoke-test.php
+
+      - name: Configure test database
+        run: |
+          cp backend/.env.example backend/.env
+          sed -i 's#^APP_ENV=.*#APP_ENV=testing#' backend/.env
+          sed -i 's#^APP_DEBUG=.*#APP_DEBUG=true#' backend/.env
+          sed -i 's#^APP_KEY=.*#APP_KEY=base64:dGVzdC1rZXktZm9yLWNpLW9ubHktMzItYnl0ZXM=#' backend/.env
+          sed -i 's#^DB_HOST=.*#DB_HOST=127.0.0.1#' backend/.env
+          sed -i 's#^DB_PORT=.*#DB_PORT=3306#' backend/.env
+          sed -i 's#^DB_DATABASE=.*#DB_DATABASE=head_heart_test#' backend/.env
+          sed -i 's#^DB_USERNAME=.*#DB_USERNAME=head_heart#' backend/.env
+          sed -i 's#^DB_PASSWORD=.*#DB_PASSWORD=test-password#' backend/.env
+          sed -i "s#^STORAGE_PATH=.*#STORAGE_PATH=${RUNNER_TEMP}/head-heart-storage#" backend/.env
+          mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports" "${RUNNER_TEMP}/head-heart-storage/tmp"
+
+      - name: Verify source and build
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+          php -l backend/src/Services/AdminService.php
+          php -l backend/src/Mail/MailDeliveryService.php
+          php -l backend/bin/production-submission-smoke-test.php
+          bash -n deploy/full-production-audit.sh
+          bash -n deploy/final-production-audit.sh
+
+      - name: Verify submission, report, admin and queue cleanup
+        run: |
+          php backend/bin/migrate.php
+          php backend/bin/seed.php
+          php backend/bin/production-submission-smoke-test.php \
+            --recipient=audit@example.test \
+            --track=personal \
+            --confirm=RUN-PRODUCTION-SUBMISSION-SMOKE
+          mysql -h 127.0.0.1 -P 3306 -u head_heart -ptest-password head_heart_test --batch --skip-column-names <<'SQL' > /tmp/post-smoke.txt
+          SELECT COUNT(*) FROM participants;
+          SELECT COUNT(*) FROM survey_sessions;
+          SELECT COUNT(*) FROM survey_answers;
+          SELECT COUNT(*) FROM score_snapshots;
+          SELECT COUNT(*) FROM generated_reports;
+          SELECT COUNT(*) FROM assessment_versions WHERE version_number = '2.0.0' AND status = 'published';
+          SELECT COUNT(*) FROM assessment_versions WHERE version_number <> '2.0.0';
+          SQL
+          mapfile -t values < /tmp/post-smoke.txt
+          test "${values[0]}" = "0"
+          test "${values[1]}" = "0"
+          test "${values[2]}" = "0"
+          test "${values[3]}" = "0"
+          test "${values[4]}" = "0"
+          test "${values[5]}" = "4"
+          test "${values[6]}" = "0"
+
+      - name: Commit tested changes
+        run: |
+          git config user.name "Amit Kumar"
+          git config user.email "amit@axon.com.sg"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
+          git commit -m "Expand questionnaire branding and production audit [audit-branding-applied]"
+          git push origin HEAD:full-audit-branding-20260720
