@@ -8,7 +8,7 @@ const audit = fs.readFileSync("backend/bin/email-settings-audit.php", "utf8");
 
 test("masked secret descriptors cannot overwrite encrypted settings", () => {
   assert.match(settings, /if \(!is_string\(\$value\)\) return;/);
-  assert.match(settings, /preg_match\('\/[\^\[]\[\*•\]\+\$\/u'/);
+  assert.match(settings, /preg_match\('\/\^\[\*•\]\+\$\/u'/);
   assert.match(settings, /SMTP2GO API key appears incomplete/);
 });
 
