@@ -95,6 +95,10 @@ jobs:
         run: |
           set -o pipefail
           php backend/bin/seed.php 2>&1 | tee database-seed.log
+      - name: Audit Lite and Full Report CMS content
+        run: |
+          set -o pipefail
+          php backend/bin/report-flow-audit.php 2>&1 | tee report-flow-audit.log
       - run: php tests/php/run.php
       - name: Run MySQL integration acceptance tests
         run: |
@@ -118,6 +122,20 @@ jobs:
           " | tee production-submission-cleanup.log
           test "$(sed -n '1p' production-submission-cleanup.log)" = "0"
           test "$(sed -n '2p' production-submission-cleanup.log)" = "0"
+      - name: Verify locked, unlocked and PDF report flow
+        run: |
+          set -o pipefail
+          php backend/bin/production-report-flow-smoke-test.php \
+            --recipient=report-flow-smoke@example.test \
+            --track=personal \
+            --confirm=RUN-PRODUCTION-REPORT-SMOKE \
+            2>&1 | tee production-report-flow-smoke.log
+          mysql -h 127.0.0.1 -P 3306 -u head_heart -ptest-password head_heart_test --batch --skip-column-names -e "
+            SELECT COUNT(*) FROM participants WHERE email_normalized = 'report-flow-smoke@example.test';
+            SELECT COUNT(*) FROM email_queue WHERE recipient_email = 'report-flow-smoke@example.test';
+          " | tee production-report-flow-cleanup.log
+          test "$(sed -n '1p' production-report-flow-cleanup.log)" = "0"
+          test "$(sed -n '2p' production-report-flow-cleanup.log)" = "0"
       - name: Verify critical tables and seed records
         env:
           MYSQL_PWD: test-password
@@ -143,5 +161,6 @@ jobs:
             database-*.log
             questionnaire-*.log
             production-*.log
+            report-*.log
           if-no-files-found: ignore
           retention-days: 7
