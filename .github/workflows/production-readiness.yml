@@ -19,6 +19,7 @@ jobs:
         run: |
           bash -n deploy/update-vps.sh
           bash -n deploy/final-production-audit.sh
+          bash -n deploy/full-production-audit.sh
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -103,6 +104,20 @@ jobs:
         run: |
           set -o pipefail
           php tests/php/questionnaire-process.php 2>&1 | tee questionnaire-integration.log
+      - name: Verify temporary participant submission and cleanup
+        run: |
+          set -o pipefail
+          php backend/bin/production-submission-smoke-test.php \
+            --recipient=production-smoke@example.test \
+            --track=personal \
+            --confirm=RUN-PRODUCTION-SUBMISSION-SMOKE \
+            2>&1 | tee production-submission-smoke.log
+          mysql -h 127.0.0.1 -P 3306 -u head_heart -ptest-password head_heart_test --batch --skip-column-names -e "
+            SELECT COUNT(*) FROM participants WHERE email_normalized = 'production-smoke@example.test';
+            SELECT COUNT(*) FROM email_queue WHERE recipient_email = 'production-smoke@example.test';
+          " | tee production-submission-cleanup.log
+          test "$(sed -n '1p' production-submission-cleanup.log)" = "0"
+          test "$(sed -n '2p' production-submission-cleanup.log)" = "0"
       - name: Verify critical tables and seed records
         env:
           MYSQL_PWD: test-password
@@ -127,5 +142,6 @@ jobs:
           path: |
             database-*.log
             questionnaire-*.log
+            production-*.log
           if-no-files-found: ignore
           retention-days: 7
