@@ -14,12 +14,13 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Git repository | `amitaxonsg/atomglobal-hhaa-v2` |
 | Default branch | `main` |
 | Production-ready foundation | PR #5 merged into `main` on 20 July 2026 |
-| Branding and full-audit release | PR #7 merged into `main` as `11ceb442c97cd17ffc89219c0b5b8dec8952293f`; production deployment pending |
-| Current production baseline commit | `70bc001474fcdfec055bfc18eda416e31a4920f3` until the branding/audit release is deployed |
-| Code acceptance | Production readiness checks run #435 passed frontend, PHP, database, exact questionnaire flow, temporary submission, report, Admin visibility, four email queues and automatic test cleanup |
+| Branding and full-audit release | PR #7 deployed successfully as commit `03392964177784f3b60db760deb64f25e5ccfe3e` |
+| CMS email hardening | PR #8 merged as `98dad4a5bedf0223ca15516ea2be0d6d1ebcb46c`; production deployment pending |
+| Current production baseline commit | `03392964177784f3b60db760deb64f25e5ccfe3e` until PR #8 is deployed |
+| Code acceptance | Production readiness checks run #436 passed frontend, PHP, database, exact questionnaire flow, temporary submission, report, Admin visibility, four email queues and automatic test cleanup |
 | Public runtime | React frontend, PHP 8.3 API and MariaDB |
-| Last production release confirmed | `/var/www/head-heart.atomglobal.com/releases/20260720055557-70bc001474fc` |
-| Last production marker confirmed | `70bc001474fcdfec055bfc18eda416e31a4920f3` |
+| Current production release confirmed | `/var/www/head-heart.atomglobal.com/releases/20260720072119-033929641777` |
+| Current production marker confirmed | `03392964177784f3b60db760deb64f25e5ccfe3e` |
 | Current observed public screen | Restored left branding with Personal, New Joiner, Manager and Executive active on the right |
 | Production health in last output | Database, migrations, storage, email, GitHub feedback and cron healthy |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
@@ -31,7 +32,7 @@ Production Admin and database verification confirmed exactly four published `2.0
 
 ## Verified production experience
 
-The `main` branch now combines the approved questionnaire process with the previously approved visual branding:
+The `main` branch combines the approved questionnaire process with the approved visual branding:
 
 - responsive desktop split screen with the reflective image on the left;
 - transparent Atom Global logo over the image;
@@ -100,13 +101,32 @@ The production database was intentionally reset to the current approved assessme
 
 Future completed submissions must remain pinned to their immutable assessment version and snapshots. Never delete a version that has a completed session, score or report.
 
+## CMS email configuration and secret safety
+
+Admin → Settings → Email is the authoritative source for the delivery provider, sender name, sender email, reply-to email, public URL, email logo/footer links, SMTP settings and SMTP2GO API key.
+
+Production safeguards introduced in PR #8:
+
+- outbound delivery no longer falls back to `amit@axon.com.sg` for the participant sender;
+- SMTP2GO receives the CMS sender identity in `Name <email@domain>` format;
+- SMTP and SMTP2GO credentials are read from encrypted CMS settings;
+- the browser receives only a masked secret descriptor, never the decrypted credential;
+- masked objects, empty secret fields and bullet/asterisk placeholders are ignored instead of overwriting the stored encrypted value;
+- an obviously truncated SMTP2GO key is rejected with a validation error;
+- `backend/bin/email-settings-audit.php` reports effective non-secret settings and whether secrets are configured, but never outputs passwords or API keys.
+
+A blank password/API-key field means **keep the current stored credential**. Paste a full new credential only when intentionally rotating it.
+
 ## Full production audit and submission smoke test
 
 `deploy/full-production-audit.sh` verifies services, immutable Nginx paths, API health, four CMS tracks, exactly four published `2.0.0` versions, database foreign-key integrity, report linkage, email templates, branding configuration, cron and recent backups.
 
+Run deployment/audit scripts from the Git source checkout at `/srv/head-heart.atomglobal.com/source`; immutable runtime releases contain the frontend and backend application, not the Git operations workspace.
+
 By default the audit is read-only. To create one temporary submission, verify Admin visibility, report generation and email queues, then remove the test records automatically:
 
 ```bash
+cd /srv/head-heart.atomglobal.com/source
 SMOKE_RECIPIENT=amit@axon.com.sg \
 SMOKE_TRACK=personal \
 bash deploy/full-production-audit.sh
@@ -137,7 +157,7 @@ Publishing a draft archives the previous published version for new starts but do
 
 Production Nginx is pinned to exact immutable release paths. A previous script changed the `current` symlink without changing the Nginx path, which caused an old frontend/API to remain served.
 
-The corrected `deploy/update-vps.sh` now:
+The corrected `deploy/update-vps.sh`:
 
 - backs up the Head–Heart Nginx site file;
 - backs up MariaDB;
@@ -145,7 +165,7 @@ The corrected `deploy/update-vps.sh` now:
 - verifies the restored left-image frontend and four-card assessment client;
 - atomically repoints the exact Nginx frontend and backend paths;
 - validates Nginx before reload;
-- verifies `/api/health`, `/api/public/assessment-experience`, `liveTrackKey` and four managed tracks;
+- verifies `/api/health`, `/api/public/assessment-experience`, compatibility `liveTrackKey` and four managed tracks;
 - restores Nginx, symlink and markers on failure;
 - keeps unrelated Nginx sites untouched.
 
@@ -182,7 +202,7 @@ GitHub feedback synchronisation uses a fine-grained token restricted to `amitaxo
 
 ## Automated verification
 
-The merged production-ready commit passed:
+The merged production-ready code passed:
 
 - frontend tests and Vite production build;
 - responsive split-layout and no-public-attribution assertions;
@@ -196,6 +216,7 @@ The merged production-ready commit passed:
 - temporary participant creation, 50-answer persistence, score and report generation;
 - Admin participant-detail visibility and all four participant-flow email queues;
 - automatic removal of temporary smoke-test records;
+- masked-secret protection and CMS-only outbound sender assertions;
 - audit records;
 - deployment and full-production-audit script syntax validation.
 
@@ -218,7 +239,7 @@ The merged production-ready commit passed:
 ## Next deployment acceptance
 
 1. Deploy merged `main` using `deploy/update-vps.sh`.
-2. Confirm the desktop public page restores the left image and approved branding.
+2. Confirm the desktop public page retains the left image and approved branding.
 3. Confirm mobile hides the image and shows the transparent logo.
 4. Confirm public pages do not show Powered by Axon 1Pro.
 5. Confirm admin login and sidebar still show Powered by Axon 1Pro.
@@ -229,10 +250,12 @@ The merged production-ready commit passed:
 10. Confirm every new session is pinned to published CMS version `2.0.0`.
 11. Test Questionnaire CMS landing, card, introduction and intake changes.
 12. Run the guarded submission smoke test and verify participant, 50 answers, score, report, Admin detail and four email queues before automatic test-data cleanup.
-13. Rotate the previously exposed SMTP2GO credential and send a real template test.
-14. Configure and test Stripe test keys, Price IDs and signed webhooks.
-15. Run `deploy/full-production-audit.sh` (or the compatibility wrapper `deploy/final-production-audit.sh`) and retain its output.
-16. Record Amit and client acceptance after production verification.
+13. Run `backend/bin/email-settings-audit.php` and confirm the CMS sender identity without exposing secrets.
+14. Confirm Admin → Settings → Email can be saved with blank secret fields without changing the stored SMTP2GO key.
+15. Send one selected-template email test and confirm SMTP2GO shows the CMS sender identity.
+16. Configure and test Stripe test keys, Price IDs and signed webhooks.
+17. Run `deploy/full-production-audit.sh` (or the compatibility wrapper `deploy/final-production-audit.sh`) from the Git source checkout and retain its output.
+18. Record Amit and client acceptance after production verification.
 
 ## Safe deployment rule
 
