@@ -7,7 +7,9 @@ Automated verification passed for:
 - questionnaire aggregate SHA-256: `379fdc28ddcbafab81af33f07cd8cd7a26364a68c98c5dab610c53087105741b`
 - public tracks: Personal, New Joiner, Manager and Executive
 - each track: 10 sections, 50 questions and five scored choices
-- PHP importer syntax
+- clean MySQL migration and exact version `2.0.0` CMS import
+- repeat-import idempotence: later deployments leave CMS content unchanged
+- PHP database tests
 - full JavaScript test suite
 - production Vite build
 
