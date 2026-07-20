@@ -11,14 +11,15 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 | Public URL | `https://head-heart.atomglobal.com/` |
 | Admin URL | `https://head-heart.atomglobal.com/admin` |
 | VPS | `161.97.137.234` |
-| Development branch | `production-readiness-20260719` |
-| Pull request | Draft PR #5; open, mergeable and not merged |
-| Latest accepted feature checkpoint | `d3a1fef4d002976a330dc8ea079afd1f700c717e` |
-| Code acceptance | Production readiness checks run #414 passed frontend, PHP, database, questionnaire integration and deployment/final-audit script validation |
+| Git repository | `amitaxonsg/atomglobal-hhaa-v2` |
+| Default branch | `main` |
+| Production-ready merge | PR #5 merged into `main` on 20 July 2026 |
+| Merged feature commit | `77e9fc3d23d5927c7233681430eb5801a29c6519` |
+| Code acceptance | Production readiness checks run #416 passed frontend, PHP, database, questionnaire integration and deployment/final-audit script validation |
 | Public runtime | React frontend, PHP 8.3 API and MariaDB |
 | Last release confirmed in pasted VPS output | `/var/www/head-heart.atomglobal.com/releases/20260719224421-7568577dc195` |
 | Last marker confirmed in pasted VPS output | `7568577dc195e4e2e319cda6edf3be4c5822768d` |
-| Current observed public screen | Latest questionnaire copy/process is visible in the centred layout; the restored split layout and one-live-assessment controls remain pending deployment |
+| Current observed public screen | Latest questionnaire copy/process is visible in the centred layout; the merged split layout and one-live-assessment controls remain pending deployment |
 | Production health in last output | Database, migrations, storage, email, GitHub feedback and cron healthy |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
 | Owner login | Confirmed for `amit@axon.com.sg` |
@@ -27,9 +28,9 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 
 The screenshot supplied after the corrected deployment confirms that the latest questionnaire process reached the public site. The exact active marker after that later deployment was not pasted; verify it from `/var/www/head-heart.atomglobal.com/deployed-commit.txt` before the next release.
 
-## Latest branch change awaiting VPS deployment
+## Merged production change awaiting VPS deployment
 
-The branch now combines the approved questionnaire process with the previously approved visual branding:
+The `main` branch now combines the approved questionnaire process with the previously approved visual branding:
 
 - responsive desktop split screen with the reflective image on the left;
 - transparent Atom Global logo over the image;
@@ -161,7 +162,7 @@ GitHub feedback synchronisation uses a fine-grained token restricted to `amitaxo
 
 ## Automated verification
 
-The latest accepted feature checkpoint passed:
+The merged production-ready commit passed:
 
 - frontend tests and Vite production build;
 - responsive split-layout and no-public-attribution assertions;
@@ -193,7 +194,7 @@ The latest accepted feature checkpoint passed:
 
 ## Next deployment acceptance
 
-1. Deploy the final verified branch head using `deploy/update-vps.sh`.
+1. Deploy merged `main` using `deploy/update-vps.sh`.
 2. Confirm the desktop public page restores the left image and approved branding.
 3. Confirm mobile hides the image and shows the transparent logo.
 4. Confirm public pages do not show Powered by Axon 1Pro.
@@ -207,7 +208,7 @@ The latest accepted feature checkpoint passed:
 12. Rotate the previously exposed SMTP2GO credential and send a real template test.
 13. Configure and test Stripe test keys, Price ID and signed webhook for the live assessment.
 14. Run `deploy/final-production-audit.sh` and retain its output.
-15. Merge PR #5 only after Amit and client acceptance.
+15. Record Amit and client acceptance after production verification.
 
 ## Safe deployment rule
 
