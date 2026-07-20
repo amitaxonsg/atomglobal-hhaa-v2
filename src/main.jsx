@@ -14,6 +14,7 @@ import "./admin-security-polish.css";
 import "./admin-support.css";
 import "./questionnaire-process.css";
 import "./questionnaire-latest.css";
+import "./report-flow.css";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);

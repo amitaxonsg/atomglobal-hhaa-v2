@@ -38,8 +38,18 @@ export function useLoader(loader, dependencies = []) {
   return { ...state, refresh, setData: data => setState({ loading: false, data, error: "" }) };
 }
 
-export function JsonEditor({ label, value, onChange, rows = 10 }) {
+export function JsonEditor({ label, value, onChange, rows = 10, readOnly = false }) {
   const [text, setText] = React.useState(() => JSON.stringify(value ?? {}, null, 2));
   React.useEffect(() => { setText(JSON.stringify(value ?? {}, null, 2)); }, [value]);
-  return <label>{label}<textarea rows={rows} value={text} onChange={event => { setText(event.target.value); try { onChange(JSON.parse(event.target.value)); } catch { /* Keep editing until JSON is valid. */ } }} /></label>;
+  return <label>{label}<textarea
+    rows={rows}
+    value={text}
+    readOnly={readOnly}
+    aria-readonly={readOnly}
+    onChange={event => {
+      if (readOnly) return;
+      setText(event.target.value);
+      try { onChange(JSON.parse(event.target.value)); } catch { /* Keep editing until JSON is valid. */ }
+    }}
+  /></label>;
 }

@@ -29,7 +29,7 @@ final class PdfService
         $heading = $this->settings->get('branding.heading_font', 'Georgia, Times New Roman, serif');
         $body = $this->settings->get('branding.body_font', 'Arial, Helvetica, sans-serif');
         $logo = $this->logoDataUri((string) $this->settings->get('branding.report_logo_url', '/media/brand/atom-global-wordmark.png'));
-        $content = $row['is_unlocked'] ? $paid : $free;
+        $paidContent = is_array($paid['content'] ?? null) ? $paid['content'] : $paid;
 
         $brand = $logo
             ? '<img class="logo" src="' . $this->h($logo) . '" alt="Atom Global Consulting">'
@@ -39,14 +39,18 @@ final class PdfService
         if (is_array($summary)) $summary = json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $html = '<!doctype html><html><head><meta charset="utf-8"><style>'
-            . '@page{margin:30mm 22mm 24mm}body{font-family:' . $this->css($body) . ';color:' . $this->css($ink) . ';font-size:11pt;line-height:1.55;background:#fff}h1,h2,h3{font-family:' . $this->css($heading) . ';font-weight:normal}h1{font-size:30pt;margin:0 0 6mm}h2{font-size:18pt;margin-top:10mm;border-bottom:1px solid #ddd;padding-bottom:2mm}h3{font-size:14pt}.logo{width:54mm;max-height:18mm;object-fit:contain}.brand{font-weight:bold;letter-spacing:.08em;color:' . $this->css($heart) . ';font-size:10pt}.meta{color:' . $this->css($muted) . ';font-size:9pt}.hero{background:' . $this->css($canvas) . ';padding:10mm;margin:8mm 0;border-left:3px solid ' . $this->css($gold) . '}.score{font-family:' . $this->css($heading) . ';font-size:28pt}.footer{position:fixed;bottom:-14mm;left:0;right:0;color:' . $this->css($muted) . ';font-size:8pt;text-align:center}ul{padding-left:5mm}pre{white-space:pre-wrap;font-family:' . $this->css($body) . ';font-size:9pt}</style></head><body>'
+            . '@page{margin:30mm 22mm 24mm}body{font-family:' . $this->css($body) . ';color:' . $this->css($ink) . ';font-size:11pt;line-height:1.55;background:#fff}h1,h2,h3,h4{font-family:' . $this->css($heading) . ';font-weight:normal}h1{font-size:30pt;margin:0 0 6mm}h2{font-size:18pt;margin-top:10mm;border-bottom:1px solid #ddd;padding-bottom:2mm}h3{font-size:14pt;margin:7mm 0 2mm}h4{font-size:12pt;margin:4mm 0 1mm}.logo{width:54mm;max-height:18mm;object-fit:contain}.brand{font-weight:bold;letter-spacing:.08em;color:' . $this->css($heart) . ';font-size:10pt}.meta{color:' . $this->css($muted) . ';font-size:9pt}.hero{background:' . $this->css($canvas) . ';padding:10mm;margin:8mm 0;border-left:3px solid ' . $this->css($gold) . '}.score{font-family:' . $this->css($heading) . ';font-size:28pt}.report-block{page-break-inside:avoid;border:1px solid #e4ddcf;border-radius:4px;padding:5mm;margin:4mm 0}.subscale{page-break-inside:avoid;margin:3mm 0}.footer{position:fixed;bottom:-14mm;left:0;right:0;color:' . $this->css($muted) . ';font-size:8pt;text-align:center}ul{padding-left:5mm;margin-top:2mm}</style></head><body>'
             . $brand . '<p class="meta">HEAD–HEART ALIGNMENT · ' . $this->h($row['track_name']) . '</p>'
             . '<h1>' . $this->h($free['profile'] ?? 'Head–Heart Alignment Report') . '</h1>'
             . '<p class="meta">Prepared for ' . $this->h($row['participant_name']) . ' · Completed ' . $this->h((string) ($row['completed_at'] ?? '')) . '</p>'
             . '<div class="hero"><div class="score">' . (int) ($free['total'] ?? 0) . ' / 250</div><p>' . $this->h((string) $summary) . '</p></div>'
             . $this->section('Strengths to build on', $free['summary']['strengths'] ?? [])
             . $this->section('Development observations', $free['summary']['watchouts'] ?? [])
-            . ($row['is_unlocked'] ? '<h2>Full development report</h2>' . $this->renderContent($content) : '<h2>Full report upgrade</h2><p>The detailed radar, development roadmap and track-specific guidance are available after verified payment or authorised admin unlock.</p>')
+            . ($row['is_unlocked']
+                ? '<h2>Full development report</h2>'
+                    . $this->scoreBreakdown($paid['subscales'] ?? [])
+                    . $this->renderContent($paidContent)
+                : '<h2>Full report upgrade</h2><p>The detailed radar, development roadmap and track-specific guidance are available after verified payment or authorised admin unlock.</p>')
             . '<div class="footer">Head–Heart Alignment by Atom Global Consulting · Private and confidential</div></body></html>';
 
         $options = new Options();
@@ -86,22 +90,64 @@ final class PdfService
         return '<h2>' . $this->h($title) . '</h2><ul>' . implode('', array_map(fn($item) => '<li>' . $this->h((string) $item) . '</li>', $items)) . '</ul>';
     }
 
+    private function scoreBreakdown(mixed $scores): string
+    {
+        if (!is_array($scores) || !$scores) return '';
+        $items = [];
+        foreach ($scores as $label => $score) $items[] = $this->h((string) $label) . ': ' . (int) $score . ' / 25';
+        return $this->section('10-area score breakdown', $items);
+    }
+
     private function renderContent(mixed $content): string
     {
         if (!is_array($content)) return '<p>' . $this->h((string) $content) . '</p>';
+        $labels = [
+            'summary' => 'Full profile interpretation',
+            'strengths' => 'Strengths to build on',
+            'watchouts' => 'Challenges and watch-outs',
+            'developmentAreas' => 'Development areas',
+            'relationships' => 'In relationships',
+            'work' => 'Improving your working style',
+            'workingStyleTips' => 'Working-style actions',
+            'handlingDifficulty' => 'How you handle difficulty',
+            'leadershipImpact' => (string) ($content['leadershipImpactLabel'] ?? 'Leadership impact'),
+            'cultureFitPrompt' => (string) ($content['cultureFitLabel'] ?? 'Culture fit reflection'),
+            'growth' => 'Practical ideas for growth',
+            'subscaleReads' => 'Your 10-area interpretation',
+            'roadmap' => 'Development roadmap',
+            'upgradeReasons' => 'Full Report applications',
+        ];
+        $skip = ['profile', 'total', 'hasLeadershipImpact', 'hasCultureFit', 'leadershipImpactLabel', 'cultureFitLabel'];
         $html = '';
         foreach ($content as $key => $value) {
-            if (in_array($key, ['profile', 'total'], true)) continue;
-            $html .= '<h3>' . $this->h(ucwords(str_replace(['_', '-'], ' ', (string) $key))) . '</h3>';
-            if (is_array($value)) {
-                if (array_is_list($value) && count(array_filter($value, 'is_scalar')) === count($value)) {
-                    $html .= '<ul>' . implode('', array_map(fn($item) => '<li>' . $this->h((string) $item) . '</li>', $value)) . '</ul>';
-                } else {
-                    $html .= '<pre>' . $this->h((string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) . '</pre>';
+            if (in_array($key, $skip, true) || $value === null || $value === '' || $value === []) continue;
+            $title = $labels[$key] ?? ucwords(str_replace(['_', '-'], ' ', (string) $key));
+            $html .= '<div class="report-block"><h3>' . $this->h($title) . '</h3>' . $this->renderValue($value) . '</div>';
+        }
+        return $html;
+    }
+
+    private function renderValue(mixed $value): string
+    {
+        if (!is_array($value)) return '<p>' . $this->h((string) $value) . '</p>';
+        if (array_is_list($value)) {
+            $html = '';
+            foreach ($value as $item) {
+                if (!is_array($item)) {
+                    $html .= '<ul><li>' . $this->h((string) $item) . '</li></ul>';
+                    continue;
                 }
-            } else {
-                $html .= '<p>' . $this->h((string) $value) . '</p>';
+                $title = (string) ($item['title'] ?? $item['area'] ?? '');
+                $detail = (string) ($item['detail'] ?? $item['insight'] ?? $item['summary'] ?? '');
+                $html .= '<div class="subscale">' . ($title !== '' ? '<h4>' . $this->h($title) . '</h4>' : '') . ($detail !== '' ? '<p>' . $this->h($detail) . '</p>' : '');
+                if (is_array($item['steps'] ?? null)) $html .= '<ul>' . implode('', array_map(fn($step) => '<li>' . $this->h((string) $step) . '</li>', $item['steps'])) . '</ul>';
+                $html .= '</div>';
             }
+            return $html;
+        }
+        $html = '';
+        foreach ($value as $key => $item) {
+            $html .= '<div class="subscale"><h4>' . $this->h((string) $key) . '</h4>' . $this->renderValue($item) . '</div>';
         }
         return $html;
     }
