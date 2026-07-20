@@ -49,7 +49,7 @@ function LatestPage({ children, width = "720", className = "", brandVisible = tr
   return <div className="latest-questionnaire-shell">
     <VisualPanel stageKey={stageKey} />
     <div className="latest-questionnaire-content">
-      <main className={`latest-questionnaire-page ${className}`} style={{ "--latest-page-width": `${width}px` }}>
+      <main className={`latest-questionnaire-page ${className}`} style={{ "--latest-default-page-width": `${width}px` }}>
         <PublicBrand visible={brandVisible} />
         {children}
         {actions && <footer className="latest-page-actions">{actions}</footer>}
@@ -139,21 +139,25 @@ export function ParticipantDetails({ track, remoteExperience, participant, setPa
     <p className="latest-copy latest-copy--last">A few details so your report can be sent to you and personalised correctly. Nothing here is identifying beyond your name and email — the rest is broad categories only.</p>
     {error && <p className="form-error" role="alert">{error}</p>}
 
-    <label className="latest-field"><span>Name *</span><input autoComplete="name" value={participant.name} onChange={update("name")} placeholder="Your full name" required /></label>
-    <SelectField label="Age range *" options={participantBaseOptions.ageRanges} value={participant.ageRange} onChange={update("ageRange")} />
-    <SelectField label="Gender" options={participantBaseOptions.genderOptions} value={participant.gender} onChange={update("gender")} required={false} />
-    <label className="latest-field"><span>Email address *</span><input type="email" autoComplete="email" value={participant.email} onChange={update("email")} placeholder="you@example.com" required /></label>
+    <div className="latest-intake-grid latest-intake-grid--identity">
+      <label className="latest-field"><span>Name *</span><input autoComplete="name" value={participant.name} onChange={update("name")} placeholder="Your full name" required /></label>
+      <SelectField label="Age range *" options={participantBaseOptions.ageRanges} value={participant.ageRange} onChange={update("ageRange")} />
+      <SelectField label="Gender" options={participantBaseOptions.genderOptions} value={participant.gender} onChange={update("gender")} required={false} />
+      <label className="latest-field"><span>Email address *</span><input type="email" autoComplete="email" value={participant.email} onChange={update("email")} placeholder="you@example.com" required /></label>
+    </div>
 
     <div className="latest-context-divider">A little more context</div>
-    <SelectField label={config.whoLabel} options={config.whoOptions} value={participant.role} onChange={update("role")} />
-    <SelectField label={config.whatLabel} options={config.whatOptions} value={participant.industry} onChange={update("industry")} />
-    <SelectField label={config.whereLabel} options={config.whereOptions} value={participant.region} onChange={update("region")} />
-    <SelectField label={config.whyLabel} options={config.whyOptions} value={participant.purpose} onChange={update("purpose")} />
-    <SelectField label={config.howLabel} options={config.howOptions} value={participant.tenure} onChange={update("tenure")} />
-    {showCompanyFields && <>
-      <SelectField label={config.departmentLabel || "Department *"} options={config.departmentOptions || []} value={participant.department} onChange={update("department")} />
-      <SelectField label={config.levelLabel || "Level *"} options={config.levelOptions || []} value={participant.level} onChange={update("level")} />
-    </>}
+    <div className="latest-intake-grid latest-intake-grid--context">
+      <SelectField label={config.whoLabel} options={config.whoOptions} value={participant.role} onChange={update("role")} />
+      <SelectField label={config.whatLabel} options={config.whatOptions} value={participant.industry} onChange={update("industry")} />
+      <SelectField label={config.whereLabel} options={config.whereOptions} value={participant.region} onChange={update("region")} />
+      <SelectField label={config.whyLabel} options={config.whyOptions} value={participant.purpose} onChange={update("purpose")} />
+      <SelectField label={config.howLabel} options={config.howOptions} value={participant.tenure} onChange={update("tenure")} />
+      {showCompanyFields && <>
+        <SelectField label={config.departmentLabel || "Department *"} options={config.departmentOptions || []} value={participant.department} onChange={update("department")} />
+        <SelectField label={config.levelLabel || "Level *"} options={config.levelOptions || []} value={participant.level} onChange={update("level")} />
+      </>}
+    </div>
 
     <p className="latest-intake-note">Used to send you a copy of your report, and to help us understand who this assessment actually helps.</p>
     <fieldset className="latest-consents"><legend>Privacy and communication</legend>

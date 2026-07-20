@@ -10,8 +10,11 @@ final class AdminService
 {
     private const BRAND_KEYS = [
         'canvas','surface','text_primary','text_muted','border','cta','cta_hover','heart','head','accent','navy',
-        'heading_font','body_font','base_font_size','card_radius','button_radius','logo_url','favicon_url',
-        'email_logo_url','report_logo_url','banner_url'
+        'questionnaire_copy','questionnaire_label','input_surface','input_text','option_surface','option_text',
+        'selected_surface','selected_text','progress','heading_font','body_font','base_font_size','page_title_size',
+        'body_text_size','question_text_size','option_text_size','field_label_size','field_text_size','meta_text_size',
+        'visual_title_size','visual_body_size','content_max_width','intake_max_width','question_max_width','content_gutter',
+        'card_radius','button_radius','logo_url','favicon_url','email_logo_url','report_logo_url','banner_url'
     ];
 
     private const SENSITIVE_KEYS = [
@@ -424,11 +427,57 @@ final class AdminService
     private function validateBranding(array $payload): array
     {
         $defaults = $this->publicConfiguration()['branding'];
+        $colourKeys = [
+            'canvas','surface','textPrimary','textMuted','border','cta','ctaHover','heart','head','accent','navy',
+            'questionnaireCopy','questionnaireLabel','inputSurface','inputText','optionSurface','optionText',
+            'selectedSurface','selectedText','progress',
+        ];
+        $numericBounds = [
+            'baseFontSize' => [12, 22], 'pageTitleSize' => [36, 88], 'bodyTextSize' => [12, 22],
+            'questionTextSize' => [14, 26], 'optionTextSize' => [9, 18], 'fieldLabelSize' => [9, 18],
+            'fieldTextSize' => [12, 22], 'metaTextSize' => [9, 18], 'visualTitleSize' => [36, 96],
+            'visualBodySize' => [12, 30], 'contentMaxWidth' => [520, 1100], 'intakeMaxWidth' => [600, 1200],
+            'questionMaxWidth' => [640, 1200], 'contentGutter' => [24, 120], 'cardRadius' => [0, 32],
+            'buttonRadius' => [0, 32],
+        ];
+        $fontKeys = ['headingFont', 'bodyFont'];
+        $assetKeys = ['logoUrl', 'faviconUrl', 'emailLogoUrl', 'reportLogoUrl', 'bannerUrl'];
         $result = [];
+
         foreach ($defaults as $key => $default) {
             $value = $payload[$key] ?? $default;
-            if (str_contains(strtolower($key), 'color') || in_array($key, ['canvas','surface','textPrimary','textMuted','border','cta','ctaHover','heart','head','accent','navy'], true)) {
-                if (!preg_match('/^#[0-9A-Fa-f]{6}$/', (string) $value)) throw new \InvalidArgumentException('Invalid colour value for ' . $key . '.');
+            if (in_array($key, $colourKeys, true)) {
+                if (!preg_match('/^#[0-9A-Fa-f]{6}$/', (string) $value)) {
+                    throw new \InvalidArgumentException('Invalid colour value for ' . $key . '.');
+                }
+                $result[$key] = strtoupper((string) $value);
+                continue;
+            }
+            if (isset($numericBounds[$key])) {
+                if (!is_numeric($value)) throw new \InvalidArgumentException('Invalid numeric value for ' . $key . '.');
+                $number = (int) round((float) $value);
+                [$minimum, $maximum] = $numericBounds[$key];
+                if ($number < $minimum || $number > $maximum) {
+                    throw new \InvalidArgumentException($key . ' must be between ' . $minimum . ' and ' . $maximum . '.');
+                }
+                $result[$key] = $number;
+                continue;
+            }
+            if (in_array($key, $fontKeys, true)) {
+                $font = trim((string) $value);
+                if ($font === '' || strlen($font) > 180 || !preg_match('/^[A-Za-z0-9\s,"\'\.\-]+$/', $font)) {
+                    throw new \InvalidArgumentException('Invalid font stack for ' . $key . '.');
+                }
+                $result[$key] = $font;
+                continue;
+            }
+            if (in_array($key, $assetKeys, true)) {
+                $url = trim((string) $value);
+                if ($url !== '' && !preg_match('#^(?:/|https://)#i', $url)) {
+                    throw new \InvalidArgumentException('Brand assets must use a local path or HTTPS URL.');
+                }
+                $result[$key] = $url;
+                continue;
             }
             $result[$key] = $value;
         }
@@ -439,11 +488,19 @@ final class AdminService
     {
         return match ($key) {
             'canvas' => '#F7F4EF', 'surface' => '#FFFFFF', 'text_primary' => '#211C16', 'text_muted' => '#726A5B',
-            'border' => '#E4DDCF', 'cta', 'accent' => '#C9A15A', 'cta_hover' => '#AF8540', 'heart' => '#C1443F',
-            'head' => '#6C8FAE', 'navy' => '#14141C', 'heading_font' => 'Georgia, "Times New Roman", serif',
-            'body_font' => 'Arial, Helvetica, sans-serif', 'base_font_size', 'card_radius', 'button_radius' => '8',
-            'logo_url', 'email_logo_url', 'report_logo_url' => '/media/brand/atom-global-wordmark.png',
-            'favicon_url' => '/icon-192.png', default => '',
+            'border' => '#E4DDCF', 'cta', 'accent', 'progress', 'selected_surface' => '#C9A15A',
+            'cta_hover', 'questionnaire_label' => '#AF8540', 'heart' => '#C1443F', 'head' => '#6C8FAE',
+            'navy', 'selected_text' => '#14141C', 'questionnaire_copy' => '#3A3428',
+            'input_surface', 'option_surface' => '#FFFFFF', 'input_text' => '#211C16', 'option_text' => '#726A5B',
+            'heading_font' => 'Georgia, "Times New Roman", serif', 'body_font' => 'Arial, Helvetica, sans-serif',
+            'base_font_size' => 16, 'page_title_size' => 62, 'body_text_size' => 16, 'question_text_size' => 17,
+            'option_text_size' => 11, 'field_label_size' => 12, 'field_text_size' => 14, 'meta_text_size' => 12,
+            'visual_title_size' => 72, 'visual_body_size' => 22, 'content_max_width' => 720,
+            'intake_max_width' => 840, 'question_max_width' => 880, 'content_gutter' => 72,
+            'card_radius', 'button_radius' => 8,
+            'logo_url' => '/media/brand/atom-global-wordmark-transparent.svg',
+            'email_logo_url', 'report_logo_url' => '/media/brand/atom-global-wordmark.png',
+            'favicon_url' => '/icon-192.png', 'banner_url' => '', default => '',
         };
     }
 

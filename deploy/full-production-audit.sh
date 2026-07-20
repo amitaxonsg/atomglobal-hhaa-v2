@@ -197,10 +197,13 @@ if [[ -n "$RELEASE" && -s "$RELEASE/backend/vendor/autoload.php" ]]; then
   ' 2>/dev/null || true)"
 
   echo "$PHP_OUTPUT"
-  python3 - <<'PY' <<<"$PHP_OUTPUT" && pass "Database, CMS, report and email integrity" || fail "Database, CMS, report or email integrity failed"
+  PHP_AUDIT_FILE="$(mktemp)"
+  printf '%s\n' "$PHP_OUTPUT" > "$PHP_AUDIT_FILE"
+  python3 - "$PHP_AUDIT_FILE" <<'PY' && pass "Database, CMS, report and email integrity" || fail "Database, CMS, report or email integrity failed"
 import json, sys
 try:
-    data = json.load(sys.stdin)
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        data = json.load(handle)
 except Exception:
     raise SystemExit(1)
 required_zero = [
@@ -220,6 +223,7 @@ if data.get('referenceVersion') != '2.0.0':
 if not data.get('cronRecent'):
     raise SystemExit(1)
 PY
+  rm -f "$PHP_AUDIT_FILE"
 else
   fail "Production PHP runtime audit could not execute"
 fi
