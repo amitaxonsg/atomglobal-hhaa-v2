@@ -1,0 +1,170 @@
+name: Assessment integrity repair
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/bin/repair-assessment-integrity.php"
+      - "backend/bin/seed.php"
+      - "tests/js/assessment-integrity-repair.test.mjs"
+      - ".github/workflows/assessment-integrity-repair.yml"
+  push:
+    branches:
+      - "assessment-integrity-repair-*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: head_heart_test
+          MYSQL_USER: head_heart
+          MYSQL_PASSWORD: test-password
+          MYSQL_ROOT_PASSWORD: root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo_mysql, json, mbstring, openssl, curl, dom, fileinfo
+          coverage: none
+
+      - uses: ramsey/composer-install@v3
+        with:
+          working-directory: backend
+
+      - name: Configure test environment
+        run: |
+          cp backend/.env.example backend/.env
+          sed -i 's#^APP_ENV=.*#APP_ENV=testing#' backend/.env
+          sed -i 's#^APP_DEBUG=.*#APP_DEBUG=true#' backend/.env
+          sed -i 's#^APP_KEY=.*#APP_KEY=base64:dGVzdC10ZXN0LXRlc3QtdGVzdC10ZXN0LXRlc3QtdGVzdA==#' backend/.env
+          sed -i 's#^DB_HOST=.*#DB_HOST=127.0.0.1#' backend/.env
+          sed -i 's#^DB_PORT=.*#DB_PORT=3306#' backend/.env
+          sed -i 's#^DB_DATABASE=.*#DB_DATABASE=head_heart_test#' backend/.env
+          sed -i 's#^DB_USERNAME=.*#DB_USERNAME=head_heart#' backend/.env
+          sed -i 's#^DB_PASSWORD=.*#DB_PASSWORD=test-password#' backend/.env
+          sed -i "s#^STORAGE_PATH=.*#STORAGE_PATH=${RUNNER_TEMP}/head-heart-storage#" backend/.env
+          mkdir -p "${RUNNER_TEMP}/head-heart-storage/media" "${RUNNER_TEMP}/head-heart-storage/reports" "${RUNNER_TEMP}/head-heart-storage/tmp"
+
+      - name: Validate source
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          php -l backend/bin/repair-assessment-integrity.php
+          php -l backend/bin/seed.php
+
+      - name: Migrate and import exact assessment reference
+        run: |
+          php backend/bin/migrate.php
+          php backend/bin/seed.php
+
+      - name: Create mixed version state matching the production screenshot
+        env:
+          MYSQL_PWD: test-password
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u head_heart head_heart_test <<'SQL'
+          INSERT INTO assessment_versions
+            (track_id, version_number, status, change_summary, published_at, archived_at, created_at, updated_at)
+          SELECT id, '1.0.0',
+                 CASE WHEN track_key IN ('newjoiner','manager') THEN 'published' ELSE 'archived' END,
+                 'Obsolete pre-reference version',
+                 CASE WHEN track_key IN ('newjoiner','manager') THEN NOW() ELSE NULL END,
+                 CASE WHEN track_key IN ('newjoiner','manager') THEN NULL ELSE NOW() END,
+                 NOW(), NOW()
+          FROM assessment_tracks;
+
+          UPDATE assessment_versions v
+          JOIN assessment_tracks t ON t.id = v.track_id
+          SET v.status = 'draft', v.published_at = NULL, v.archived_at = NULL
+          WHERE v.version_number = '2.0.0'
+            AND t.track_key IN ('newjoiner','manager');
+
+          INSERT INTO participants
+            (name, email, marketing_consent, transactional_consent, created_at, updated_at)
+          VALUES ('Historical Record', 'historical@example.test', 0, 1, NOW(), NOW());
+
+          INSERT INTO survey_sessions
+            (participant_id, track_id, assessment_version_id, status, resume_token_hash, resume_expires_at,
+             question_snapshot_json, participant_context_json, attribution_snapshot_json,
+             last_activity_at, created_at, updated_at)
+          SELECT p.id, t.id, v.id, 'completed', SHA2('historical-session', 256), DATE_ADD(NOW(), INTERVAL 7 DAY),
+                 JSON_OBJECT('questions', JSON_ARRAY()), JSON_OBJECT(), JSON_OBJECT(), NOW(), NOW(), NOW()
+          FROM participants p
+          JOIN assessment_tracks t ON t.track_key = 'personal'
+          JOIN assessment_versions v ON v.track_id = t.id AND v.version_number = '1.0.0'
+          WHERE p.email = 'historical@example.test';
+          SQL
+
+      - name: Audit detects mixed versions without changing data
+        run: |
+          set +e
+          php backend/bin/repair-assessment-integrity.php
+          status=$?
+          set -e
+          test "$status" -eq 2
+
+      - name: Repair exact v2 and prune only unreferenced versions
+        run: |
+          php backend/bin/repair-assessment-integrity.php \
+            --apply \
+            --prune-unreferenced \
+            --confirm=PUBLISH-EXACT-V2-AND-PRUNE-UNREFERENCED
+
+      - name: Verify final database integrity and historical preservation
+        env:
+          MYSQL_PWD: test-password
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u head_heart head_heart_test --batch --skip-column-names <<'SQL' > /tmp/integrity.txt
+          SELECT COUNT(*)
+          FROM assessment_tracks t
+          JOIN assessment_versions v ON v.track_id = t.id
+          WHERE t.track_key IN ('personal','newjoiner','manager','executive')
+            AND v.version_number = '2.0.0'
+            AND v.status = 'published';
+
+          SELECT COUNT(*)
+          FROM assessment_versions v
+          JOIN assessment_tracks t ON t.id = v.track_id
+          WHERE v.version_number = '1.0.0';
+
+          SELECT COUNT(*)
+          FROM survey_sessions s
+          JOIN assessment_versions v ON v.id = s.assessment_version_id
+          JOIN assessment_tracks t ON t.id = v.track_id
+          WHERE t.track_key = 'personal'
+            AND v.version_number = '1.0.0';
+
+          SELECT COUNT(*)
+          FROM assessment_versions v
+          JOIN assessment_tracks t ON t.id = v.track_id
+          WHERE v.status = 'published'
+            AND v.version_number <> '2.0.0';
+          SQL
+
+          mapfile -t values < /tmp/integrity.txt
+          test "${values[0]}" = "4"
+          test "${values[1]}" = "1"
+          test "${values[2]}" = "1"
+          test "${values[3]}" = "0"
+
+          php backend/bin/repair-assessment-integrity.php

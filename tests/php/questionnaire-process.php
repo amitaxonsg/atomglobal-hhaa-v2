@@ -19,7 +19,7 @@ $configuration = $container['assessmentExperience']->publicConfiguration();
 expectQuestionnaire(count($configuration['tracks'] ?? []) === 4, 'Questionnaire experience does not expose four tracks.');
 expectQuestionnaire(($configuration['landing']['title'] ?? '') === 'Head–Heart Alignment', 'Latest questionnaire landing title is missing.');
 expectQuestionnaire(str_contains((string) ($configuration['landing']['primaryCopy'] ?? ''), 'two votes'), 'Latest questionnaire landing copy is missing.');
-expectQuestionnaire(($configuration['liveTrackKey'] ?? '') === 'personal', 'Default live assessment is not Personal.');
+expectQuestionnaire(($configuration['liveTrackKey'] ?? '') === 'personal', 'Default compatibility liveTrackKey is not Personal.');
 
 $track = $db->fetch('SELECT id, track_key FROM assessment_tracks WHERE track_key = ? LIMIT 1', ['personal']);
 expectQuestionnaire((bool) $track, 'Personal track is missing.');
@@ -110,28 +110,43 @@ expectQuestionnaire(($managerExperience['intake']['departmentOptions'][0] ?? '')
 expectQuestionnaire(($managerExperience['intake']['companyRoleTriggers'][1] ?? '') === 'Senior Executive / Leadership', 'Company role triggers were not saved.');
 
 $liveManager = $container['assessmentExperience']->saveLiveTrack('manager', $ownerId);
-expectQuestionnaire(($liveManager['liveTrackKey'] ?? '') === 'manager', 'Manager could not be selected as the single live assessment.');
+expectQuestionnaire(($liveManager['liveTrackKey'] ?? '') === 'manager', 'Compatibility liveTrackKey could not be set to Manager.');
 $configuration = $container['assessmentExperience']->publicConfiguration();
-expectQuestionnaire(($configuration['liveTrackKey'] ?? '') === 'manager', 'Public configuration did not expose the selected live assessment.');
+expectQuestionnaire(($configuration['liveTrackKey'] ?? '') === 'manager', 'Public configuration did not expose the compatibility liveTrackKey.');
 
-$blockedParticipant = [
-    'name' => 'Blocked Personal Start',
-    'email' => 'blocked-personal@example.test',
-    'privacyConsent' => true,
-    'transactionalConsent' => true,
-];
-$blocked = false;
-try {
-    $container['surveys']->create(['trackKey' => 'personal', 'participant' => $blockedParticipant]);
-} catch (InvalidArgumentException $error) {
-    $blocked = str_contains($error->getMessage(), 'not currently open');
+foreach (['personal', 'newjoiner', 'manager', 'executive'] as $availableTrackKey) {
+    $participant = [
+        'name' => 'Four Track Test ' . $availableTrackKey,
+        'email' => 'four-track-' . $availableTrackKey . '-' . bin2hex(random_bytes(3)) . '@example.test',
+        'privacyConsent' => true,
+        'transactionalConsent' => true,
+    ];
+    $availableSession = $container['surveys']->create([
+        'trackKey' => $availableTrackKey,
+        'participant' => $participant,
+    ]);
+    expectQuestionnaire(($availableSession['trackKey'] ?? '') === $availableTrackKey, "$availableTrackKey did not start its own assessment session.");
+    expectQuestionnaire(($availableSession['assessmentVersion'] ?? '') === '2.0.0', "$availableTrackKey did not use published CMS assessment version 2.0.0.");
+    expectQuestionnaire(count($availableSession['assessment']['questions'] ?? []) === 50, "$availableTrackKey did not return 50 published questions.");
+    expectQuestionnaire(count($availableSession['assessment']['sections'] ?? []) === 10, "$availableTrackKey did not return 10 published sections.");
+
+    $storedVersion = $db->fetch(
+        'SELECT t.track_key trackKey, v.version_number versionNumber, v.status '
+        . 'FROM survey_sessions s '
+        . 'JOIN assessment_tracks t ON t.id = s.track_id '
+        . 'JOIN assessment_versions v ON v.id = s.assessment_version_id '
+        . 'WHERE s.id = ?',
+        [(int) $availableSession['id']]
+    );
+    expectQuestionnaire(($storedVersion['trackKey'] ?? '') === $availableTrackKey, "$availableTrackKey session was linked to the wrong track.");
+    expectQuestionnaire(($storedVersion['versionNumber'] ?? '') === '2.0.0', "$availableTrackKey session was linked to the wrong assessment version.");
+    expectQuestionnaire(($storedVersion['status'] ?? '') === 'published', "$availableTrackKey session was not linked to a published assessment version.");
 }
-expectQuestionnaire($blocked, 'A non-live assessment incorrectly accepted a new participant.');
 
 $livePersonal = $container['assessmentExperience']->saveLiveTrack('personal', $ownerId);
-expectQuestionnaire(($livePersonal['liveTrackKey'] ?? '') === 'personal', 'Personal could not be restored as the single live assessment.');
+expectQuestionnaire(($livePersonal['liveTrackKey'] ?? '') === 'personal', 'Compatibility liveTrackKey could not be restored to Personal.');
 $audit = $db->fetch('SELECT COUNT(*) count FROM audit_logs WHERE action = ?', ['assessment.live_track_changed']);
-expectQuestionnaire((int) ($audit['count'] ?? 0) >= 2, 'Live assessment changes were not recorded in the audit log.');
+expectQuestionnaire((int) ($audit['count'] ?? 0) >= 2, 'Compatibility liveTrackKey changes were not recorded in the audit log.');
 
 $email = 'questionnaire-' . bin2hex(random_bytes(4)) . '@example.test';
 $participant = [
@@ -150,6 +165,7 @@ $participant = [
 ];
 
 $session = $container['surveys']->create(['trackKey' => 'personal', 'participant' => $participant]);
+expectQuestionnaire(($session['assessmentVersion'] ?? '') === '2.0.0', 'Questionnaire session was not pinned to CMS version 2.0.0.');
 expectQuestionnaire(count($session['assessment']['questions'] ?? []) === 50, 'Questionnaire did not return 50 published questions.');
 expectQuestionnaire(count($session['assessment']['sections'] ?? []) === 10, 'Questionnaire did not return 10 sections.');
 
