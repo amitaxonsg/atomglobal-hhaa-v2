@@ -28,7 +28,7 @@ $config = require dirname(__DIR__) . '/config/app.php';
 $db = new Database(require dirname(__DIR__) . '/config/database.php');
 $crypto = new Crypto($config['key']);
 $settings = new SettingsService($db, $crypto);
-$reports = new ReportService($db, $config);
+$reports = new ReportService($db, $settings, $config);
 $mailQueue = new MailQueue($db);
 $pdf = new PdfService($db, $settings, $config);
 
