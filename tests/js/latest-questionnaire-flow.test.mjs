@@ -11,6 +11,8 @@ const service = readFileSync(new URL("../../backend/src/Services/AssessmentExper
 const survey = readFileSync(new URL("../../backend/src/Services/SurveyService.php", import.meta.url), "utf8");
 const main = readFileSync(new URL("../../src/main.jsx", import.meta.url), "utf8");
 
+const questionsSource = layout.slice(layout.indexOf("export function Questions"));
+
 test("public questionnaire keeps the latest process inside the approved split branding", () => {
   assert.match(layout, /latest-questionnaire-shell/);
   assert.match(layout, /latest-visual-panel/);
@@ -51,6 +53,23 @@ test("all four published assessments are offered to new participants", () => {
   assert.match(layout, /experience\?\.tracks\?\.\[track\.key\]/);
   assert.doesNotMatch(survey, /This assessment is not currently open for new participants/);
   assert.match(admin, /four public assessment choices/);
+});
+
+test("participant questions hide topic labels while preserving internal section data", () => {
+  assert.match(questionsSource, /Question group \{section \+ 1\} of/);
+  assert.match(questionsSource, /className="sr-only">Assessment questions/);
+  assert.doesNotMatch(questionsSource, /latest-section-code/);
+  assert.doesNotMatch(questionsSource, /\{subscale\.name\}/);
+  assert.doesNotMatch(questionsSource, /\{subscale\.blurb\}/);
+  assert.match(questionsSource, /subscale\.items\.map/);
+});
+
+test("question progress is visible, percentage based and accessible", () => {
+  assert.match(questionsSource, /role="progressbar"/);
+  assert.match(questionsSource, /aria-valuenow=\{progress\}/);
+  assert.match(questionsSource, /\{progress\}% complete/);
+  assert.match(questionsSource, /\{answered\}\/\{track\.allItems\.length\} answered/);
+  assert.match(questionsSource, /saveLabel/);
 });
 
 test("admin warns that material question changes affect interpretation and history", () => {
