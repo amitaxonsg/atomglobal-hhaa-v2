@@ -2,261 +2,285 @@
 
 Self-hosted React, PHP 8.3 and MariaDB assessment, reporting, payment, email, feedback and administration platform for Atom Global Consulting.
 
-This is the independent V2 project. Do not reconnect it to the original repository or former Netlify project.
+This is the independent V2 project. **Never reconnect it to the original repository or former Netlify project.**
 
-## Current status — 20 July 2026
+## Current status — 22 July 2026
 
 | Item | State |
 |---|---|
 | Public URL | `https://head-heart.atomglobal.com/` |
 | Admin URL | `https://head-heart.atomglobal.com/admin` |
 | VPS | `161.97.137.234` |
-| Git repository | `amitaxonsg/atomglobal-hhaa-v2` |
+| Repository | `amitaxonsg/atomglobal-hhaa-v2` |
 | Default branch | `main` |
-| Production-ready foundation | PR #5 merged into `main` on 20 July 2026 |
-| Branding and full-audit release | PR #7 deployed successfully as commit `03392964177784f3b60db760deb64f25e5ccfe3e` |
-| CMS email hardening | PR #8 merged as `98dad4a5bedf0223ca15516ea2be0d6d1ebcb46c`; production deployment pending |
-| Current production baseline commit | `03392964177784f3b60db760deb64f25e5ccfe3e` until PR #8 is deployed |
-| Code acceptance | Production readiness checks run #436 passed frontend, PHP, database, exact questionnaire flow, temporary submission, report, Admin visibility, four email queues and automatic test cleanup |
-| Public runtime | React frontend, PHP 8.3 API and MariaDB |
-| Current production release confirmed | `/var/www/head-heart.atomglobal.com/releases/20260720072119-033929641777` |
-| Current production marker confirmed | `03392964177784f3b60db760deb64f25e5ccfe3e` |
-| Current observed public screen | Restored left branding with Personal, New Joiner, Manager and Executive active on the right |
-| Production health in last output | Database, migrations, storage, email, GitHub feedback and cron healthy |
+| Sunil integration branch | `production-readiness-sunil-20260722` |
+| Integration base | `main` commit `6ed8b18d5c5d7a818f973628a3ad5959d8912314` |
+| Sunil feedback | Issues #10, #11 and #12 |
+| Production deployment | Not automatic; latest integration remains pending CI, exact assets and Amit verification |
+| Production timer | `head-heart-v2-sync.timer` must remain disabled and inactive |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
-| Owner login | Confirmed for `amit@axon.com.sg` |
-| Git deployment timer | `head-heart-v2-sync.timer` must remain disabled and inactive |
-| Application cron | Installed and healthy |
+| Email | CMS sender hardening merged; exposed SMTP2GO credential still requires rotation before final acceptance |
 
-Production Admin and database verification confirmed exactly four published `2.0.0` assessments. All obsolete `1.0.0` questionnaire versions, the unfinished old session and its test participant data were removed after verified MariaDB backups.
+PR #5 and the later production-hardening PRs #6–#9 have already been merged into `main`. The historical branch `production-readiness-20260719` diverged from those merged changes and must not be deployed directly.
 
-## Verified production experience
+Before integration, the following backup refs were created:
 
-The `main` branch combines the approved questionnaire process with the approved visual branding:
+- `backup/production-readiness-before-reconcile-20260722`
+- `backup/main-before-sunil-audit-20260722`
 
-- responsive desktop split screen with the reflective image on the left;
-- transparent Atom Global logo over the image;
-- CMS stage headline, supporting copy, focal point and overlay;
-- warm cream content area and current typography;
-- latest `index.html` questionnaire landing, introduction, intake and question process;
-- mobile single-column layout with the public logo and no image panel;
-- no **Powered by Axon 1Pro** footer on participant or report pages;
-- Axon attribution retained only on admin login and the protected admin sidebar.
+A conflicting reconciliation PR was closed without merge. The safe branch `production-readiness-sunil-20260722` was created from current `main`, and the Sunil-specific changes are being ported and tested there.
 
-The public questionnaire displays all four approved assessment cards: Personal, New Joiner, Manager and Executive. Every card uses its own active published assessment version and CMS content.
+Full audit details are recorded in `docs/SUNIL-FEEDBACK-AUDIT-20260722.md`.
 
-## Four public assessment choices
+## Sunil feedback implemented in code
 
-The approved public landing displays Personal, New Joiner, Manager and Executive together in the right-hand content panel.
+### Questionnaire presentation
 
-Each card uses its own active published assessment version. Landing copy and card descriptions remain editable in Admin → Questionnaire, while questions, sections, scoring and reports remain versioned under Admin → Assessments.
+- Keeps the approved responsive desktop split layout and all four public assessment choices.
+- Keeps the left image, overlay, focal point, headline and supporting copy editable in **Admin → Content**.
+- Keeps logo, colours, font stacks, text sizes, widths, gutter and component radii editable in **Admin → Branding**.
+- Uses the approved fallback message: **“Align with what you feel and what you reason with.”**
+- Applies thinner visual font weights without removing CMS font-family and size controls.
+- Hides section names, section codes and section descriptions from participant question screens.
+- Preserves section identity internally for questions, scoring, reporting and administration.
+- Uses neutral participant wording: `Question group X of 10`.
+- Shows a stronger accessible progress bar with percentage, answered count and autosave state.
 
-The legacy `liveTrackKey` remains available for backward compatibility and deployment verification, but it no longer hides the other three public choices.
+### Lite Report
 
-Existing secure resume links continue using their original assessment version. Completed answers, scoring, reports and PDFs stay tied to immutable snapshots.
+The locked Lite Report is restricted to:
 
-## Questionnaire process retained from the supplied `index.html`
+- profile type;
+- Head–Heart gauge and score out of 250;
+- top two strengths;
+- **Here’s what you’re missing** preview.
 
-1. Display all four approved assessment choices.
-2. Show the track introduction and Heart/Head explanation.
-3. Collect name, email, age range and optional gender.
-4. Collect five assessment-specific context fields.
-5. Optionally reveal Department and Level for configured work roles.
-6. Record required privacy and transactional consent; marketing stays optional.
-7. Present 10 autosaved sections of five questions each.
-8. Accept five scored choices or `N/A — doesn’t apply / can’t answer`.
-9. Exclude N/A from scoring.
-10. Save an optional note beneath every question.
-11. Support secure resume from the private email link.
-12. Generate the Lite Report after completion.
-13. Reveal the Full Report only after verified payment or an authorised admin action.
+The locked API continues to exclude Full Report content. The preview is a redacted sales summary derived from approved CMS content.
 
-Reference hashes and ownership are documented in `docs/QUESTIONNAIRE-INDEX-REFERENCE.md`.
+### Full Report
 
-## Admin → Questionnaire
+The unlocked Full Report presentation supports:
 
-The Questionnaire workspace manages:
+- complete profile summary and full strengths list;
+- challenges and development areas;
+- Sharpest Edge and Growth Edge when present in CMS content;
+- relationship/team interpretation;
+- working, management or executive style;
+- difficulty handling;
+- leadership impact / how the participant comes across;
+- culture fit reflection;
+- five practical actions;
+- all 10 areas with radar chart and score legend;
+- CMS subscale interpretations;
+- development roadmap;
+- explanation of the Head–Heart profiles;
+- written reflections when supplied in the immutable report snapshot;
+- three-month retake reminder;
+- methodology and sourcing;
+- email-to-self, copy-as-text, print and PDF actions.
+
+Full content remains locked until a verified Stripe webhook or an authorised administrator action. Checkout is disabled unless the Stripe secret, signed webhook secret and selected track Price ID are all configured.
+
+## Client assets still pending
+
+Sunil supplied these exact attachments by email:
+
+- `niklas-liniger-cs58J0MvILA-unsplash.jpg`
+- `Atom Global 2019.png`
+
+The files were verified in Gmail, but the connector could not transfer the binary attachments into GitHub. They are **not yet committed**.
+
+Before client sign-off, upload the exact files through **Admin → Content / Branding** or commit the exact binaries and update the CMS URLs. Do not substitute generated or visually similar assets.
+
+## Proposed Full Report prices
+
+Sunil proposed:
+
+| Assessment | Proposed price |
+|---|---:|
+| Personal | USD 4.99 |
+| New Joiner | USD 29 |
+| Manager | USD 49 |
+| Executive | USD 99 |
+
+These values require Amit approval and matching Stripe Price IDs before checkout is enabled. The application must continue showing checkout as unavailable until all Stripe conditions pass.
+
+## Questionnaire and CMS ownership
+
+### Admin → Questionnaire
 
 - public landing heading and introduction paragraphs;
-- track-card title prefix and track description;
+- four track-card descriptions;
 - track introduction and Lite/Full Report offer text;
 - Heart and Head labels and explanations;
-- participant context labels and option lists;
-- conditional role triggers, Department and Level fields;
+- participant context labels and options;
+- conditional Department and Level fields;
 - N/A availability;
 - optional answer notes.
 
-**Admin → Content** manages the responsive left-panel images and stage copy. **Admin → Branding** manages logos, core and questionnaire colours, heading/body fonts, page/body/question/option/field sizes, participant/question widths, desktop gutter and component radii. Branding never edits assessment wording, scoring or report profile logic.
+### Admin → Content
 
-## Production database baseline reset — 20 July 2026
+- stage image and optional mobile image;
+- alt text;
+- focal point;
+- overlay strength;
+- stage headline;
+- supporting message.
 
-The production database was intentionally reset to the current approved assessment baseline after a full reference audit:
+### Admin → Branding
 
-- exactly four assessment-version rows remain;
-- Personal, New Joiner, Manager and Executive are all published as `2.0.0`;
-- each track contains the approved 10 sections, 50 questions, five answer choices and matching report profiles;
-- no `1.0.0` questionnaire version, old session, old participant, answer, score or report remains;
-- the attached `index.html` reference hashes remain recorded in global settings;
-- full database backups were created before every cleanup stage.
+- public, email and report logos;
+- questionnaire colours;
+- heading and body font stacks;
+- title, body, question, option, field and meta sizes;
+- page, intake and question widths;
+- desktop gutter;
+- card and button/input radii.
 
-Future completed submissions must remain pinned to their immutable assessment version and snapshots. Never delete a version that has a completed session, score or report.
+### Admin → Assessments
 
-## CMS email configuration and secret safety
-
-Admin → Settings → Email is the authoritative source for the delivery provider, sender name, sender email, reply-to email, public URL, email logo/footer links, SMTP settings and SMTP2GO API key.
-
-Production safeguards introduced in PR #8:
-
-- outbound delivery no longer falls back to `amit@axon.com.sg` for the participant sender;
-- SMTP2GO receives the CMS sender identity in `Name <email@domain>` format;
-- SMTP and SMTP2GO credentials are read from encrypted CMS settings;
-- the browser receives only a masked secret descriptor, never the decrypted credential;
-- masked objects, empty secret fields and bullet/asterisk placeholders are ignored instead of overwriting the stored encrypted value;
-- an obviously truncated SMTP2GO key is rejected with a validation error;
-- `backend/bin/email-settings-audit.php` reports effective non-secret settings and whether secrets are configured, but never outputs passwords or API keys.
-
-A blank password/API-key field means **keep the current stored credential**. Paste a full new credential only when intentionally rotating it.
-
-## Full production audit and submission smoke test
-
-`deploy/full-production-audit.sh` verifies services, immutable Nginx paths, API health, four CMS tracks, exactly four published `2.0.0` versions, database foreign-key integrity, report linkage, email templates, branding configuration, cron and recent backups.
-
-Run deployment/audit scripts from the Git source checkout at `/srv/head-heart.atomglobal.com/source`; immutable runtime releases contain the frontend and backend application, not the Git operations workspace.
-
-By default the audit is read-only. To create one temporary submission, verify Admin visibility, report generation and email queues, then remove the test records automatically:
-
-```bash
-cd /srv/head-heart.atomglobal.com/source
-SMOKE_RECIPIENT=amit@axon.com.sg \
-SMOKE_TRACK=personal \
-bash deploy/full-production-audit.sh
-```
-
-Add `SMOKE_SEND_EMAIL=1` only when four real participant-flow test messages should be delivered to the chosen clean recipient. The smoke test refuses an email already present in the participant database.
+- four versioned assessment tracks;
+- 10 sections and 50 questions per track;
+- five scored answer choices;
+- profile score ranges;
+- Lite and Full Report content;
+- controlled cloning, publishing and archival.
 
 ## Assessment and historical-report protection
 
-**Admin → Assessments** retains all four tracks and their versions. The interface and API display a permanent warning:
+The administration interface and API enforce this warning:
 
 > Do not replace an existing question with a different question. A material meaning change can invalidate comparisons and report interpretation.
 
 Safeguards:
 
 - published and archived versions are immutable;
-- draft questions permit spelling, grammar and clarity corrections only;
+- draft questions allow spelling, grammar and clarity corrections only;
 - question identity, section, position, required/active state and scoring direction are locked;
 - the administrator must confirm meaning and scoring intent are unchanged;
 - before/after wording is recorded in the audit log;
 - a materially different question requires a separately reviewed assessment version;
 - existing sessions preserve question and scoring snapshots;
-- completion preserves answer, score and report snapshots.
+- completed assessments preserve answer, score and report snapshots.
 
-Publishing a draft archives the previous published version for new starts but does not rewrite old sessions or reports.
+## Production database baseline
 
-## Deployment routing and rollback
+The approved database baseline contains:
 
-Production Nginx is pinned to exact immutable release paths. A previous script changed the `current` symlink without changing the Nginx path, which caused an old frontend/API to remain served.
+- Personal, New Joiner, Manager and Executive;
+- exactly one published CMS version `2.0.0` per track;
+- exactly 10 active sections and 50 active questions per version;
+- five scored choices;
+- contiguous report profile ranges covering scores 50–250;
+- immutable report content snapshots for completed participants.
 
-The corrected `deploy/update-vps.sh`:
+Never delete a version referenced by a participant session, score snapshot or generated report.
 
-- backs up the Head–Heart Nginx site file;
-- backs up MariaDB;
-- builds and tests a new immutable release;
-- verifies the restored left-image frontend and four-card assessment client;
-- atomically repoints the exact Nginx frontend and backend paths;
-- validates Nginx before reload;
-- verifies `/api/health`, `/api/public/assessment-experience`, compatibility `liveTrackKey` and four managed tracks;
-- restores Nginx, symlink and markers on failure;
-- keeps unrelated Nginx sites untouched.
+## Email and secret safety
 
-Repeated `gatorinbox.com` conflicting-server-name messages are unrelated warnings. They do not fail `nginx -t`, and this project must not change those configurations.
+**Admin → Settings → Email** is authoritative for provider, sender name, sender address, reply-to address, public URL, branding links and encrypted credentials.
 
-## Feedback, help and email
+Safeguards include:
 
-The secure admin portal includes:
+- no participant sender fallback to Amit’s address;
+- SMTP2GO receives the CMS sender identity;
+- the browser receives only masked secret descriptors;
+- empty or masked fields do not overwrite stored encrypted values;
+- obviously truncated SMTP2GO keys are rejected;
+- `backend/bin/email-settings-audit.php` reports only non-secret status.
 
-- Feedback and Help sections;
-- searchable feedback states and permanent timeline;
-- acknowledgement to `sunil.setpaul@atomglobal.com`;
-- internal notification to `amit@axon.com.sg`;
-- clarification and completion emails;
-- GitHub issue creation/comments/closure when the restricted token is configured;
-- editable email templates with preview, selected-template test, queue and retry;
-- global search across operational records and feedback.
+A blank password or API-key field means **keep the stored credential**.
 
-GitHub feedback synchronisation uses a fine-grained token restricted to `amitaxonsg/atomglobal-hhaa-v2` with **Issues: read and write**. Never place tokens, passwords or keys in Git, chat, feedback text or screenshots.
+## Report security and smoke testing
 
-## Administration coverage completed in code
+The production report service maintains separate immutable `free_report_json` and `paid_report_json` snapshots.
 
-- Secure login/logout, CSRF, rate limiting, roles and permissions.
-- Password reset.
-- Dashboard trends, funnel, progress, revenue, email health and alerts.
-- Participant search, filters, history, N/A, notes, export and anonymisation.
-- Questionnaire, content and branding CMS.
-- Assessment version cloning, protected correction and controlled publishing.
-- Lite/Full Report content, unlock/lock/revoke/resend and PDF generation.
-- Payments and signed Stripe webhook processing.
-- Email templates, queue, provider IDs and retry.
-- Affiliates, attribution, analytics, SEO/AEO/GEO and audit logs.
-- Feedback workflow, GitHub Issues synchronisation and searchable help.
+- Locked responses expose Lite content and an approved upgrade preview only.
+- Full Report content remains server-side until unlock.
+- Stripe readiness is returned as a redacted boolean/status.
+- The participant buy button remains disabled while Stripe is incomplete.
+- Branded Full Report PDF generation is covered by a guarded smoke test.
+
+`backend/bin/production-report-flow-smoke-test.php` creates a temporary participant, completes 50 answers, verifies locked privacy, authorises a test unlock, verifies Full Report content and PDF generation, and removes all temporary participant, report, email and PDF records.
 
 ## Automated verification
 
-The merged production-ready code passed:
+The production-readiness workflow must pass on the Sunil integration branch before deployment. It covers:
 
-- frontend tests and Vite production build;
-- responsive split-layout and no-public-attribution assertions;
+- shell-script syntax;
+- Node 22 and dependency installation;
+- frontend tests and production build;
 - questionnaire reference hashes;
-- CMS landing, intake and conditional fields;
-- four public assessment choices and independent server-side track validation;
+- all four public assessment choices;
+- hidden participant topic labels and accessible progress;
+- Sunil Lite/Full Report contracts;
 - PHP lint and unit tests;
 - clean MySQL migrations and seed;
-- production integration acceptance;
-- N/A persistence/exclusion, notes, autosave, resume, completion and scoring;
-- temporary participant creation, 50-answer persistence, score and report generation;
-- Admin participant-detail visibility and all four participant-flow email queues;
-- automatic removal of temporary smoke-test records;
-- masked-secret protection and CMS-only outbound sender assertions;
-- audit records;
-- deployment and full-production-audit script syntax validation.
+- report-content audit;
+- full integration acceptance;
+- questionnaire N/A, notes, autosave, resume, scoring and completion;
+- guarded temporary submission and automatic cleanup;
+- locked/unlocked/PDF report smoke test and cleanup;
+- email secret protection and sender identity.
 
-## VPS layout
+A passing CI run verifies code and test-database behaviour. It does not prove that Sunil’s exact image/logo are in production or that Stripe and live email delivery are complete.
+
+## Deployment routing and rollback
+
+Production Nginx is pinned to exact immutable release paths. Run deployments only from the Git checkout:
 
 ```text
 /srv/head-heart.atomglobal.com/source
-/srv/head-heart.atomglobal.com/staging-source
-/var/www/head-heart.atomglobal.com/releases
-/var/www/head-heart.atomglobal.com/current
-/var/www/head-heart-staging.atomglobal.com/current
-/etc/head-heart-alignment/app.env
-/etc/head-heart-alignment/staging.env
-/var/lib/head-heart-alignment
-/var/lib/head-heart-alignment-staging
-/var/backups/head-heart-alignment
-/var/backups/head-heart-alignment-staging
 ```
 
-## Next deployment acceptance
+Runtime layout:
 
-1. Deploy merged `main` using `deploy/update-vps.sh`.
-2. Confirm the desktop public page retains the left image and approved branding.
-3. Confirm mobile hides the image and shows the transparent logo.
-4. Confirm public pages do not show Powered by Axon 1Pro.
-5. Confirm admin login and sidebar still show Powered by Axon 1Pro.
-6. Confirm `/api/public/assessment-experience` returns all four managed tracks.
-7. Confirm Personal, New Joiner, Manager and Executive appear together on the right.
-8. Confirm each card starts published CMS assessment version `2.0.0`.
-9. Confirm every track contains the exact attached 10 sections and 50 questions.
-10. Confirm every new session is pinned to published CMS version `2.0.0`.
-11. Test Questionnaire CMS landing, card, introduction and intake changes.
-12. Run the guarded submission smoke test and verify participant, 50 answers, score, report, Admin detail and four email queues before automatic test-data cleanup.
-13. Run `backend/bin/email-settings-audit.php` and confirm the CMS sender identity without exposing secrets.
-14. Confirm Admin → Settings → Email can be saved with blank secret fields without changing the stored SMTP2GO key.
-15. Send one selected-template email test and confirm SMTP2GO shows the CMS sender identity.
-16. Configure and test Stripe test keys, Price IDs and signed webhooks.
-17. Run `deploy/full-production-audit.sh` (or the compatibility wrapper `deploy/final-production-audit.sh`) from the Git source checkout and retain its output.
-18. Record Amit and client acceptance after production verification.
+```text
+/var/www/head-heart.atomglobal.com/releases
+/var/www/head-heart.atomglobal.com/current
+/etc/head-heart-alignment/app.env
+/var/lib/head-heart-alignment
+/var/backups/head-heart-alignment
+```
+
+`deploy/update-vps.sh` must:
+
+- back up MariaDB;
+- back up the Head–Heart Nginx site file;
+- build and test a new immutable release;
+- update the exact Head–Heart frontend and backend Nginx paths;
+- validate Nginx before reload;
+- verify `/api/health` and questionnaire configuration;
+- restore Nginx, symlink and markers automatically on failure;
+- leave unrelated Nginx sites untouched;
+- keep `head-heart-v2-sync.timer` disabled.
+
+Repeated `gatorinbox.com` conflicting-server-name warnings are unrelated. They do not fail `nginx -t`, and this project must not alter those configurations.
+
+## Deployment acceptance gate
+
+Do not deploy the Sunil integration until:
+
+1. the integration pull request passes all CI checks;
+2. the exact client image and logo are available in CMS or Git;
+3. Amit reviews the Lite and Full Report presentation;
+4. proposed prices are either approved or explicitly left checkout-disabled;
+5. the exposed SMTP2GO credential is rotated;
+6. the exact accepted commit is recorded;
+7. production backups and rollback remain active.
+
+After deployment:
+
+1. verify desktop and mobile branding;
+2. verify all four assessment cards;
+3. verify topic titles remain hidden only from participants;
+4. complete a guarded temporary submission;
+5. verify Lite Report and locked-data privacy;
+6. verify authorised Full Report unlock and PDF;
+7. verify Admin participant and report visibility;
+8. run `deploy/full-production-audit.sh` and retain its output;
+9. notify Sunil only after Amit confirms the production result.
 
 ## Safe deployment rule
 
-Every deployment must back up the database and Head–Heart Nginx site, build and test a new immutable release, repoint exact Nginx paths, verify health and questionnaire configuration, retain rollback, and keep `head-heart-v2-sync.timer` disabled. New Git commits never alter production automatically.
+Never deploy merely because a commit exists. Deploy only an exact CI-accepted commit using the backup-first immutable release script, verify the live release and APIs, retain rollback, and keep automatic Git deployment disabled.
