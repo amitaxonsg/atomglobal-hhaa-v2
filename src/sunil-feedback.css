@@ -1,0 +1,54 @@
+.latest-visual-panel__copy h2,
+.latest-questionnaire-page h1,
+.latest-track-card strong,
+.latest-head-heart-grid article strong,
+.latest-question-card legend,
+.report-hero h2,
+.report-card h2,
+.paid-report h2 {
+  font-weight: 400;
+}
+
+.latest-visual-panel__copy p,
+.latest-copy,
+.latest-track-card span,
+.latest-question-card legend,
+.report-card p,
+.report-card li {
+  font-weight: 400;
+}
+
+.latest-question-progress {
+  margin-bottom: 34px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 35%, var(--line, #e4ddcf));
+  border-radius: var(--card-radius, 8px);
+  background: color-mix(in srgb, var(--cream, #fff) 90%, var(--questionnaire-progress, var(--gold, #c9a15a)));
+}
+
+.latest-question-progress > div {
+  margin-bottom: 10px;
+  color: var(--ink, #211c16);
+  font-size: max(12px, var(--questionnaire-meta-size, 12px));
+}
+
+.latest-question-progress > div strong {
+  font-weight: 600;
+}
+
+.latest-question-progress > i {
+  height: 9px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line, #e4ddcf) 72%, transparent);
+}
+
+.latest-question-progress b {
+  min-width: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 65%, transparent);
+}
+
+@media (max-width: 680px) {
+  .latest-question-progress > div {
+    display: grid;
+    gap: 4px;
+  }
+}
