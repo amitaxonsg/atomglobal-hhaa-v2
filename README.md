@@ -222,6 +222,20 @@ Safeguards:
 
 A blank password or API-key field means **keep the stored credential**. Never paste live secrets into Git, issue comments, feedback text or deployment scripts.
 
+## Full production audit and submission smoke test
+
+The production report service stores separate immutable `free_report_json` and `paid_report_json` snapshots.
+
+- Locked responses expose Lite content and an approved upgrade preview only.
+- Full content remains server-side until authorised unlock.
+- Stripe readiness is returned as redacted status rather than credentials.
+- The participant buy button stays disabled while Stripe is incomplete.
+- Branded PDF generation is covered by the guarded report-flow smoke test.
+
+`backend/bin/production-submission-smoke-test.php` and `backend/bin/production-report-flow-smoke-test.php` create temporary records, verify the complete submission/report chain, and delete temporary participant, answer, score, report, email and PDF data.
+
+Run these only after an immutable deployment and retain the non-secret output with `deploy/full-production-audit.sh`.
+
 ## Deployment and rollback
 
 Production Nginx is pinned to exact immutable release paths.
