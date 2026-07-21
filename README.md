@@ -15,14 +15,15 @@ This is the independent V2 project. **Never reconnect it to the original reposit
 | Default branch | `main` |
 | Sunil integration branch | `production-readiness-sunil-20260722` |
 | Integration base | `main` commit `6ed8b18d5c5d7a818f973628a3ad5959d8912314` |
-| Burn-tested feature checkpoint | `761854b21519a38c6f5263274f4a38f8b323fe48` |
-| CI | Production readiness checks run #456 passed frontend, PHP and full MySQL acceptance |
+| Burn-tested code checkpoint | `45ee1165bb8cc25ed10f9052abfc2fd8ecae4b9b` |
+| CI | Production readiness checks run #458 passed frontend, PHP and full MySQL acceptance |
 | Pull request | Draft PR #14; open and not merged |
-| Sunil feedback | Issues #10, #11 and #12 |
-| Production deployment | Not automatic; exact image/logo and Amit verification remain pending |
-| Production timer | `head-heart-v2-sync.timer` must remain disabled and inactive |
+| Sunil feedback | Issues #10, #11 and #12; issue #10 marked ready for Amit verification |
+| Production CMS assets | Sunil’s exact photograph, official logo and supporting message applied and verified |
+| Production code deployment | Not automatic; integration-branch code still requires Amit acceptance and an exact immutable deployment |
+| Production timer | `head-heart-v2-sync.timer` disabled and inactive |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
-| Email | CMS sender hardening merged; previously exposed SMTP2GO credential still requires rotation |
+| Email | Health check passing and SMTP2GO reported working; confirm rotated credential and retain one real selected-template delivery before final sign-off |
 
 PR #5 and production-hardening PRs #6–#9 have already been merged into `main`. The historical branch `production-readiness-20260719` diverged from those changes and must not be deployed directly.
 
@@ -31,33 +32,71 @@ Backup refs created before reconciliation:
 - `backup/production-readiness-before-reconcile-20260722`
 - `backup/main-before-sunil-audit-20260722`
 
-A conflicting reconciliation PR was closed without merge. The safe branch `production-readiness-sunil-20260722` was created from current `main`, and Sunil’s changes were ported manually and burn-tested there.
+The safe branch `production-readiness-sunil-20260722` was created from current `main`, and Sunil’s changes were ported and burn-tested there.
 
 Full audit details: `docs/SUNIL-FEEDBACK-AUDIT-20260722.md`.
 
 ## Burn test result
 
-Production readiness checks run **#456** passed all jobs:
+Production readiness checks run **#458** passed:
 
-- frontend tests;
-- Vite production build;
+- frontend tests and Vite production build;
 - deployment-script syntax checks;
 - PHP lint and unit tests;
 - clean MySQL migrations and seed;
 - Lite/Full Report content audit;
 - MySQL integration acceptance;
 - questionnaire CMS, N/A, notes, autosave, secure resume, scoring and completion;
-- temporary participant submission with automatic cleanup;
+- guarded temporary participant submission with automatic cleanup;
 - locked/unlocked/PDF report smoke test with automatic cleanup;
 - critical table and seed verification.
 
-The burn test proves code and test-database behaviour. It does not prove that Sunil’s exact image/logo are present in production, that real email delivery has passed after credential rotation, or that Stripe is configured.
+The burn test proves code and test-database behaviour. Production visual review and live external-service acceptance remain separate gates.
 
-## Sunil feedback implemented
+## Production CMS asset checkpoint — completed
+
+Sunil supplied:
+
+- `niklas-liniger-cs58J0MvILA-unsplash.jpg`
+- `Atom Global 2019.png`
+
+The exact files were copied into persistent CMS media storage and registered in the production media library.
+
+| Purpose | Production CMS URL |
+|---|---|
+| Opening photograph | `/media-uploads/sunil-opening-6af386d476e53f13429d.jpg` |
+| Public logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
+| Email logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
+| Report logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
+
+The opening-stage supporting message is:
+
+> Align with what you feel and what you reason with.
+
+Verification completed:
+
+- public photograph hash matched the uploaded source;
+- public logo hash matched the uploaded source;
+- Admin/CMS public configuration returned the new opening photograph;
+- public, email and report branding settings returned the new logo;
+- production API health returned `status: ok`;
+- database, migrations, storage, email, GitHub feedback and cron checks were true;
+- Stripe and Stripe webhook checks remained false;
+- `head-heart-v2-sync.timer` remained disabled and inactive.
+
+Rollback records:
+
+- database backup: `/var/backups/head-heart-alignment/head_heart_prod-cms-assets-20260721T234142Z.sql.gz`
+- CMS rollback data: `/var/backups/head-heart-alignment/cms-assets-before-20260721T234142Z.json`
+- original uploaded files remain in `/root`.
+
+These CMS assets live in persistent storage and survive later immutable code releases.
+
+## Sunil feedback implemented in code
 
 ### Questionnaire presentation
 
-- Keeps the approved responsive desktop split layout and all four public assessment choices.
+- Retains the approved responsive desktop split layout and all four public assessment choices.
 - Keeps the left image, overlay, focal point, headline and supporting copy editable in **Admin → Content**.
 - Keeps logo, colours, font stacks, text sizes, widths, gutter and radii editable in **Admin → Branding**.
 - Uses the approved fallback message: **“Align with what you feel and what you reason with.”**
@@ -76,11 +115,11 @@ The locked Lite Report is restricted to:
 - top two strengths;
 - **Here’s what you’re missing** preview.
 
-The locked API continues to exclude Full Report content. The preview is derived from approved CMS content and remains redacted.
+The locked API excludes Full Report content. The preview is derived from approved CMS content and remains redacted.
 
 ### Full Report
 
-The unlocked Full Report presentation supports:
+The unlocked Full Report supports:
 
 - complete profile summary and full strengths list;
 - challenges and development areas;
@@ -88,8 +127,8 @@ The unlocked Full Report presentation supports:
 - relationship/team interpretation;
 - working, management or executive style;
 - difficulty handling;
-- leadership impact / how the participant comes across;
-- culture fit reflection;
+- leadership impact and how the participant comes across;
+- culture-fit reflection;
 - practical actions;
 - all 10 areas with radar chart and score legend;
 - CMS subscale interpretations;
@@ -100,18 +139,7 @@ The unlocked Full Report presentation supports:
 - methodology and sourcing;
 - email-to-self, copy-as-text, print and PDF actions.
 
-Full content remains locked until a verified Stripe webhook or authorised administrator action. Checkout remains disabled unless the Stripe secret, signed webhook secret and selected track Price ID are configured.
-
-## Client assets still pending
-
-Sunil supplied these exact attachments:
-
-- `niklas-liniger-cs58J0MvILA-unsplash.jpg`
-- `Atom Global 2019.png`
-
-The attachments were verified in Gmail, but the connector could not transfer their binary bytes into GitHub. They are **not committed**.
-
-Before client sign-off, upload the exact files through **Admin → Content / Branding** or commit the exact binaries and update the CMS URLs. Do not substitute generated or visually similar assets.
+Full content remains locked until a verified Stripe webhook or authorised administrator action. Checkout remains disabled unless the Stripe secret, signed webhook secret and selected-track Price ID are configured.
 
 ## Proposed Full Report prices
 
@@ -179,19 +207,6 @@ Safeguards:
 - existing sessions preserve question and scoring snapshots;
 - completed assessments preserve answer, score and report snapshots.
 
-## Production database baseline
-
-The approved baseline contains:
-
-- Personal, New Joiner, Manager and Executive;
-- one published CMS version `2.0.0` per track;
-- 10 active sections and 50 active questions per version;
-- five scored choices;
-- contiguous report profile ranges covering 50–250;
-- immutable report snapshots for completed participants.
-
-Never delete a version referenced by a participant session, score snapshot or generated report.
-
 ## Email and secret safety
 
 **Admin → Settings → Email** is authoritative for provider, sender, reply-to, public URL, branding links and encrypted credentials.
@@ -205,19 +220,7 @@ Safeguards:
 - obviously truncated SMTP2GO keys are rejected;
 - `backend/bin/email-settings-audit.php` reports non-secret status only.
 
-A blank password or API-key field means **keep the stored credential**.
-
-## Full production audit and submission smoke test
-
-The production report service stores separate immutable `free_report_json` and `paid_report_json` snapshots.
-
-- Locked responses expose Lite content and an approved upgrade preview only.
-- Full content remains server-side until unlock.
-- Stripe readiness is returned as a redacted status.
-- The participant buy button stays disabled while Stripe is incomplete.
-- Branded PDF generation is covered by the guarded smoke test.
-
-`backend/bin/production-submission-smoke-test.php` and `backend/bin/production-report-flow-smoke-test.php` create temporary records, verify the complete submission/report chain and delete all temporary participant, answer, score, report, email and PDF data.
+A blank password or API-key field means **keep the stored credential**. Never paste live secrets into Git, issue comments, feedback text or deployment scripts.
 
 ## Deployment and rollback
 
@@ -253,27 +256,19 @@ Runtime:
 
 Repeated `gatorinbox.com` conflicting-server-name warnings are unrelated and must not be modified by this project.
 
-## Deployment acceptance gate
+## Remaining acceptance gate
 
-Do not deploy until:
+Before marking the project live-ready:
 
-1. the exact client image and logo are available in CMS or Git;
-2. Amit reviews the Lite and Full Report presentation;
-3. prices are approved or explicitly left checkout-disabled;
-4. the SMTP2GO credential is rotated;
-5. the exact accepted deployment commit is recorded;
-6. production backup and rollback remain active.
-
-After deployment:
-
-1. verify desktop/mobile branding and all four cards;
-2. verify topic labels remain hidden only from participants;
-3. run a guarded temporary submission;
-4. verify Lite Report and locked privacy;
-5. verify authorised Full Report unlock and PDF;
-6. verify Admin participant/report visibility;
-7. run `deploy/full-production-audit.sh` and retain its output;
-8. notify Sunil only after Amit confirms production.
+1. Amit visually verifies the exact photograph, logo, supporting message, thinner typography, hidden participant topic titles and stronger progress bar.
+2. Confirm the rotated SMTP2GO credential and retain one real selected-template delivery result.
+3. Amit approves the proposed prices or explicitly keeps checkout disabled.
+4. Configure and test Stripe secret, Price IDs and signed webhook before paid acceptance.
+5. Amit/client approve the final detailed Full Report CMS wording.
+6. Deploy the exact accepted integration-branch commit through `deploy/update-vps.sh`.
+7. Run `deploy/full-production-audit.sh` and retain its output.
+8. Run the guarded temporary submission and report-flow smoke tests.
+9. Notify Sunil only after Amit confirms production.
 
 ## Safe deployment rule
 
