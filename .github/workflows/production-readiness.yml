@@ -18,6 +18,7 @@ jobs:
       - name: Validate deployment scripts
         run: |
           bash -n deploy/update-vps.sh
+          bash -n deploy/repair-public-media.sh
           bash -n deploy/final-production-audit.sh
           bash -n deploy/full-production-audit.sh
       - uses: actions/setup-node@v4
