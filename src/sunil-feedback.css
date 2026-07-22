@@ -18,6 +18,37 @@
   font-weight: 400;
 }
 
+/* Sunil feedback: keep the approved alignment statement fully italic. */
+.latest-track-selection > .latest-copy:first-of-type,
+.latest-track-introduction > .latest-copy:first-of-type {
+  font-style: italic;
+}
+
+/* Keep the public logo compact and visually above the photograph. */
+.latest-visual-panel__logo {
+  width: clamp(88px, 10vw, 132px);
+  max-width: 28%;
+}
+
+.latest-visual-panel__logo img,
+.latest-public-brand img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.latest-public-brand {
+  width: clamp(82px, 9vw, 118px);
+}
+
+/* Use a lighter, contemporary weight consistently across public screens. */
+.latest-questionnaire-shell,
+.latest-questionnaire-page,
+.latest-visual-panel__copy {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
 .latest-question-progress {
   margin-bottom: 34px;
   padding: 14px 16px;
@@ -50,5 +81,10 @@
   .latest-question-progress > div {
     display: grid;
     gap: 4px;
+  }
+
+  .latest-visual-panel__logo {
+    width: 86px;
+    max-width: 32%;
   }
 }
