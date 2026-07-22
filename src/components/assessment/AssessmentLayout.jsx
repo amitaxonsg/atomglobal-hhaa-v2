@@ -108,7 +108,7 @@ export function TrackIntroduction({ track, remoteExperience, onBack, onContinue 
   return <LatestPage width="720" className="latest-track-introduction" stageKey={track.key}>
     <button className="latest-text-back" onClick={onBack}>← Back</button>
     <AssessmentMeta trackKey={track.key} />
-    <h1>{experience.introHeadline}</h1>
+    <h1 className="sr-only">{experience.introHeadline}</h1>
     <p className="latest-copy"><VoteCopy text={experience.introBody} /></p>
     <p className="latest-copy latest-copy--last">{experience.introOffer}</p>
     <div className="latest-head-heart-grid">
@@ -135,7 +135,7 @@ export function ParticipantDetails({ track, remoteExperience, participant, setPa
 
   return <LatestPage width="480" className="latest-intake-page" stageKey="participant">
     <button className="latest-text-back" onClick={onBack}>← Back</button>
-    <h1>Before you begin</h1>
+    <h1 className="sr-only">Before you begin</h1>
     <p className="latest-copy latest-copy--last">A few details so your report can be sent to you and personalised correctly. Nothing here is identifying beyond your name and email — the rest is broad categories only.</p>
     {error && <p className="form-error" role="alert">{error}</p>}
 

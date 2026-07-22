@@ -104,3 +104,11 @@
     max-width: 32%;
   }
 }
+
+/* Hide participant-facing assessment labels and track titles after selection. */
+.latest-track-introduction .latest-assessment-meta,
+.latest-track-introduction > h1,
+.latest-intake-page > h1,
+.latest-questions-page > h1:not(.sr-only) {
+  display: none !important;
+}
