@@ -39,18 +39,70 @@ check_http() {
   [[ "$code" == "$expected" ]] && pass "$label returned HTTP $code" || fail "$label returned HTTP $code; expected $expected"
 }
 
+detect_web_identity() {
+  WEB_USER=""
+  if [[ -r /etc/apache2/envvars ]]; then
+    WEB_USER="$(awk -F= '/^[[:space:]]*export[[:space:]]+APACHE_RUN_USER=/{gsub(/["[:space:]]/, "", $2); print $2; exit}' /etc/apache2/envvars)"
+  fi
+  if [[ -z "$WEB_USER" ]]; then
+    WEB_USER="$(ps -eo user=,comm= | awk '$2 ~ /^(apache2|httpd)$/ && $1 != "root" {print $1; exit}')"
+  fi
+  if [[ -z "$WEB_USER" && -r /etc/nginx/nginx.conf ]]; then
+    WEB_USER="$(awk '$1 == "user" {gsub(";", "", $2); print $2; exit}' /etc/nginx/nginx.conf)"
+  fi
+  WEB_USER="${WEB_USER:-www-data}"
+}
+
 echo "=================================================="
 echo " HEAD–HEART FULL PRODUCTION AUDIT"
 echo "=================================================="
 
-for service in nginx php8.3-fpm mariadb cron; do
+WEB_SERVER=""
+WEB_SERVICE=""
+if systemctl is-active --quiet apache2 2>/dev/null; then
+  WEB_SERVER="apache"
+  WEB_SERVICE="apache2"
+  pass "Apache is the active production web server"
+  apache2ctl configtest >/dev/null && pass "Apache configuration syntax" || fail "Apache configuration syntax"
+elif systemctl is-active --quiet httpd 2>/dev/null; then
+  WEB_SERVER="apache"
+  WEB_SERVICE="httpd"
+  pass "httpd is the active production web server"
+  apachectl configtest >/dev/null && pass "Apache configuration syntax" || fail "Apache configuration syntax"
+elif systemctl is-active --quiet nginx 2>/dev/null; then
+  WEB_SERVER="nginx"
+  WEB_SERVICE="nginx"
+  pass "Nginx is the active production web server"
+  nginx -t >/dev/null && pass "Nginx configuration syntax" || fail "Nginx configuration syntax"
+else
+  fail "No supported active Apache/Nginx production service was found"
+fi
+
+if [[ -n "$WEB_SERVICE" ]]; then
+  enabled="$(systemctl is-enabled "$WEB_SERVICE" 2>/dev/null || true)"
+  [[ "$enabled" == "enabled" ]] && pass "$WEB_SERVICE is enabled" || warn "$WEB_SERVICE enabled state is $enabled"
+fi
+
+for service in mariadb cron; do
   enabled="$(systemctl is-enabled "$service" 2>/dev/null || true)"
   active="$(systemctl is-active "$service" 2>/dev/null || true)"
   [[ "$active" == "active" ]] && pass "$service is active" || fail "$service is not active"
-  [[ "$enabled" == "enabled" || "$service" == "php8.3-fpm" ]] || warn "$service enabled state is $enabled"
+  [[ "$enabled" == "enabled" ]] || warn "$service enabled state is $enabled"
 done
 
-nginx -t && pass "Nginx configuration syntax" || fail "Nginx configuration syntax"
+PHP_FPM_SERVICE=""
+for candidate in php8.4-fpm php8.3-fpm php8.2-fpm php-fpm; do
+  if systemctl is-active --quiet "$candidate" 2>/dev/null; then PHP_FPM_SERVICE="$candidate"; break; fi
+done
+if [[ -n "$PHP_FPM_SERVICE" ]]; then
+  pass "$PHP_FPM_SERVICE is active"
+else
+  warn "No active PHP-FPM service detected; Apache may be using another PHP handler"
+fi
+
+PHP_BIN="$(command -v php8.3 || command -v php || true)"
+[[ -n "$PHP_BIN" ]] && pass "PHP CLI is available: $PHP_BIN" || fail "PHP CLI is unavailable"
+detect_web_identity
 
 RELEASE="$(readlink -f "$APP_ROOT/current" 2>/dev/null || true)"
 COMMIT="$(cat "$APP_ROOT/deployed-commit.txt" 2>/dev/null || cat "$APP_ROOT/v2-deployed-commit.txt" 2>/dev/null || true)"
@@ -67,17 +119,48 @@ if [[ -n "$RELEASE" ]]; then
     grep -R -F -q "$label" "$RELEASE/frontend/assets" 2>/dev/null && pass "Frontend bundle contains $label" || fail "Frontend bundle is missing $label"
   done
   grep -R -F -q 'questionnaire-intake-width' "$RELEASE/frontend/assets" 2>/dev/null && pass "Expanded questionnaire branding tokens are present" || warn "Expanded questionnaire branding tokens are not deployed yet"
+  if [[ -L "$RELEASE/frontend/media-uploads" ]]; then
+    MEDIA_TARGET="$(readlink -f "$RELEASE/frontend/media-uploads" 2>/dev/null || true)"
+    [[ -n "$MEDIA_TARGET" && -d "$MEDIA_TARGET" ]] && pass "Frontend persistent-media link is valid: $MEDIA_TARGET" || fail "Frontend persistent-media link is broken"
+  else
+    fail "Frontend persistent-media link is missing"
+  fi
 fi
 
-NGINX_SITE=""
-for candidate in "/etc/nginx/sites-enabled/$DOMAIN.conf" "/etc/nginx/sites-available/$DOMAIN.conf"; do
-  [[ -e "$candidate" ]] && NGINX_SITE="$(readlink -f "$candidate")" && break
-done
-if [[ -n "$NGINX_SITE" && -n "$RELEASE" ]]; then
-  grep -F -q "$RELEASE/frontend" "$NGINX_SITE" && pass "Nginx frontend points to active release" || fail "Nginx frontend path is stale"
-  grep -F -q "$RELEASE/backend/public/index.php" "$NGINX_SITE" && pass "Nginx API points to active release" || fail "Nginx API path is stale"
-else
-  fail "Head–Heart Nginx site could not be resolved"
+if [[ "$WEB_SERVER" == "apache" && -n "$RELEASE" ]]; then
+  APACHE_SITE=""
+  while IFS= read -r candidate; do
+    [[ -e "$candidate" ]] || continue
+    APACHE_SITE="$(readlink -f "$candidate")"
+    grep -Eq '^[[:space:]]*<VirtualHost[^>]*:443' "$candidate" && break
+  done < <(grep -RIlE "^[[:space:]]*ServerName[[:space:]]+${DOMAIN}([[:space:]]|$)" /etc/apache2/sites-enabled /etc/apache2/sites-available 2>/dev/null | sort -u)
+  if [[ -n "$APACHE_SITE" ]]; then
+    if grep -qF "$APP_ROOT/current/frontend" "$APACHE_SITE"; then
+      pass "Apache frontend uses the controlled current-release link"
+    elif grep -qF "$RELEASE/frontend" "$APACHE_SITE"; then
+      pass "Apache frontend points to the active immutable release"
+    else
+      fail "Apache frontend path is stale or unrecognised"
+    fi
+    if grep -qF "$APP_ROOT/current/backend" "$APACHE_SITE" || grep -qF "$RELEASE/backend" "$APACHE_SITE"; then
+      pass "Apache API uses the controlled backend release path"
+    else
+      fail "Apache API path is stale or unrecognised"
+    fi
+  else
+    fail "Head–Heart Apache site could not be resolved"
+  fi
+elif [[ "$WEB_SERVER" == "nginx" && -n "$RELEASE" ]]; then
+  NGINX_SITE=""
+  for candidate in "/etc/nginx/sites-enabled/$DOMAIN.conf" "/etc/nginx/sites-enabled/$DOMAIN" "/etc/nginx/sites-available/$DOMAIN.conf" "/etc/nginx/sites-available/$DOMAIN"; do
+    [[ -e "$candidate" ]] && NGINX_SITE="$(readlink -f "$candidate")" && break
+  done
+  if [[ -n "$NGINX_SITE" ]]; then
+    if grep -qF "$APP_ROOT/current/frontend" "$NGINX_SITE" || grep -qF "$RELEASE/frontend" "$NGINX_SITE"; then pass "Nginx frontend path is current"; else fail "Nginx frontend path is stale"; fi
+    if grep -qF "$APP_ROOT/current/backend" "$NGINX_SITE" || grep -qF "$RELEASE/backend" "$NGINX_SITE"; then pass "Nginx API path is current"; else fail "Nginx API path is stale"; fi
+  else
+    fail "Head–Heart Nginx site could not be resolved"
+  fi
 fi
 
 if [[ "$(systemctl is-enabled "$TIMER" 2>/dev/null || true)" == "disabled" && "$(systemctl is-active "$TIMER" 2>/dev/null || true)" == "inactive" ]]; then
@@ -94,7 +177,9 @@ check_http "Signed-out admin session" "https://$DOMAIN/api/admin/session" 401
 HEALTH_FILE="$(mktemp)"
 CONFIG_FILE="$(mktemp)"
 EXPERIENCE_FILE="$(mktemp)"
-trap 'rm -f "$HEALTH_FILE" "$CONFIG_FILE" "$EXPERIENCE_FILE"' EXIT
+MEDIA_HEADERS="$(mktemp)"
+MEDIA_BODY="$(mktemp)"
+trap 'rm -f "$HEALTH_FILE" "$CONFIG_FILE" "$EXPERIENCE_FILE" "$MEDIA_HEADERS" "$MEDIA_BODY"' EXIT
 
 curl --fail --silent --show-error --max-time 30 "https://$DOMAIN/api/health" > "$HEALTH_FILE" || true
 curl --fail --silent --show-error --max-time 30 "https://$DOMAIN/api/public/configuration" > "$CONFIG_FILE" || true
@@ -136,9 +221,40 @@ for key in required:
         raise SystemExit(1)
 PY
 
-if [[ -n "$RELEASE" && -s "$RELEASE/backend/vendor/autoload.php" ]]; then
+mapfile -t PUBLIC_MEDIA_PATHS < <(python3 - "$CONFIG_FILE" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as handle:
+    data = json.load(handle)
+paths = set()
+def walk(value):
+    if isinstance(value, dict):
+        for item in value.values(): walk(item)
+    elif isinstance(value, list):
+        for item in value: walk(item)
+    elif isinstance(value, str) and value.startswith('/media-uploads/'):
+        paths.add(value)
+walk(data)
+for path in sorted(paths): print(path)
+PY
+)
+if [[ ${#PUBLIC_MEDIA_PATHS[@]} -gt 0 ]]; then
+  for media_path in "${PUBLIC_MEDIA_PATHS[@]}"; do
+    : > "$MEDIA_HEADERS"
+    : > "$MEDIA_BODY"
+    curl --fail --silent --show-error --max-time 30 -D "$MEDIA_HEADERS" -o "$MEDIA_BODY" "https://$DOMAIN$media_path" || true
+    if grep -Eiq '^content-type:[[:space:]]*image/' "$MEDIA_HEADERS" && [[ -s "$MEDIA_BODY" ]]; then
+      pass "CMS media returns a real image: $media_path"
+    else
+      fail "CMS media is missing or returned the SPA/HTML fallback: $media_path"
+    fi
+  done
+else
+  fail "No public CMS media paths were found"
+fi
+
+if [[ -n "$RELEASE" && -s "$RELEASE/backend/vendor/autoload.php" && -n "$PHP_BIN" ]]; then
   export RELEASE
-  PHP_OUTPUT="$(runuser -u www-data -- php8.3 -d display_errors=0 -d log_errors=0 -r '
+  PHP_OUTPUT="$(runuser -u "$WEB_USER" -- "$PHP_BIN" -d display_errors=0 -d log_errors=0 -r '
     $release = getenv("RELEASE");
     $c = require $release . "/backend/src/bootstrap.php";
     $db = $c["db"];
@@ -236,12 +352,12 @@ else
   fail "No production database backup was found"
 fi
 
-if [[ -n "$SMOKE_RECIPIENT" && -n "$RELEASE" ]]; then
+if [[ -n "$SMOKE_RECIPIENT" && -n "$RELEASE" && -n "$PHP_BIN" ]]; then
   echo
   echo "===== GUARDED TEMPORARY SUBMISSION SMOKE TEST ====="
   args=("--recipient=$SMOKE_RECIPIENT" "--track=$SMOKE_TRACK" "--confirm=RUN-PRODUCTION-SUBMISSION-SMOKE")
   [[ "$SMOKE_SEND_EMAIL" == "1" ]] && args+=("--send-email")
-  php8.3 "$RELEASE/backend/bin/production-submission-smoke-test.php" "${args[@]}" \
+  "$PHP_BIN" "$RELEASE/backend/bin/production-submission-smoke-test.php" "${args[@]}" \
     && pass "Temporary production submission smoke test" \
     || fail "Temporary production submission smoke test"
 else
