@@ -1,6 +1,6 @@
 # Head–Heart Alignment Digital Assessment Platform
 
-Self-hosted React, PHP 8.3 and MariaDB assessment, reporting, payment, email, feedback and administration platform for Atom Global Consulting.
+Self-hosted React, PHP and MariaDB assessment, reporting, payment, email, feedback and administration platform for Atom Global Consulting.
 
 This is the independent V2 project. **Never reconnect it to the original repository or former Netlify project.**
 
@@ -10,101 +10,59 @@ This is the independent V2 project. **Never reconnect it to the original reposit
 |---|---|
 | Public URL | `https://head-heart.atomglobal.com/` |
 | Admin URL | `https://head-heart.atomglobal.com/admin` |
-| VPS | `161.97.137.234` |
+| VPS | `german.axonserver.com` — `161.97.137.234` |
+| Active public web server | Apache 2.4.58 on Ubuntu |
+| Nginx on this VPS | Installed but inactive; do not start it because Apache already owns ports 80/443 |
 | Repository | `amitaxonsg/atomglobal-hhaa-v2` |
 | Default branch | `main` |
-| Sunil integration branch | `production-readiness-sunil-20260722` |
+| Safe integration branch | `production-readiness-sunil-20260722` |
 | Integration base | `main` commit `6ed8b18d5c5d7a818f973628a3ad5959d8912314` |
-| Burn-tested code checkpoint | `45ee1165bb8cc25ed10f9052abfc2fd8ecae4b9b` |
-| CI | Production readiness checks run #458 passed frontend, PHP and full MySQL acceptance |
-| Pull request | Draft PR #14; open and not merged |
-| Sunil feedback | Issues #10, #11 and #12; issue #10 marked ready for Amit verification |
-| Production CMS assets | Sunil’s exact photograph, official logo and supporting message applied and verified |
-| Production code deployment | Not automatic; integration-branch code still requires Amit acceptance and an exact immutable deployment |
-| Production timer | `head-heart-v2-sync.timer` disabled and inactive |
+| Pull request | Draft PR #14; open, unmerged and not automatically deployed |
+| Automatic Git timer | `head-heart-v2-sync.timer` must remain disabled and inactive |
 | Stripe | Not configured; checkout and signed-webhook acceptance remain pending |
-| Email | Health check passing and SMTP2GO reported working; confirm rotated credential and retain one real selected-template delivery before final sign-off |
 
-PR #5 and production-hardening PRs #6–#9 have already been merged into `main`. The historical branch `production-readiness-20260719` diverged from those changes and must not be deployed directly.
+PRs #5–#9 are already merged into `main`. The historical branch `production-readiness-20260719` diverged from that foundation and must not be deployed directly.
 
-Backup refs created before reconciliation:
+Backup refs retained before Sunil integration:
 
 - `backup/production-readiness-before-reconcile-20260722`
 - `backup/main-before-sunil-audit-20260722`
 
-The safe branch `production-readiness-sunil-20260722` was created from current `main`, and Sunil’s changes were ported and burn-tested there.
+## Important Apache correction
 
-Full audit details: `docs/SUNIL-FEEDBACK-AUDIT-20260722.md`.
+Read-only production diagnostics on 22 July confirmed:
 
-## Burn test result
+- local HTTPS is served by `Apache/2.4.58 (Ubuntu)`;
+- `nginx.service` is inactive because Apache already holds ports 80 and 443;
+- attempts to start Nginx fail with `Address already in use`;
+- the home page returns the real React `index.html`;
+- the two `/media-uploads/` requests incorrectly return the same HTML file instead of image bytes.
 
-Production readiness checks run **#458** passed:
+Therefore:
 
-- frontend tests and Vite production build;
-- deployment-script syntax checks;
-- PHP lint and unit tests;
-- clean MySQL migrations and seed;
-- Lite/Full Report content audit;
-- MySQL integration acceptance;
-- questionnaire CMS, N/A, notes, autosave, secure resume, scoring and completion;
-- guarded temporary participant submission with automatic cleanup;
-- locked/unlocked/PDF report smoke test with automatic cleanup;
-- critical table and seed verification.
+- never use the Nginx-only deployment path on this VPS;
+- never start or force-reload Nginx;
+- do not modify unrelated Apache sites;
+- use the web-server-aware dispatcher `deploy/update-vps.sh` for future accepted releases;
+- use `deploy/repair-public-media.sh` for the current image/logo repair.
 
-The burn test proves code and test-database behaviour. Production visual review and live external-service acceptance remain separate gates.
-
-## Production CMS asset checkpoint — completed
-
-Sunil supplied:
-
-- `niklas-liniger-cs58J0MvILA-unsplash.jpg`
-- `Atom Global 2019.png`
-
-The exact files were copied into persistent CMS media storage and registered in the production media library.
-
-| Purpose | Production CMS URL |
-|---|---|
-| Opening photograph | `/media-uploads/sunil-opening-6af386d476e53f13429d.jpg` |
-| Public logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
-| Email logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
-| Report logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
-
-The opening-stage supporting message is:
-
-> Align with what you feel and what you reason with.
-
-Verification completed:
-
-- public photograph hash matched the uploaded source;
-- public logo hash matched the uploaded source;
-- Admin/CMS public configuration returned the new opening photograph;
-- public, email and report branding settings returned the new logo;
-- production API health returned `status: ok`;
-- database, migrations, storage, email, GitHub feedback and cron checks were true;
-- Stripe and Stripe webhook checks remained false;
-- `head-heart-v2-sync.timer` remained disabled and inactive.
-
-Rollback records:
-
-- database backup: `/var/backups/head-heart-alignment/head_heart_prod-cms-assets-20260721T234142Z.sql.gz`
-- CMS rollback data: `/var/backups/head-heart-alignment/cms-assets-before-20260721T234142Z.json`
-- original uploaded files remain in `/root`.
-
-These CMS assets live in persistent storage and survive later immutable code releases.
+Detailed evidence and the correction design are recorded in `docs/APACHE-VPS-CORRECTION-20260722.md`.
 
 ## Sunil feedback implemented in code
 
 ### Questionnaire presentation
 
-- Retains the approved responsive desktop split layout and all four public assessment choices.
-- Keeps the left image, overlay, focal point, headline and supporting copy editable in **Admin → Content**.
-- Keeps logo, colours, font stacks, text sizes, widths, gutter and radii editable in **Admin → Branding**.
-- Uses the approved fallback message: **“Align with what you feel and what you reason with.”**
+- Keeps the CMS-driven left-image layout and all four public choices: Personal, New Joiner, Manager and Executive.
+- Keeps image, overlay, focal point, headline and supporting copy editable in **Admin → Content**.
+- Keeps logos, colours, font stacks, text sizes, widths, gutter and radii editable in **Admin → Branding**.
+- Uses the approved message: **“Align with what you feel and what you reason with.”**
 - Applies thinner visual font weights without removing CMS controls.
-- Hides section names, section codes and descriptions from participant question screens.
+- Hides section names, codes and descriptions from participant question screens.
 - Preserves section identity internally for question selection, scoring, reports and administration.
-- Uses neutral participant wording: `Question group X of 10`.
-- Shows a stronger accessible progress bar with percentage, answered count and autosave state.
+- Uses neutral `Question group X of 10` wording.
+- Shows stronger accessible progress with percentage, answered count and autosave state.
+
+The four assessment cards on the opening page remain visible. Sunil’s request to hide titles applies to the internal question-group/topic titles, not to Personal, New Joiner, Manager and Executive.
 
 ### Lite Report
 
@@ -115,48 +73,83 @@ The locked Lite Report is restricted to:
 - top two strengths;
 - **Here’s what you’re missing** preview.
 
-The locked API excludes Full Report content. The preview is derived from approved CMS content and remains redacted.
+The locked API excludes Full Report content. Checkout remains unavailable while Stripe is incomplete.
 
 ### Full Report
 
 The unlocked Full Report supports:
 
-- complete profile summary and full strengths list;
+- complete profile summary and strengths;
 - challenges and development areas;
 - Sharpest Edge and Growth Edge when present in CMS content;
 - relationship/team interpretation;
 - working, management or executive style;
 - difficulty handling;
-- leadership impact and how the participant comes across;
-- culture-fit reflection;
+- leadership and culture impact;
 - practical actions;
-- all 10 areas with radar chart and score legend;
-- CMS subscale interpretations;
-- development roadmap;
-- Head–Heart profile explanation;
-- written reflections when included in the immutable snapshot;
+- all 10 areas with radar chart, score legend and CMS interpretations;
+- development roadmap and profile explanation;
+- written reflections when stored in the immutable report snapshot;
 - three-month retake reminder;
 - methodology and sourcing;
-- email-to-self, copy-as-text, print and PDF actions.
+- email-to-self, copy, print and PDF actions.
 
-Full content remains locked until a verified Stripe webhook or authorised administrator action. Checkout remains disabled unless the Stripe secret, signed webhook secret and selected-track Price ID are configured.
+## Sunil’s supplied CMS assets
 
-## Proposed Full Report prices
+Original files retained on the VPS:
 
-| Assessment | Proposed price |
-|---|---:|
-| Personal | USD 4.99 |
-| New Joiner | USD 29 |
-| Manager | USD 49 |
-| Executive | USD 99 |
+- `/root/niklas-liniger-cs58J0MvILA-unsplash.jpg`
+- `/root/Atom Global 2019.png`
 
-These require Amit approval and matching Stripe Price IDs. The application must keep checkout unavailable until all Stripe checks pass.
+CMS paths:
+
+| Purpose | Public CMS path |
+|---|---|
+| Opening photograph | `/media-uploads/sunil-opening-6af386d476e53f13429d.jpg` |
+| Public logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
+| Email logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
+| Report logo | `/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png` |
+
+The CMS/database references are correct. Browser verification showed that public delivery was broken because Apache returned the SPA HTML fallback for both image URLs.
+
+### Current media repair
+
+From the clean safe-branch checkout:
+
+```bash
+cd /srv/head-heart.atomglobal.com/source
+git fetch origin
+git checkout production-readiness-sunil-20260722
+git pull --ff-only origin production-readiness-sunil-20260722
+bash deploy/repair-public-media.sh
+```
+
+The repair:
+
+- backs up the existing two media files and frontend media link;
+- restores the exact `/root` photograph and logo to persistent CMS storage;
+- applies private Apache-readable permissions only to this project’s storage paths/files;
+- creates `current/frontend/media-uploads` as a link to persistent CMS media;
+- does not edit Apache or Nginx configuration;
+- does not start or reload either web server;
+- checks CMS references;
+- requires real `image/*` responses;
+- compares both public responses byte-for-byte with Sunil’s originals;
+- rolls back files, metadata and the media link on failure.
+
+Required success text:
+
+```text
+HEAD–HEART PUBLIC MEDIA REPAIR PASSED
+No Apache or Nginx service was started or reloaded.
+CMS references and exact public file delivery verified.
+```
 
 ## CMS ownership
 
 ### Admin → Questionnaire
 
-- landing heading and introduction paragraphs;
+- landing heading and introduction;
 - four track-card descriptions;
 - track introduction and Lite/Full Report offer text;
 - Heart and Head labels and explanations;
@@ -167,28 +160,24 @@ These require Amit approval and matching Stripe Price IDs. The application must 
 ### Admin → Content
 
 - stage image and optional mobile image;
-- alt text;
-- focal point;
+- alt text and focal point;
 - overlay strength;
-- stage headline;
-- supporting message.
+- stage headline and supporting message.
 
 ### Admin → Branding
 
 - public, email and report logos;
 - questionnaire colours;
-- heading and body font stacks;
-- title, body, question, option, field and meta sizes;
-- page, intake and question widths;
-- desktop gutter;
-- card and button/input radii.
+- heading/body fonts;
+- text sizes, page widths and desktop gutter;
+- card and control radii.
 
 ### Admin → Assessments
 
 - four versioned tracks;
 - 10 sections and 50 questions per track;
 - five scored choices;
-- profile score ranges;
+- profile ranges;
 - Lite and Full Report content;
 - controlled cloning, publishing and archival.
 
@@ -199,46 +188,27 @@ These require Amit approval and matching Stripe Price IDs. The application must 
 Safeguards:
 
 - published and archived versions are immutable;
-- draft questions allow spelling, grammar and clarity corrections only;
-- identity, section, position, required/active state and scoring direction are locked;
-- the administrator must confirm meaning and scoring intent are unchanged;
+- draft questions permit spelling, grammar and clarity corrections only;
+- identity, section, position, required/active state and scoring direction remain locked;
 - before/after wording is audited;
-- a materially different question requires a separately reviewed assessment version;
-- existing sessions preserve question and scoring snapshots;
+- materially different questions require a separately reviewed assessment version;
+- sessions preserve question and scoring snapshots;
 - completed assessments preserve answer, score and report snapshots.
 
 ## Email and secret safety
 
 **Admin → Settings → Email** is authoritative for provider, sender, reply-to, public URL, branding links and encrypted credentials.
 
-Safeguards:
-
-- no participant sender fallback to Amit’s address;
-- SMTP2GO receives the CMS sender identity;
-- the browser receives masked secret descriptors only;
-- empty or masked fields do not overwrite stored encrypted values;
-- obviously truncated SMTP2GO keys are rejected;
+- No participant sender fallback to Amit’s address.
+- SMTP2GO receives the CMS sender identity.
+- Browsers receive masked secret descriptors only.
+- Empty or masked fields do not overwrite stored encrypted values.
+- Truncated SMTP2GO keys are rejected.
 - `backend/bin/email-settings-audit.php` reports non-secret status only.
 
-A blank password or API-key field means **keep the stored credential**. Never paste live secrets into Git, issue comments, feedback text or deployment scripts.
-
-## Full production audit and submission smoke test
-
-The production report service stores separate immutable `free_report_json` and `paid_report_json` snapshots.
-
-- Locked responses expose Lite content and an approved upgrade preview only.
-- Full content remains server-side until authorised unlock.
-- Stripe readiness is returned as redacted status rather than credentials.
-- The participant buy button stays disabled while Stripe is incomplete.
-- Branded PDF generation is covered by the guarded report-flow smoke test.
-
-`backend/bin/production-submission-smoke-test.php` and `backend/bin/production-report-flow-smoke-test.php` create temporary records, verify the complete submission/report chain, and delete temporary participant, answer, score, report, email and PDF data.
-
-Run these only after an immutable deployment and retain the non-secret output with `deploy/full-production-audit.sh`.
+A blank password/API-key field means **keep the existing stored credential**. Never place live secrets in Git, issues, feedback, chat screenshots or deployment scripts.
 
 ## Deployment and rollback
-
-Production Nginx is pinned to exact immutable release paths.
 
 Source checkout:
 
@@ -256,34 +226,73 @@ Runtime:
 /var/backups/head-heart-alignment
 ```
 
-`deploy/update-vps.sh` must:
+### Web-server-aware dispatcher
 
-- back up MariaDB;
-- back up the Head–Heart Nginx site;
-- build and test a new immutable release;
-- repoint the exact Head–Heart frontend/backend Nginx paths;
-- validate Nginx before reload;
-- verify health and questionnaire APIs;
-- restore Nginx, symlink and markers on failure;
-- leave unrelated Nginx sites untouched;
-- keep `head-heart-v2-sync.timer` disabled.
+Use only after an exact branch commit has passed CI and Amit has accepted it:
 
-Repeated `gatorinbox.com` conflicting-server-name warnings are unrelated and must not be modified by this project.
+```bash
+bash deploy/update-vps.sh
+```
+
+The dispatcher:
+
+- selects `deploy/update-vps-apache.sh` when Apache/httpd is active;
+- selects `deploy/update-vps-nginx.sh` only when Nginx is genuinely active;
+- refuses to start a web server automatically when no supported service is active.
+
+### Apache production path
+
+`deploy/update-vps-apache.sh`:
+
+- requires the existing active Apache service;
+- resolves only the Head–Heart virtual-host file;
+- backs up MariaDB and the project virtual host;
+- builds and tests an immutable release;
+- links persistent CMS media into the release frontend;
+- uses the controlled `current` symlink or updates only recognised old Head–Heart release paths;
+- validates Apache before any reload;
+- reloads Apache only when its Head–Heart virtual-host path actually changed;
+- verifies health, four public tracks and every configured CMS image;
+- rejects an HTML/SPA fallback masquerading as a successful media response;
+- rolls back the site file, current release and deployment markers on failure.
+
+### Nginx compatibility path
+
+`deploy/update-vps-nginx.sh` preserves the earlier Nginx deployment method for a genuinely Nginx-based host. It is **not** the production path for `german.axonserver.com`.
+
+## Full production audit
+
+`deploy/full-production-audit.sh` now detects the active server instead of assuming Nginx. It verifies:
+
+- active Apache or Nginx service and configuration syntax;
+- MariaDB, cron and available PHP runtime;
+- immutable release and commit marker;
+- frontend/backend build integrity;
+- current Apache/Nginx release paths;
+- persistent media link;
+- public API, CMS and all four tracks;
+- every configured `/media-uploads/` URL returns a real image, not HTML;
+- database, assessment, report, email and orphan-record integrity;
+- recent backup;
+- disabled automatic Git deployment timer.
+
+The guarded temporary submission/report tests remain optional and must clean up their own test data.
 
 ## Remaining acceptance gate
 
 Before marking the project live-ready:
 
-1. Amit visually verifies the exact photograph, logo, supporting message, thinner typography, hidden participant topic titles and stronger progress bar.
-2. Confirm the rotated SMTP2GO credential and retain one real selected-template delivery result.
-3. Amit approves the proposed prices or explicitly keeps checkout disabled.
-4. Configure and test Stripe secret, Price IDs and signed webhook before paid acceptance.
-5. Amit/client approve the final detailed Full Report CMS wording.
-6. Deploy the exact accepted integration-branch commit through `deploy/update-vps.sh`.
-7. Run `deploy/full-production-audit.sh` and retain its output.
-8. Run the guarded temporary submission and report-flow smoke tests.
-9. Notify Sunil only after Amit confirms production.
+1. Run the corrected Apache-safe media repair and retain its full output.
+2. Verify the exact photograph and logo in a fresh browser session.
+3. Verify thinner typography, hidden participant topic titles and stronger progress display.
+4. Confirm the rotated SMTP2GO credential and retain one real selected-template delivery result.
+5. Approve the proposed prices or keep checkout disabled.
+6. Configure and test Stripe secret, four Price IDs and signed webhook before paid acceptance.
+7. Approve final detailed Full Report CMS wording.
+8. Deploy only the exact accepted branch commit through `deploy/update-vps.sh`.
+9. Run `deploy/full-production-audit.sh` and retain the output.
+10. Notify Sunil only after Amit confirms production.
 
 ## Safe deployment rule
 
-Never deploy merely because a commit exists. Deploy only an exact CI-accepted commit using the backup-first immutable release script, verify the live release and APIs, retain rollback, and keep automatic Git deployment disabled.
+Never deploy merely because a commit exists. Deploy only an exact CI-accepted commit using the backup-first immutable process, verify the live release and public media, retain rollback, and keep automatic Git deployment disabled.
