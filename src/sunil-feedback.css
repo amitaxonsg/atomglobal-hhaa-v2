@@ -57,6 +57,14 @@
   display: none !important;
 }
 
+/* After a participant selects a track, hide titles and labels that may reveal context. */
+.latest-track-introduction .latest-assessment-meta,
+.latest-track-introduction > h1,
+.latest-intake-page > h1,
+.latest-questions-page > h1:not(.sr-only) {
+  display: none !important;
+}
+
 .latest-question-progress {
   margin-bottom: 34px;
   padding: 14px 16px;
