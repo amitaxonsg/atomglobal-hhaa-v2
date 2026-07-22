@@ -191,6 +191,28 @@ for track_key in personal newjoiner manager executive; do
 done
 grep -q 'Every choice you make is cast by two votes' <<<"$EXPERIENCE" || { echo "Latest questionnaire copy is missing: $EXPERIENCE" >&2; exit 1; }
 
+PUBLIC_CONFIG="$(curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/public/configuration")"
+grep -q '"branding"' <<<"$PUBLIC_CONFIG" || { echo "Public branding configuration is missing." >&2; exit 1; }
+grep -q '"stages"' <<<"$PUBLIC_CONFIG" || { echo "Public stage configuration is missing." >&2; exit 1; }
+mapfile -t PUBLIC_MEDIA_PATHS < <(
+  printf '%s' "$PUBLIC_CONFIG" | php -r '
+    $data = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    $paths = [];
+    $walk = function ($value) use (&$walk, &$paths): void {
+        if (is_array($value)) {
+            foreach ($value as $item) $walk($item);
+            return;
+        }
+        if (is_string($value) && str_starts_with($value, "/media-uploads/")) $paths[$value] = true;
+    };
+    $walk($data);
+    foreach (array_keys($paths) as $path) echo $path, PHP_EOL;
+  '
+)
+for media_path in "${PUBLIC_MEDIA_PATHS[@]}"; do
+  curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN$media_path" >/dev/null
+ done
+
 curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/" >/dev/null
 
 find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r rm -rf
@@ -202,4 +224,5 @@ echo "Commit: $COMMIT"
 echo "Nginx site: $NGINX_SITE"
 echo "Health: $HEALTH"
 echo "Questionnaire API: landing, compatibility liveTrackKey and four public assessment tracks verified."
+echo "Public CMS media: ${#PUBLIC_MEDIA_PATHS[@]} configured paths verified."
 trap - ERR
