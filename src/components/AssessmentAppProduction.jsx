@@ -108,6 +108,10 @@ export default function AssessmentAppProduction() {
   const remoteExperience = trackKey ? experience.tracks?.[trackKey] || {} : {};
 
   React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [stage, section]);
+
+  React.useEffect(() => {
     let active = true;
     api.publicAssessmentExperience()
       .then(data => { if (active) setExperience(data || { landing: null, tracks: {} }); })
