@@ -49,6 +49,14 @@
   letter-spacing: -0.01em;
 }
 
+/* Participant-facing assessment pages must never reveal a section/topic title. */
+.latest-questions-page > h1,
+.latest-questions-page .section-title,
+.latest-questions-page .assessment-title,
+.latest-questions-page .topic-title {
+  display: none !important;
+}
+
 .latest-question-progress {
   margin-bottom: 34px;
   padding: 14px 16px;
