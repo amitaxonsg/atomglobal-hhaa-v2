@@ -71,6 +71,14 @@ export const questionnaireReference = {
   sourceFileSha256: "2626c5f1d1edaf50f4d140b0e93306700cac13c6fcefdff8a107e3b35966c7e8",
   questionnaireSha256: "379fdc28ddcbafab81af33f07cd8cd7a26364a68c98c5dab610c53087105741b",
   reviewedDate: "2026-07-19",
+  clientValidation: {
+    reviewedDate: "2026-07-23",
+    liveFile: "Head-Heart-Alignment-LIVE.html",
+    liveFileSha256: "42823643de6c080c580260e6b8e55bc1cab934408ac105eae532c6500b0c0530",
+    fullPreviewFile: "Head-Heart-Alignment-FULL-PREVIEW.html",
+    fullPreviewFileSha256: "107aa77d15300102f2dd68dcf3dd4da81015269be88fd2fc35e40a2d306c43f9",
+    result: "Validated against the existing production engine; no structural questionnaire, scoring, intake, report, payment, or service-worker replacement required.",
+  },
 };
 
 export const experienceDefaults = {
