@@ -108,7 +108,7 @@ export function TrackIntroduction({ track, remoteExperience, onBack, onContinue 
   return <LatestPage width="720" className="latest-track-introduction" stageKey={track.key}>
     <button className="latest-text-back" onClick={onBack}>← Back</button>
     <AssessmentMeta trackKey={track.key} />
-    <h1>{experience.introHeadline}</h1>
+    <h1 className="sr-only">{experience.introHeadline}</h1>
     <p className="latest-copy"><VoteCopy text={experience.introBody} /></p>
     <p className="latest-copy latest-copy--last">{experience.introOffer}</p>
     <div className="latest-head-heart-grid">
@@ -135,7 +135,7 @@ export function ParticipantDetails({ track, remoteExperience, participant, setPa
 
   return <LatestPage width="480" className="latest-intake-page" stageKey="participant">
     <button className="latest-text-back" onClick={onBack}>← Back</button>
-    <h1>Before you begin</h1>
+    <h1 className="sr-only">Before you begin</h1>
     <p className="latest-copy latest-copy--last">A few details so your report can be sent to you and personalised correctly. Nothing here is identifying beyond your name and email — the rest is broad categories only.</p>
     {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -183,13 +183,11 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
   const goForward = () => lastSection ? onFinish() : setSection(section + 1);
 
   return <LatestPage width="720" className="latest-questions-page" stageKey={track.key}>
-    <div className="latest-question-progress">
-      <div><span>Section {section + 1} of {track.subscales.length}</span><span>{answered}/{track.allItems.length} answered{saveLabel ? ` · ${saveLabel}` : ""}</span></div>
+    <div className="latest-question-progress" role="progressbar" aria-label="Assessment completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}>
+      <div><span>Question group {section + 1} of {track.subscales.length}</span><strong>{progress}% complete · {answered}/{track.allItems.length} answered{saveLabel ? ` · ${saveLabel}` : ""}</strong></div>
       <i><b style={{ width: `${progress}%` }} /></i>
     </div>
-    <p className="latest-section-code">{subscale.code} · Section {section + 1} of {track.subscales.length}</p>
-    <h1>{subscale.name}</h1>
-    <p className="latest-copy latest-copy--last">{subscale.blurb}</p>
+    <h1 className="sr-only">Assessment questions</h1>
     {error && <p className="form-error" role="alert">{error}</p>}
 
     <div className="latest-question-list">{subscale.items.map((item, itemIndex) => {
@@ -208,7 +206,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
 
     <div className="latest-question-navigation">
       <button className="latest-secondary-button" onClick={goBack}>← Back</button>
-      <button className="latest-primary-button" disabled={!canContinue || busy} onClick={goForward}>{busy ? "Preparing report…" : lastSection ? "See my result →" : "Next section →"}</button>
+      <button className="latest-primary-button" disabled={!canContinue || busy} onClick={goForward}>{busy ? "Preparing report…" : lastSection ? "See my result →" : "Next question group →"}</button>
     </div>
   </LatestPage>;
 }

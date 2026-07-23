@@ -1,0 +1,114 @@
+.latest-visual-panel__copy h2,
+.latest-questionnaire-page h1,
+.latest-track-card strong,
+.latest-head-heart-grid article strong,
+.latest-question-card legend,
+.report-hero h2,
+.report-card h2,
+.paid-report h2 {
+  font-weight: 400;
+}
+
+.latest-visual-panel__copy p,
+.latest-copy,
+.latest-track-card span,
+.latest-question-card legend,
+.report-card p,
+.report-card li {
+  font-weight: 400;
+}
+
+/* Sunil feedback: keep the approved alignment statement fully italic. */
+.latest-track-selection > .latest-copy:first-of-type,
+.latest-track-introduction > .latest-copy:first-of-type {
+  font-style: italic;
+}
+
+/* Keep the public logo compact and visually above the photograph. */
+.latest-visual-panel__logo {
+  width: clamp(88px, 10vw, 132px);
+  max-width: 28%;
+}
+
+.latest-visual-panel__logo img,
+.latest-public-brand img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.latest-public-brand {
+  width: clamp(82px, 9vw, 118px);
+}
+
+/* Use a lighter, contemporary weight consistently across public screens. */
+.latest-questionnaire-shell,
+.latest-questionnaire-page,
+.latest-visual-panel__copy {
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Participant-facing assessment pages must never reveal a section/topic title. */
+.latest-questions-page > h1,
+.latest-questions-page .section-title,
+.latest-questions-page .assessment-title,
+.latest-questions-page .topic-title {
+  display: none !important;
+}
+
+/* After a participant selects a track, hide titles and labels that may reveal context. */
+.latest-track-introduction .latest-assessment-meta,
+.latest-track-introduction > h1,
+.latest-intake-page > h1,
+.latest-questions-page > h1:not(.sr-only) {
+  display: none !important;
+}
+
+.latest-question-progress {
+  margin-bottom: 34px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 35%, var(--line, #e4ddcf));
+  border-radius: var(--card-radius, 8px);
+  background: color-mix(in srgb, var(--cream, #fff) 90%, var(--questionnaire-progress, var(--gold, #c9a15a)));
+}
+
+.latest-question-progress > div {
+  margin-bottom: 10px;
+  color: var(--ink, #211c16);
+  font-size: max(12px, var(--questionnaire-meta-size, 12px));
+}
+
+.latest-question-progress > div strong {
+  font-weight: 600;
+}
+
+.latest-question-progress > i {
+  height: 9px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line, #e4ddcf) 72%, transparent);
+}
+
+.latest-question-progress b {
+  min-width: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 65%, transparent);
+}
+
+@media (max-width: 680px) {
+  .latest-question-progress > div {
+    display: grid;
+    gap: 4px;
+  }
+
+  .latest-visual-panel__logo {
+    width: 86px;
+    max-width: 32%;
+  }
+}
+
+/* Hide participant-facing assessment labels and track titles after selection. */
+.latest-track-introduction .latest-assessment-meta,
+.latest-track-introduction > h1,
+.latest-intake-page > h1,
+.latest-questions-page > h1:not(.sr-only) {
+  display: none !important;
+}

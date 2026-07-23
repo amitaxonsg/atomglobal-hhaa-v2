@@ -51,6 +51,7 @@ test("full audit requires four current v2 assessments and no old traces", () => 
   assert.match(audit, /oldVersionSessions/);
   assert.match(audit, /assessmentVersionRows/);
   assert.match(audit, /participantTemplates/);
+  assert.match(audit, /CMS media is missing or returned the SPA\/HTML fallback/);
   assert.doesNotMatch(audit, /single live-assessment control/);
 });
 
@@ -59,5 +60,6 @@ test("guarded smoke test verifies and cleans the complete submission chain", () 
   assert.match(smoke, /All 50 frontend answer payloads were persisted/);
   assert.match(smoke, /Admin participant detail shows the generated report/);
   assert.match(smoke, /Temporary participant, session, answers, score, report/);
-  assert.match(readme, /Full production audit and submission smoke test/);
+  assert.match(readme, /## Full production audit/);
+  assert.match(readme, /guarded temporary submission\/report tests/);
 });
