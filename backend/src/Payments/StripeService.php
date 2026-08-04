@@ -15,10 +15,7 @@ final class StripeService
 
     public function checkout(int $sessionId, string $trackKey, ?string $affiliateCode): array
     {
-        $secret = $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? '');
-        $environmentKey = 'STRIPE_PRICE_' . strtoupper($trackKey);
-        $price = $this->settings->get('stripe.price_' . $trackKey, $_ENV[$environmentKey] ?? '');
-        if (!$secret || !$price) throw new \RuntimeException('Stripe test or live credentials and track price IDs are not configured.');
+        [$stripe, $price, $requestOptions, $connectedAccount] = $this->checkoutContext($trackKey);
 
         $survey = $this->db->fetch('SELECT s.id, s.status, p.email, t.track_key FROM survey_sessions s JOIN participants p ON p.id = s.participant_id JOIN assessment_tracks t ON t.id = s.track_id WHERE s.id = ? AND t.track_key = ?', [$sessionId, $trackKey]);
         if (!$survey || $survey['status'] !== 'completed') throw new \InvalidArgumentException('A completed assessment is required before checkout.');
@@ -27,7 +24,6 @@ final class StripeService
 
         $affiliate = null;
         if ($affiliateCode) $affiliate = $this->db->fetch('SELECT id, affiliate_code FROM affiliates WHERE affiliate_code = ? AND is_active = 1', [strtoupper(trim($affiliateCode))]);
-        $stripe = new StripeClient($secret);
         $checkout = $stripe->checkout->sessions->create([
             'mode' => 'payment',
             'customer_email' => $survey['email'],
@@ -40,8 +36,9 @@ final class StripeService
                 'generated_report_id' => (string) $report['id'],
                 'track_key' => $trackKey,
                 'affiliate_code' => $affiliate['affiliate_code'] ?? '',
+                'connected_account_id' => $connectedAccount,
             ],
-        ]);
+        ], $requestOptions);
         $this->db->execute(
             'INSERT INTO payments (survey_session_id, affiliate_id, provider, status, stripe_checkout_session_id, currency, metadata_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
             [$sessionId, $affiliate['id'] ?? null, 'stripe', 'checkout_started', $checkout->id, strtoupper((string) ($checkout->currency ?? 'USD')), json_encode($checkout->metadata)]
@@ -51,9 +48,23 @@ final class StripeService
 
     public function webhook(string $payload, string $signature): void
     {
-        $secret = $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? '');
-        if (!$secret) throw new \RuntimeException('Stripe webhook secret is not configured.');
+        $untrusted = json_decode($payload, true);
+        $incomingAccount = is_array($untrusted) ? trim((string) ($untrusted['account'] ?? '')) : '';
+        $connectEvent = $incomingAccount !== '';
+        $secret = $connectEvent
+            ? trim((string) ($this->config['stripe_connect_webhook_secret'] ?? $this->settings->get('stripe.connect_webhook_secret', '')))
+            : trim((string) $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? ''));
+        if ($secret === '') {
+            throw new \RuntimeException($connectEvent ? 'Stripe Connect webhook secret is not configured.' : 'Stripe webhook secret is not configured.');
+        }
         $event = Webhook::constructEvent($payload, $signature, $secret);
+
+        if ($connectEvent) {
+            $expectedAccount = trim((string) $this->settings->get('stripe.connected_account_id', ''));
+            if ($expectedAccount === '' || !hash_equals($expectedAccount, (string) ($event->account ?? ''))) {
+                throw new \RuntimeException('Stripe event was sent for an unrecognised connected account.');
+            }
+        }
 
         $this->db->transaction(function () use ($event) {
             $exists = $this->db->fetch('SELECT id, status FROM stripe_webhook_events WHERE stripe_event_id = ? FOR UPDATE', [$event->id]);
@@ -65,10 +76,11 @@ final class StripeService
 
             try {
                 match ($event->type) {
-                    'checkout.session.completed' => $this->completed($event->data->object),
+                    'checkout.session.completed', 'checkout.session.async_payment_succeeded' => $this->completed($event->data->object),
                     'checkout.session.async_payment_failed' => $this->failed($event->data->object, 'failed'),
                     'checkout.session.expired' => $this->failed($event->data->object, 'abandoned'),
                     'charge.refunded' => $this->refunded($event->data->object),
+                    'account.application.deauthorized' => $this->deauthorised((string) ($event->account ?? '')),
                     default => null,
                 };
                 $this->db->execute('UPDATE stripe_webhook_events SET status = ?, processed_at = NOW(), failure_reason = NULL WHERE id = ?', ['processed', $eventId]);
@@ -78,6 +90,24 @@ final class StripeService
                 throw $error;
             }
         });
+    }
+
+    private function checkoutContext(string $trackKey): array
+    {
+        $connectionType = (string) $this->settings->get('stripe.connection_type', 'manual');
+        $connectedAccount = trim((string) $this->settings->get('stripe.connected_account_id', ''));
+        if ($connectionType === 'connect' && $connectedAccount !== '') {
+            $secret = trim((string) ($this->config['stripe_platform_secret_key'] ?? ''));
+            $price = trim((string) $this->settings->get('stripe.connect_price_' . $trackKey, ''));
+            if ($secret === '' || $price === '') throw new \RuntimeException('Stripe Connect account and USD track price are not configured.');
+            return [new StripeClient($secret), $price, ['stripe_account' => $connectedAccount], $connectedAccount];
+        }
+
+        $secret = trim((string) $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? ''));
+        $environmentKey = 'STRIPE_PRICE_' . strtoupper($trackKey);
+        $price = trim((string) $this->settings->get('stripe.price_' . $trackKey, $_ENV[$environmentKey] ?? ''));
+        if ($secret === '' || $price === '') throw new \RuntimeException('Stripe test or live credentials and track price IDs are not configured.');
+        return [new StripeClient($secret), $price, [], ''];
     }
 
     private function completed(object $checkout): void
@@ -153,6 +183,12 @@ final class StripeService
         $this->db->execute('UPDATE generated_reports SET is_unlocked = 0, unlock_reason = ?, unlocked_at = NULL, pdf_path = NULL, pdf_generated_at = NULL, updated_at = NOW() WHERE survey_session_id = ?', ['stripe_refund', $payment['survey_session_id']]);
         $this->db->execute('UPDATE affiliate_commissions SET status = ?, adjustment_note = ?, updated_at = NOW() WHERE payment_id = ?', ['void', 'Payment refunded', $payment['id']]);
         if (!empty($report['pdf_path']) && is_file($report['pdf_path'])) @unlink($report['pdf_path']);
+    }
+
+    private function deauthorised(string $accountId): void
+    {
+        if ($accountId === '') return;
+        (new StripeConnectService($this->db, $this->settings, $this->config))->handleRemoteDeauthorisation($accountId);
     }
 
     private function enqueue(string $template, string $recipient, array $variables): void

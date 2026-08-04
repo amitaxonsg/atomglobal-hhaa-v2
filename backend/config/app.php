@@ -19,4 +19,8 @@ return [
     'session_secure' => filter_var($_ENV['SESSION_SECURE'] ?? true, FILTER_VALIDATE_BOOL),
     'report_token_days' => (int) ($_ENV['REPORT_TOKEN_LIFETIME_DAYS'] ?? 30),
     'resume_token_hours' => (int) ($_ENV['RESUME_TOKEN_LIFETIME_HOURS'] ?? 168),
+    'stripe_connect_client_id' => trim((string) ($_ENV['STRIPE_CONNECT_CLIENT_ID'] ?? '')),
+    'stripe_platform_secret_key' => trim((string) ($_ENV['STRIPE_PLATFORM_SECRET_KEY'] ?? '')),
+    'stripe_connect_redirect_uri' => trim((string) ($_ENV['STRIPE_CONNECT_REDIRECT_URI'] ?? '')),
+    'stripe_connect_webhook_secret' => trim((string) ($_ENV['STRIPE_CONNECT_WEBHOOK_SECRET'] ?? '')),
 ];
