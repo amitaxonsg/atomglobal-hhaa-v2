@@ -5,6 +5,7 @@ use AtomGlobal\Database;
 use AtomGlobal\Env;
 use AtomGlobal\Mail\MailDeliveryService;
 use AtomGlobal\Mail\MailQueue;
+use AtomGlobal\Payments\StripeConnectService;
 use AtomGlobal\Security\Crypto;
 use AtomGlobal\Services\AdminInsightsService;
 use AtomGlobal\Services\AdminService;
@@ -52,4 +53,5 @@ return [
     'adminInsights' => new AdminInsightsService($db, $mailQueue, $config),
     'feedback' => new FeedbackService($db, $settings, $mailQueue, $config),
     'assessmentExperience' => new AssessmentExperienceService($db, $settings),
+    'stripeConnect' => new StripeConnectService($db, $settings, $config),
 ];
