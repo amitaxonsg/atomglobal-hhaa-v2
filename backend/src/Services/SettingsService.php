@@ -49,4 +49,9 @@ final class SettingsService
             [$key, $encoded, $sensitive ? 1 : 0]
         );
     }
+
+    public function delete(string $key): void
+    {
+        $this->db->execute('DELETE FROM global_settings WHERE setting_key = ?', [$key]);
+    }
 }
