@@ -202,10 +202,16 @@ function stripeSettingsElements() {
 function updateEnhancement() {
   if (!window.location.pathname.startsWith("/admin")) return;
   const elements = stripeSettingsElements();
-  if (!elements) return;
+  if (!elements) {
+    currentManualSection = null;
+    currentStripeActive = false;
+    document.documentElement.classList.remove("stripe-connect-settings-active");
+    return;
+  }
   const active = elements.stripeTab?.classList.contains("active");
 
-  if (!enhancementMount) {
+  if (!enhancementMount || !enhancementMount.isConnected) {
+    if (enhancementRoot) enhancementRoot.unmount();
     enhancementMount = document.createElement("div");
     enhancementMount.id = "stripe-connect-settings-root";
     elements.tabs.insertAdjacentElement("afterend", enhancementMount);
