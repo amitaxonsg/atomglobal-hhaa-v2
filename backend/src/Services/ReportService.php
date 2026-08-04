@@ -88,6 +88,15 @@ final class ReportService
 
     private function checkoutAvailable(string $trackKey): bool
     {
+        $connectionType = (string) $this->settings->get('stripe.connection_type', 'manual');
+        $connectedAccount = trim((string) $this->settings->get('stripe.connected_account_id', ''));
+        if ($connectionType === 'connect' && $connectedAccount !== '') {
+            $platformSecret = trim((string) ($this->config['stripe_platform_secret_key'] ?? ''));
+            $webhook = trim((string) ($this->config['stripe_connect_webhook_secret'] ?? ''));
+            $price = trim((string) $this->settings->get('stripe.connect_price_' . $trackKey, ''));
+            return $platformSecret !== '' && $webhook !== '' && $price !== '';
+        }
+
         $secret = trim((string) $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? ''));
         $webhook = trim((string) $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? ''));
         $environmentKey = 'STRIPE_PRICE_' . strtoupper($trackKey);
