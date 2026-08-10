@@ -177,7 +177,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
   const answered = answers.filter(answer => answer?.value != null).length;
   const choices = track.answerChoices || answerChoices;
   const progress = Math.round(answered / Math.max(1, track.allItems.length) * 100);
-  const saveLabel = saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Save issue" : "";
+  const saveLabel = saveState === "saving" ? "Saving…" : saveState === "retrying" ? "Retrying save…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Connection issue" : "";
   const lastSection = section === track.subscales.length - 1;
   const goBack = () => section ? setSection(section - 1) : onBack();
   const goForward = () => lastSection ? onFinish() : setSection(section + 1);
