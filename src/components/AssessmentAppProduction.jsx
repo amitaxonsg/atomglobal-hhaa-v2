@@ -6,6 +6,8 @@ import AdminApp from "./admin/AdminApp";
 import { ParticipantDetails, Questions, SelectVersion, StageShell, TrackIntroduction, blankParticipant } from "./assessment/AssessmentLayout";
 import ReportView from "./assessment/ReportView";
 
+const SAVE_RETRY_DELAYS_MS = [1000, 2000, 4000];
+
 function PaymentStatus({ cancelled = false }) {
   return <StageShell>
     <p className="eyebrow">Secure checkout</p>
@@ -100,8 +102,10 @@ export default function AssessmentAppProduction() {
   const [report, setReport] = React.useState(null);
   const [experience, setExperience] = React.useState({ landing: null, tracks: {} });
   const [error, setError] = React.useState("");
+  const [saveError, setSaveError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [saveState, setSaveState] = React.useState("");
+  const saveSequenceRef = React.useRef(0);
 
   const fallbackTrack = trackKey ? assessmentTracks[trackKey] : null;
   const track = buildRuntimeTrack(fallbackTrack, session?.assessment);
@@ -144,23 +148,49 @@ export default function AssessmentAppProduction() {
 
   React.useEffect(() => {
     if (!session?.id || !session?.resumeToken || stage !== "questions") return undefined;
+
+    const sequence = ++saveSequenceRef.current;
+    let cancelled = false;
     setSaveState("saving");
-    const timer = window.setTimeout(() => {
-      api.saveSession({ id: session.id, resumeToken: session.resumeToken, participant, answers, section })
-        .then(saved => {
+    setSaveError("");
+
+    const timer = window.setTimeout(async () => {
+      const payload = { id: session.id, resumeToken: session.resumeToken, participant, answers, section };
+
+      for (let attempt = 0; attempt <= SAVE_RETRY_DELAYS_MS.length; attempt += 1) {
+        try {
+          const saved = await api.saveSession(payload);
+          if (cancelled || sequence !== saveSequenceRef.current) return;
           setSession(current => ({ ...current, ...saved }));
           setSaveState("saved");
-        })
-        .catch(saveError => {
-          setSaveState("error");
-          setError(saveError.message);
-        });
+          setSaveError("");
+          return;
+        } catch (_) {
+          if (cancelled || sequence !== saveSequenceRef.current) return;
+
+          const willRetry = attempt < SAVE_RETRY_DELAYS_MS.length;
+          if (!willRetry) {
+            setSaveState("error");
+            setSaveError("Connection interrupted. Your answers are still on this page. We will try saving again automatically when you make another change.");
+            return;
+          }
+
+          setSaveState("retrying");
+          setSaveError("Connection interrupted — retrying automatically…");
+          await new Promise(resolve => window.setTimeout(resolve, SAVE_RETRY_DELAYS_MS[attempt]));
+        }
+      }
     }, 500);
-    return () => window.clearTimeout(timer);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [answers, section, participant, session?.id, session?.resumeToken, stage]);
 
   const selectTrack = key => {
     setError("");
+    setSaveError("");
     setTrackKey(key);
     setAnswers(assessmentTracks[key].allItems.map(() => ({ value: null, note: "" })));
     setStage("intro");
@@ -170,6 +200,7 @@ export default function AssessmentAppProduction() {
   const begin = async () => {
     setBusy(true);
     setError("");
+    setSaveError("");
     try {
       const created = await api.createSession({ trackKey, participant, section: 0, ...attributionFromLocation() });
       const count = created.assessment?.questions?.length || 50;
@@ -188,6 +219,7 @@ export default function AssessmentAppProduction() {
   const finish = async () => {
     setBusy(true);
     setError("");
+    setSaveError("");
     try {
       const completed = await api.completeSession({ id: session.id, resumeToken: session.resumeToken, participant, answers, section: 9 });
       const reportPayload = isMockMode ? mockReport(track, answers, participant, session) : await api.getReport(completed.reportToken);
@@ -212,6 +244,7 @@ export default function AssessmentAppProduction() {
     setSession(null);
     setReport(null);
     setError("");
+    setSaveError("");
     window.history.replaceState({}, "", "/");
     window.scrollTo(0, 0);
   };
@@ -222,7 +255,7 @@ export default function AssessmentAppProduction() {
   if (stage === "select") return <SelectVersion experience={experience} onSelect={selectTrack} />;
   if (stage === "intro" && fallbackTrack) return <TrackIntroduction track={fallbackTrack} remoteExperience={remoteExperience} onBack={() => setStage("select")} onContinue={() => setStage("details")} />;
   if (stage === "details" && fallbackTrack) return <ParticipantDetails track={fallbackTrack} remoteExperience={remoteExperience} participant={participant} setParticipant={setParticipant} onBack={() => setStage("intro")} onContinue={begin} error={error} busy={busy} />;
-  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
+  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error || saveError} />;
   if (stage === "report" && report) return <ReportView payload={report} token={session?.reportToken} onReset={reset} />;
   return <StageShell><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
 }
