@@ -13,6 +13,7 @@ test("first answer advances to the next unanswered question without unnecessary 
   assert.match(layoutSource, /const needsScroll = rect\.top < 0 \|\| rect\.bottom > window\.innerHeight/);
   assert.match(layoutSource, /if \(needsScroll\) target\.scrollIntoView\(\{ behavior: reducedMotion \? "auto" : "smooth", block: "center" \}\)/);
   assert.match(layoutSource, /querySelector\('input\[type="radio"\]'\)/);
+  assert.match(feedbackCss, /\.latest-question-card:focus-within/);
 });
 
 test("last answered question advances to enabled group navigation", () => {
@@ -20,8 +21,9 @@ test("last answered question advances to enabled group navigation", () => {
   assert.match(layoutSource, /querySelector\("\.latest-primary-button:not\(:disabled\)"\)/);
 });
 
-test("participant questions omit per-question notes and only modestly enlarge the logo", () => {
+test("participant questions omit per-question notes, modestly enlarge the logo and use compact desktop spacing", () => {
   assert.doesNotMatch(layoutSource, /<textarea className="latest-answer-note"/);
   assert.match(feedbackCss, /\.latest-visual-panel__logo\s*\{[\s\S]*?clamp\(104px, 11\.5vw, 156px\)/);
-  assert.doesNotMatch(feedbackCss, /@media \(min-width: 901px\)/);
+  assert.match(feedbackCss, /@media \(min-width: 901px\)[\s\S]*?\.latest-question-card \{\s*padding-bottom: 26px/);
+  assert.match(feedbackCss, /\.latest-scale-options label \{[\s\S]*?min-height: 64px/);
 });
