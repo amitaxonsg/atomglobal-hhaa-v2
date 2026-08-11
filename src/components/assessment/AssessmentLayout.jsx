@@ -194,14 +194,16 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
 
     window.setTimeout(() => {
       const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+      const rect = target.getBoundingClientRect();
+      const needsScroll = rect.top < 0 || rect.bottom > window.innerHeight;
+      if (needsScroll) target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
 
       window.setTimeout(() => {
         const focusTarget = nextQuestion
           ? nextQuestion.querySelector('input[type="radio"]')
           : navigationRef.current?.querySelector(".latest-primary-button:not(:disabled)");
         focusTarget?.focus({ preventScroll: true });
-      }, reducedMotion ? 0 : 350);
+      }, needsScroll && !reducedMotion ? 350 : 0);
     }, 80);
   };
 
@@ -224,7 +226,6 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
           return <label className={current.value === value ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} checked={current.value === value} onChange={() => handleAnswer(itemIndex, answerIndex, value, wasAnswered)} /><strong>{value}</strong><span>{choice}</span></label>;
         })}</div>
         {experience.allowNotApplicable && <div className="latest-na-row"><label className={current.value === "NA" ? "selected" : ""}><input type="radio" name={`question-${answerIndex}`} checked={current.value === "NA"} onChange={() => handleAnswer(itemIndex, answerIndex, "NA", wasAnswered)} />N/A — doesn’t apply / can’t answer</label></div>}
-        {experience.allowAnswerNotes && <textarea className="latest-answer-note" rows="2" value={current.note || ""} onChange={event => onNote(answerIndex, event.target.value)} placeholder="Optional — describe a specific moment this played out for you..." />}
       </fieldset>;
     })}</div>
 
