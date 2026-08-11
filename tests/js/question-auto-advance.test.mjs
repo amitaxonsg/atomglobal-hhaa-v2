@@ -20,9 +20,8 @@ test("last answered question advances to enabled group navigation", () => {
   assert.match(layoutSource, /querySelector\("\.latest-primary-button:not\(:disabled\)"\)/);
 });
 
-test("question groups use the compact approved presentation without per-question notes", () => {
+test("participant questions omit per-question notes and only modestly enlarge the logo", () => {
   assert.doesNotMatch(layoutSource, /<textarea className="latest-answer-note"/);
-  assert.match(feedbackCss, /\.latest-visual-panel__logo\s*\{[\s\S]*?156px/);
-  assert.match(feedbackCss, /@media \(min-width: 901px\)[\s\S]*?\.latest-question-card \{\s*padding-bottom: 12px/);
-  assert.match(feedbackCss, /\.latest-scale-options label \{[\s\S]*?min-height: 44px/);
+  assert.match(feedbackCss, /\.latest-visual-panel__logo\s*\{[\s\S]*?clamp\(104px, 11\.5vw, 156px\)/);
+  assert.doesNotMatch(feedbackCss, /@media \(min-width: 901px\)/);
 });
