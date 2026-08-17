@@ -7,13 +7,22 @@ import { ParticipantDetails, Questions, SelectVersion, StageShell, TrackIntroduc
 import ReportView from "./assessment/ReportView";
 
 function PaymentStatus({ cancelled = false }) {
+  const params = new URLSearchParams(window.location.search);
+  const method = params.get("method") || "";
+  const reportUrl = params.get("report") || "";
+  const cashOnDelivery = method === "cash-on-delivery";
+
   return <StageShell>
     <p className="eyebrow">Secure checkout</p>
-    <h1>{cancelled ? "Payment not completed" : "Payment received"}</h1>
+    <h1>{cancelled ? "Payment not completed" : cashOnDelivery ? "Cash on Delivery selected" : "Payment received"}</h1>
     <p className="lead">{cancelled
       ? "Nothing was charged. Return to your private report link when you are ready to try again."
-      : "Stripe is confirming your payment. After the signed webhook is verified, a fresh private Full Report link is sent by email."}</p>
-    <a className="button button--primary" href="/">Return to assessment</a>
+      : cashOnDelivery
+        ? "Cash on Delivery is enabled for this UAT. No Stripe charge was made. Your Full Report has been unlocked and the normal confirmation and report emails have been queued."
+        : "Stripe is confirming your payment. After the signed webhook is verified, a fresh private Full Report link is sent by email."}</p>
+    {cashOnDelivery && reportUrl
+      ? <a className="button button--primary" href={reportUrl}>Open Full Report</a>
+      : <a className="button button--primary" href="/">Return to assessment</a>}
   </StageShell>;
 }
 
