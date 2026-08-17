@@ -177,7 +177,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
   const answered = answers.filter(answer => answer?.value != null).length;
   const choices = track.answerChoices || answerChoices;
   const progress = Math.round(answered / Math.max(1, track.allItems.length) * 100);
-  const saveLabel = saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Save issue" : "";
+  const saveLabel = saveState === "saving" ? "Saving…" : saveState === "retrying" ? "Retrying save…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Connection issue" : "";
   const lastSection = section === track.subscales.length - 1;
   const goBack = () => section ? setSection(section - 1) : onBack();
   const goForward = () => lastSection ? onFinish() : setSection(section + 1);
@@ -200,7 +200,6 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
           return <label className={current.value === value ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} checked={current.value === value} onChange={() => onAnswer(answerIndex, value)} /><strong>{value}</strong><span>{choice}</span></label>;
         })}</div>
         {experience.allowNotApplicable && <div className="latest-na-row"><label className={current.value === "NA" ? "selected" : ""}><input type="radio" name={`question-${answerIndex}`} checked={current.value === "NA"} onChange={() => onAnswer(answerIndex, "NA")} />N/A — doesn’t apply / can’t answer</label></div>}
-        {experience.allowAnswerNotes && <textarea className="latest-answer-note" rows="2" value={current.note || ""} onChange={event => onNote(answerIndex, event.target.value)} placeholder="Optional — describe a specific moment this played out for you..." />}
       </fieldset>;
     })}</div>
 

@@ -10,6 +10,7 @@ require __DIR__ . '/extra-routes.php';
 require __DIR__ . '/attribution-routes.php';
 require __DIR__ . '/feedback-routes.php';
 require __DIR__ . '/assessment-experience-routes.php';
+require __DIR__ . '/uat-payment-routes.php';
 
 $router->add('POST', '/api/admin/password-reset/request', function (Request $request) use ($container, $db) {
     $email = strtolower(trim((string) ($request->body['email'] ?? '')));

@@ -24,10 +24,10 @@
   font-style: italic;
 }
 
-/* Keep the public logo compact and visually above the photograph. */
+/* Keep the public logo clear over the photograph, with a modest size increase. */
 .latest-visual-panel__logo {
-  width: clamp(88px, 10vw, 132px);
-  max-width: 28%;
+  width: clamp(104px, 11.5vw, 156px);
+  max-width: 32%;
 }
 
 .latest-visual-panel__logo img,
@@ -38,7 +38,7 @@
 }
 
 .latest-public-brand {
-  width: clamp(82px, 9vw, 118px);
+  width: clamp(96px, 10vw, 132px);
 }
 
 /* Use a lighter, contemporary weight consistently across public screens. */
@@ -93,6 +93,38 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 65%, transparent);
 }
 
+/* Small desktop spacing reduction only; no scoring, save or navigation logic is changed. */
+@media (min-width: 901px) {
+  .latest-questions-page {
+    padding-top: 44px;
+    padding-bottom: 56px;
+  }
+
+  .latest-questions-page .latest-question-progress {
+    margin-bottom: 26px;
+  }
+
+  .latest-question-card {
+    padding-bottom: 26px;
+  }
+
+  .latest-question-card + .latest-question-card {
+    padding-top: 26px;
+  }
+
+  .latest-question-card legend {
+    margin-bottom: 12px;
+  }
+
+  .latest-scale-options label {
+    min-height: 64px;
+  }
+
+  .latest-na-row {
+    margin-bottom: 10px;
+  }
+}
+
 @media (max-width: 680px) {
   .latest-question-progress > div {
     display: grid;
@@ -100,8 +132,8 @@
   }
 
   .latest-visual-panel__logo {
-    width: 86px;
-    max-width: 32%;
+    width: 96px;
+    max-width: 34%;
   }
 }
 
