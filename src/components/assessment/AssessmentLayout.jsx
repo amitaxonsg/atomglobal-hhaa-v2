@@ -195,15 +195,16 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
     <div className="latest-question-list">{subscale.items.map((item, itemIndex) => {
       const answerIndex = offset + itemIndex;
       const current = answers[answerIndex] || { value: null, note: "" };
-      return <fieldset className="latest-question-card" key={item.id || item.t}>
-        <legend><span>{answerIndex + 1}.</span> {item.t}</legend>
+      const labelId = `question-${answerIndex}-label`;
+      return <div className="latest-question-card" role="group" aria-labelledby={labelId} key={item.id || item.t}>
+        <div className="latest-question-legend" id={labelId}><span>{answerIndex + 1}.</span> {item.t}</div>
         <div className="latest-scale-options">{choices.map((choice, choiceIndex) => {
           const value = choiceIndex + 1;
           return <label className={current.value === value ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} checked={current.value === value} onChange={() => onAnswer(answerIndex, value)} /><strong>{value}</strong><span>{choice}</span></label>;
         })}</div>
         {experience.allowNotApplicable && <div className="latest-na-row"><label className={current.value === "NA" ? "selected" : ""}><input type="radio" name={`question-${answerIndex}`} checked={current.value === "NA"} onChange={() => onAnswer(answerIndex, "NA")} />N/A — doesn’t apply / can’t answer</label></div>}
         {experience.allowAnswerNotes && <textarea className="latest-answer-note" rows="2" value={current.note || ""} onChange={event => onNote(answerIndex, event.target.value)} placeholder="Optional — describe a specific moment this played out for you..." />}
-      </fieldset>;
+      </div>;
     })}</div>
 
     <div className="latest-question-navigation">
