@@ -4,6 +4,7 @@ declare(strict_types=1);
 use AtomGlobal\Http\Request;
 use AtomGlobal\Http\Response;
 use AtomGlobal\Http\Router;
+use AtomGlobal\Payments\CashOnDeliveryService;
 use AtomGlobal\Payments\StripeService;
 use AtomGlobal\Security\Auth;
 use AtomGlobal\Security\Csrf;
@@ -62,6 +63,10 @@ $router->add('GET', '/api/reports/{token}', function (Request $request, array $p
 $router->add('POST', '/api/payments/checkout', function (Request $request) use ($container, $config) {
     $stripe = new StripeService($container['db'], $container['settings'], $container['reports'], $config);
     return Response::json($stripe->checkout((int) ($request->body['sessionId'] ?? 0), (string) ($request->body['track'] ?? ''), $request->body['affiliateCode'] ?? null));
+});
+$router->add('POST', '/api/payments/cash-on-delivery', function (Request $request) use ($container, $config) {
+    $cash = new CashOnDeliveryService($container['db'], $container['settings'], $container['reports'], $config);
+    return Response::json($cash->checkout((int) ($request->body['sessionId'] ?? 0), (string) ($request->body['track'] ?? '')));
 });
 $router->add('POST', '/api/stripe/webhook', function (Request $request) use ($container, $config) {
     $stripe = new StripeService($container['db'], $container['settings'], $container['reports'], $config);

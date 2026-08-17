@@ -108,6 +108,7 @@ export default function ReportView({ payload, token, onReset }) {
   const paidContent = report?.paid?.content || report?.paid || null;
   const unlocked = Boolean(report?.is_unlocked);
   const checkoutAvailable = isMockMode || Boolean(report?.checkoutAvailable);
+  const cashOnDeliveryAvailable = Boolean(report?.cashOnDeliveryAvailable);
   const upgradePreview = report?.free?.upgradePreview || [];
   const [checkout, setCheckout] = React.useState({ busy: false, error: "" });
   const price = new Intl.NumberFormat(undefined, {
@@ -122,6 +123,24 @@ export default function ReportView({ payload, token, onReset }) {
       const result = await api.createCheckout({ sessionId: report.sessionId, track: report.trackKey });
       if (result.preview) window.location.reload();
       else window.location.href = result.url;
+    } catch (error) {
+      setCheckout({ busy: false, error: error.message });
+    }
+  };
+
+  const openCashOnDelivery = async () => {
+    if (!cashOnDeliveryAvailable || checkout.busy) return;
+    setCheckout({ busy: true, error: "" });
+    try {
+      const response = await fetch("/api/payments/cash-on-delivery", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: report.sessionId, track: report.trackKey }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Cash on Delivery checkout failed");
+      window.location.href = result.successUrl || result.reportUrl;
     } catch (error) {
       setCheckout({ busy: false, error: error.message });
     }
@@ -164,9 +183,13 @@ export default function ReportView({ payload, token, onReset }) {
         {checkout.error && <p className="form-error" role="alert">{checkout.error}</p>}
         <div className="upgrade-box">
           <div><span>One-time payment</span><strong>{price}</strong><small>Secure checkout · Printable PDF · Private report link</small></div>
-          <button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Unlock complete report" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>
+          <div className="upgrade-box__actions">
+            <button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Pay by card" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>
+            {cashOnDeliveryAvailable && <button className="button button--ghost" disabled={checkout.busy} onClick={openCashOnDelivery}>Cash on Delivery</button>}
+          </div>
         </div>
-        {!checkoutAvailable && <p className="preview-note">Your Lite Report is ready now. Full Report purchasing will open after Atom Global completes its secure Stripe configuration.</p>}
+        {cashOnDeliveryAvailable && <p className="preview-note">Cash on Delivery is temporarily enabled for client UAT. Selecting it unlocks the Full Report and queues the normal confirmation/report emails without charging Stripe.</p>}
+        {!checkoutAvailable && !cashOnDeliveryAvailable && <p className="preview-note">Your Lite Report is ready now. Full Report purchasing will open after Atom Global completes its secure payment configuration.</p>}
       </>}
     </section>
 
