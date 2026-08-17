@@ -15,6 +15,13 @@ function includesSearch(item, search, fields) {
   return fields.some(field => String(item[field] ?? "").toLowerCase().includes(term));
 }
 
+function booleanSetting(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+  return fallback;
+}
+
 export function ReportsPage({ initialSearch = "" }) {
   const loader = useLoader(() => api.adminReports(), []);
   const [notice, setNotice] = React.useState("");
@@ -37,9 +44,35 @@ export function ReportsPage({ initialSearch = "" }) {
 
 export function PaymentsPage({ initialSearch = "" }) {
   const loader = useLoader(() => api.adminPayments(), []);
+  const settings = useLoader(() => api.adminSettings(), []);
   const [search, setSearch] = useSearch(initialSearch);
+  const [codEnabled, setCodEnabled] = React.useState(false);
+  const [notice, setNotice] = React.useState("");
+
+  React.useEffect(() => {
+    if (!settings.data) return;
+    const explicit = settings.data?.system?.cashOnDeliveryEnabled;
+    const migrationDefault = settings.data?.payments?.cashOnDeliveryEnabled;
+    setCodEnabled(explicit == null ? booleanSetting(migrationDefault, false) : booleanSetting(explicit, false));
+  }, [settings.data]);
+
+  const saveCod = async () => {
+    try {
+      await api.saveSettings("system", { cashOnDeliveryEnabled: codEnabled });
+      setNotice(`UAT no-payment option ${codEnabled ? "enabled" : "disabled"}. The checkout will update on the participant's next report refresh.`);
+      settings.refresh();
+    } catch (error) {
+      setNotice(error.message);
+    }
+  };
+
   const items = (loader.data?.items || []).filter(item => includesSearch(item, search, ["participantName", "participantEmail", "track", "status", "provider", "affiliateCode", "stripe_checkout_session_id", "stripe_payment_intent_id"]));
-  return <><PageHeader title="Payments" actions={<button className="button" onClick={loader.refresh}>Refresh</button>} /><Notice type="error">{loader.error}</Notice>
+  return <><PageHeader title="Payments" actions={<button className="button" onClick={() => { loader.refresh(); settings.refresh(); }}>Refresh</button>} /><Notice>{notice}</Notice><Notice type="error">{loader.error || settings.error}</Notice>
+    <section className="admin-card editor-form" style={{ marginBottom: 20 }}>
+      <div className="card-heading"><div><h2>Client UAT payment bypass</h2><small>Temporary testing control — no Stripe charge</small></div><button className="button button--primary" onClick={saveCod}>Save UAT option</button></div>
+      <label className="check-row"><input type="checkbox" checked={codEnabled} onChange={event => setCodEnabled(event.target.checked)} /> Enable “Cash on Delivery / UAT — No payment” on the participant checkout</label>
+      <p className="hint">When enabled, the participant can complete the checkout flow without paying Stripe. The system records a manual UAT payment, unlocks the Full Report, rotates the private report link and queues the normal success/report emails. Disable this immediately after UAT.</p>
+    </section>
     <div className="admin-filters"><input type="search" placeholder="Search participant, payment status or Stripe ID" value={search} onChange={event => setSearch(event.target.value)} />{search && <button className="button" onClick={() => setSearch("")}>Clear</button>}<span>{items.length} payments</span></div>
     {loader.loading ? <Spinner /> : <section className="admin-card"><DataTable columns={["Participant", "Track", "Status", "Amount", "Provider", "Affiliate", "Date"]} rows={items.map(item => [<><strong>{item.participantName}</strong><span>{item.participantEmail}</span></>, item.track, <span className={`status status--${item.status}`}>{item.status}</span>, money(item.amount, item.currency), item.provider, item.affiliateCode || "—", dateTime(item.created_at)])} /></section>}
   </>;
