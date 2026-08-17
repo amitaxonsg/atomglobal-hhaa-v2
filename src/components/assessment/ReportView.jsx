@@ -184,7 +184,7 @@ export default function ReportView({ payload, token, onReset }) {
         <div className="upgrade-box">
           <div><span>One-time payment</span><strong>{price}</strong><small>Secure checkout · Printable PDF · Private report link</small></div>
           <div className="upgrade-box__actions">
-            <button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Pay by card" : "Card checkout unavailable"} {checkoutAvailable && <ArrowRight />}</button>
+            <button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Pay by card" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>
             {cashOnDeliveryAvailable && <button className="button button--ghost" disabled={checkout.busy} onClick={openCashOnDelivery}>Cash on Delivery</button>}
           </div>
         </div>
