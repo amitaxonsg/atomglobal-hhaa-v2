@@ -1,0 +1,1 @@
+Production readiness trigger for 17 Aug 2026 UAT layout and no-payment control.
