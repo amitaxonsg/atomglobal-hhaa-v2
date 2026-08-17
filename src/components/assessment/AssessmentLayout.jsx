@@ -179,33 +179,8 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
   const progress = Math.round(answered / Math.max(1, track.allItems.length) * 100);
   const saveLabel = saveState === "saving" ? "Saving…" : saveState === "retrying" ? "Retrying save…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Connection issue" : "";
   const lastSection = section === track.subscales.length - 1;
-  const questionRefs = React.useRef([]);
-  const navigationRef = React.useRef(null);
   const goBack = () => section ? setSection(section - 1) : onBack();
   const goForward = () => lastSection ? onFinish() : setSection(section + 1);
-  const handleAnswer = (itemIndex, answerIndex, value, wasAnswered) => {
-    onAnswer(answerIndex, value);
-    if (wasAnswered) return;
-
-    const nextItemIndex = subscale.items.findIndex((_, candidateIndex) => candidateIndex > itemIndex && answers[offset + candidateIndex]?.value == null);
-    const nextQuestion = nextItemIndex >= 0 ? questionRefs.current[nextItemIndex] : null;
-    const target = nextQuestion || navigationRef.current;
-    if (!target) return;
-
-    window.setTimeout(() => {
-      const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
-      const rect = target.getBoundingClientRect();
-      const needsScroll = rect.top < 0 || rect.bottom > window.innerHeight;
-      if (needsScroll) target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
-
-      window.setTimeout(() => {
-        const focusTarget = nextQuestion
-          ? nextQuestion.querySelector('input[type="radio"]')
-          : navigationRef.current?.querySelector(".latest-primary-button:not(:disabled)");
-        focusTarget?.focus({ preventScroll: true });
-      }, needsScroll && !reducedMotion ? 350 : 0);
-    }, 80);
-  };
 
   return <LatestPage width="720" className="latest-questions-page" stageKey={track.key}>
     <div className="latest-question-progress" role="progressbar" aria-label="Assessment completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress}>
@@ -218,18 +193,17 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
     <div className="latest-question-list">{subscale.items.map((item, itemIndex) => {
       const answerIndex = offset + itemIndex;
       const current = answers[answerIndex] || { value: null, note: "" };
-      const wasAnswered = current.value != null;
-      return <fieldset className="latest-question-card" key={item.id || item.t} ref={element => { questionRefs.current[itemIndex] = element; }}>
+      return <fieldset className="latest-question-card" key={item.id || item.t}>
         <legend><span>{answerIndex + 1}.</span> {item.t}</legend>
         <div className="latest-scale-options">{choices.map((choice, choiceIndex) => {
           const value = choiceIndex + 1;
-          return <label className={current.value === value ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} checked={current.value === value} onChange={() => handleAnswer(itemIndex, answerIndex, value, wasAnswered)} /><strong>{value}</strong><span>{choice}</span></label>;
+          return <label className={current.value === value ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} checked={current.value === value} onChange={() => onAnswer(answerIndex, value)} /><strong>{value}</strong><span>{choice}</span></label>;
         })}</div>
-        {experience.allowNotApplicable && <div className="latest-na-row"><label className={current.value === "NA" ? "selected" : ""}><input type="radio" name={`question-${answerIndex}`} checked={current.value === "NA"} onChange={() => handleAnswer(itemIndex, answerIndex, "NA", wasAnswered)} />N/A — doesn’t apply / can’t answer</label></div>}
+        {experience.allowNotApplicable && <div className="latest-na-row"><label className={current.value === "NA" ? "selected" : ""}><input type="radio" name={`question-${answerIndex}`} checked={current.value === "NA"} onChange={() => onAnswer(answerIndex, "NA")} />N/A — doesn’t apply / can’t answer</label></div>}
       </fieldset>;
     })}</div>
 
-    <div className="latest-question-navigation" ref={navigationRef}>
+    <div className="latest-question-navigation">
       <button className="latest-secondary-button" onClick={goBack}>← Back</button>
       <button className="latest-primary-button" disabled={!canContinue || busy} onClick={goForward}>{busy ? "Preparing report…" : lastSection ? "See my result →" : "Next question group →"}</button>
     </div>
