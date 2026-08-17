@@ -5,6 +5,7 @@ use AtomGlobal\Database;
 use AtomGlobal\Env;
 use AtomGlobal\Mail\MailDeliveryService;
 use AtomGlobal\Mail\MailQueue;
+use AtomGlobal\Payments\UatPaymentService;
 use AtomGlobal\Security\Crypto;
 use AtomGlobal\Services\AdminInsightsService;
 use AtomGlobal\Services\AdminService;
@@ -38,6 +39,7 @@ return [
     'crypto' => $crypto,
     'settings' => $settings,
     'reports' => $reports,
+    'uatPayment' => new UatPaymentService($db, $settings, $reports, $config),
     'privacy' => new PrivacyService($db),
     'surveys' => new SurveyService($db, new ScoringService(), $reports, $mailQueue, $settings, $config),
     'health' => new HealthService($db, $config, $settings),
