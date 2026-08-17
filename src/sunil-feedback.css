@@ -93,24 +93,41 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 65%, transparent);
 }
 
-/* Keep the questionnaire stationary after an answer, but clearly point to the next unanswered item. */
+/* Keep the questionnaire stationary after an answer, show completion and point to the next unanswered item. */
 .latest-question-card {
   position: relative;
 }
 
+.latest-question-card:has(.selected) legend::before {
+  content: "✓";
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--orange, #C1443F);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 1px;
+}
+
 .latest-question-card:has(.selected) + .latest-question-card:not(:has(.selected))::before {
-  content: "Next question \2193";
+  content: "Next question ↓";
   position: absolute;
   top: 4px;
   right: 0;
   z-index: 1;
-  padding: 3px 8px;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--cream, #fff) 82%, var(--questionnaire-progress, var(--gold, #c9a15a)));
-  color: var(--ink, #211c16);
+  background: var(--orange, #C1443F);
+  color: #fff;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--orange, #C1443F) 24%, transparent);
   pointer-events: none;
 }
 
