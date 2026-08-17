@@ -16,6 +16,7 @@ import "./questionnaire-process.css";
 import "./questionnaire-latest.css";
 import "./report-flow.css";
 import "./sunil-feedback.css";
+import "./uat-payment-admin.jsx";
 
 function ServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = React.useState(false);
