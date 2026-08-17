@@ -147,12 +147,23 @@ export default function ReportView({ payload, token, onReset }) {
   const checkoutAvailable = isMockMode || Boolean(report?.checkoutAvailable);
   const upgradePreview = report?.free?.upgradePreview?.length ? report.free.upgradePreview : fullReportPreview;
   const [checkout, setCheckout] = React.useState({ busy: false, error: "" });
+  const [uat, setUat] = React.useState({ enabled: false, busy: false });
   const [copyState, setCopyState] = React.useState("");
   const topStrengths = summary.strengths.slice(0, 2);
   const price = new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: report?.currency || "USD",
   }).format(Number(report?.priceMinor || 0) / 100);
+
+  React.useEffect(() => {
+    if (unlocked || isMockMode) return undefined;
+    let active = true;
+    fetch("/api/payments/uat-status", { credentials: "include" })
+      .then(response => response.ok ? response.json() : { enabled: false })
+      .then(result => { if (active) setUat(current => ({ ...current, enabled: Boolean(result.enabled) })); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [unlocked]);
 
   const openCheckout = async () => {
     if (!checkoutAvailable) return;
@@ -162,6 +173,25 @@ export default function ReportView({ payload, token, onReset }) {
       if (result.preview) window.location.reload();
       else window.location.href = result.url;
     } catch (error) {
+      setCheckout({ busy: false, error: error.message });
+    }
+  };
+
+  const openUatCheckout = async () => {
+    setCheckout({ busy: false, error: "" });
+    setUat(current => ({ ...current, busy: true }));
+    try {
+      const response = await fetch("/api/payments/uat-checkout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: report.sessionId, track: report.trackKey }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "UAT checkout could not be completed.");
+      window.location.assign(result.reportUrl);
+    } catch (error) {
+      setUat(current => ({ ...current, busy: false }));
       setCheckout({ busy: false, error: error.message });
     }
   };
@@ -209,9 +239,13 @@ export default function ReportView({ payload, token, onReset }) {
         {checkout.error && <p className="form-error" role="alert">{checkout.error}</p>}
         <div className="upgrade-box">
           <div><span>One-time payment</span><strong>{price}</strong><small>Proposed price pending Amit and Stripe confirmation · Printable PDF · Private report link</small></div>
-          <button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Unlock complete report" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>
+          <button className="button button--primary" disabled={!checkoutAvailable || checkout.busy || uat.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Unlock complete report" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>
         </div>
-        {!checkoutAvailable && <p className="preview-note">Your Lite Report is ready now. Full Report purchasing will open only after Atom Global completes its secure Stripe configuration.</p>}
+        {uat.enabled && <div className="upgrade-box">
+          <div><span>Client UAT only</span><strong>No payment</strong><small>Tests Full Report unlocking and report-email delivery without charging Stripe.</small></div>
+          <button className="button" disabled={checkout.busy || uat.busy} onClick={openUatCheckout}>{uat.busy ? "Unlocking UAT report…" : "UAT test — unlock without payment"}</button>
+        </div>}
+        {!checkoutAvailable && !uat.enabled && <p className="preview-note">Your Lite Report is ready now. Full Report purchasing will open only after Atom Global completes its secure Stripe configuration.</p>}
       </>}
     </section>
 
