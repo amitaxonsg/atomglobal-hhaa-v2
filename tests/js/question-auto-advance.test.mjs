@@ -5,23 +5,24 @@ import { readFile } from "node:fs/promises";
 const layoutSource = await readFile(new URL("../../src/components/assessment/AssessmentLayout.jsx", import.meta.url), "utf8");
 const feedbackCss = await readFile(new URL("../../src/sunil-feedback.css", import.meta.url), "utf8");
 
-test("first answer advances to the next unanswered question without unnecessary scrolling", () => {
-  assert.match(layoutSource, /const handleAnswer = \(itemIndex, answerIndex, value, wasAnswered\)/);
-  assert.match(layoutSource, /if \(wasAnswered\) return/);
-  assert.match(layoutSource, /candidateIndex > itemIndex && answers\[offset \+ candidateIndex\]\?\.value == null/);
-  assert.match(layoutSource, /const rect = target\.getBoundingClientRect\(\)/);
-  assert.match(layoutSource, /const needsScroll = rect\.top < 0 \|\| rect\.bottom > window\.innerHeight/);
-  assert.match(layoutSource, /if \(needsScroll\) target\.scrollIntoView\(\{ behavior: reducedMotion \? "auto" : "smooth", block: "center" \}\)/);
-  assert.match(layoutSource, /querySelector\('input\[type="radio"\]'\)/);
-  assert.match(feedbackCss, /\.latest-question-card:focus-within/);
+test("answering a question updates only that answer and does not move or focus the next question", () => {
+  assert.match(layoutSource, /onChange=\{\(\) => onAnswer\(answerIndex, value\)\}/);
+  assert.match(layoutSource, /onChange=\{\(\) => onAnswer\(answerIndex, "NA"\)\}/);
+  assert.doesNotMatch(layoutSource, /handleAnswer/);
+  assert.doesNotMatch(layoutSource, /scrollIntoView/);
+  assert.doesNotMatch(layoutSource, /focus\(\{ preventScroll: true \}\)/);
+  assert.doesNotMatch(layoutSource, /questionRefs/);
+  assert.doesNotMatch(feedbackCss, /\.latest-question-card:focus-within/);
 });
 
-test("last answered question advances to enabled group navigation", () => {
-  assert.match(layoutSource, /const target = nextQuestion \|\| navigationRef\.current/);
-  assert.match(layoutSource, /querySelector\("\.latest-primary-button:not\(:disabled\)"\)/);
+test("question numbering and radio groups remain isolated by absolute answer index", () => {
+  assert.match(layoutSource, /const answerIndex = offset \+ itemIndex/);
+  assert.match(layoutSource, /name={`question-\$\{answerIndex\}`}/);
+  assert.match(layoutSource, /checked=\{current\.value === value\}/);
+  assert.match(layoutSource, /<span>\{answerIndex \+ 1\}<\/span>/);
 });
 
-test("participant questions omit per-question notes, modestly enlarge the logo and use compact desktop spacing", () => {
+test("participant questions retain the accepted compact UAT presentation without per-question notes", () => {
   assert.doesNotMatch(layoutSource, /<textarea className="latest-answer-note"/);
   assert.match(feedbackCss, /\.latest-visual-panel__logo\s*\{[\s\S]*?clamp\(104px, 11\.5vw, 156px\)/);
   assert.match(feedbackCss, /@media \(min-width: 901px\)[\s\S]*?\.latest-question-card \{\s*padding-bottom: 26px/);
