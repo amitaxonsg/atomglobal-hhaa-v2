@@ -62,19 +62,24 @@ final class UatPaymentService
 
             $this->reports->unlockBySession($sessionId, 'uat_no_payment');
             $access = $this->rotateReportAccess((int) $report['id']);
+            $variables = [
+                'participantName' => $survey['name'],
+                'trackName' => $survey['track_name'],
+                'reportUrl' => $access['reportUrl'],
+                'paidReportUrl' => $access['reportUrl'],
+                'paymentMethod' => 'UAT no-payment test',
+                'amount' => '0.00',
+                'currency' => strtoupper((string) $survey['currency']),
+            ];
 
-            $this->db->execute(
-                'INSERT INTO email_queue (template_key, recipient_email, variables_json, status, attempts, scheduled_at, created_at) VALUES (?, ?, ?, ?, 0, NOW(), NOW())',
-                ['paid_report_ready', strtolower((string) $survey['email']), json_encode([
-                    'participantName' => $survey['name'],
-                    'trackName' => $survey['track_name'],
-                    'reportUrl' => $access['reportUrl'],
-                    'paidReportUrl' => $access['reportUrl'],
-                    'paymentMethod' => 'UAT no-payment test',
-                    'amount' => '0.00',
-                    'currency' => strtoupper((string) $survey['currency']),
-                ]), 'queued']
-            );
+            // Mirror the normal post-payment email chain so UAT can validate both messages without charging Stripe.
+            foreach (['payment_successful', 'paid_report_ready'] as $templateKey) {
+                $this->db->execute(
+                    'INSERT INTO email_queue (template_key, recipient_email, variables_json, status, attempts, scheduled_at, created_at) VALUES (?, ?, ?, ?, 0, NOW(), NOW())',
+                    [$templateKey, strtolower((string) $survey['email']), json_encode($variables), 'queued']
+                );
+            }
+
             $this->db->execute(
                 'INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, after_json, created_at) VALUES (NULL, ?, ?, ?, ?, NOW())',
                 ['payment.uat_no_payment', 'payment', (string) $paymentId, json_encode(['surveySessionId' => $sessionId, 'reportId' => $report['id']])]
