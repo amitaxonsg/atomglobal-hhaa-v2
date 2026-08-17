@@ -93,12 +93,6 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 65%, transparent);
 }
 
-/* The existing assessment engine already focuses the next radio choice. Make that move visible. */
-.latest-question-card:focus-within {
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 78%, transparent);
-  background: color-mix(in srgb, var(--cream, #fff) 95%, transparent);
-}
-
 /* Small desktop spacing reduction only; no scoring, save or navigation logic is changed. */
 @media (min-width: 901px) {
   .latest-questions-page {
