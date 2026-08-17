@@ -18,7 +18,12 @@ final class CashOnDeliveryService
 
     public function enabled(): bool
     {
-        $value = $this->settings->get('payments.cash_on_delivery_enabled', false);
+        // The system-level value is the administrator's explicit UAT override.
+        // If it has never been saved, fall back to the migration-level payments default.
+        $override = $this->settings->get('system.cash_on_delivery_enabled', null);
+        $value = $override === null
+            ? $this->settings->get('payments.cash_on_delivery_enabled', false)
+            : $override;
         if (is_bool($value)) return $value;
         return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on'], true);
     }
