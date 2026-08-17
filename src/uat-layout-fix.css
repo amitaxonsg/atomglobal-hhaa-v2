@@ -1,0 +1,19 @@
+.latest-question-legend {
+  width: 100%;
+  margin-bottom: 16px;
+  color: var(--ink, #211c16);
+  font-size: var(--questionnaire-question-size, 17px);
+  line-height: 1.5;
+}
+
+.latest-question-legend span {
+  color: var(--gold-dark, #af8540);
+}
+
+/* Keep each question in normal document flow after an answer causes a React save/re-render. */
+.latest-question-card {
+  display: block;
+  min-width: 0;
+  box-sizing: border-box;
+  background: transparent;
+}
