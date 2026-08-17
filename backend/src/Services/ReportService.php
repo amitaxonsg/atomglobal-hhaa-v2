@@ -62,6 +62,7 @@ final class ReportService
             $row['view_count'] = (int) $row['view_count'];
             $row['checkoutAvailable'] = $this->checkoutAvailable((string) $row['trackKey']);
             $row['checkoutStatus'] = $row['checkoutAvailable'] ? 'available' : 'not_configured';
+            $row['cashOnDeliveryAvailable'] = $this->cashOnDeliveryAvailable();
             $this->db->execute('UPDATE generated_reports SET view_count = view_count + 1, last_viewed_at = NOW() WHERE id = ?', [$row['id']]);
         }
         return $row;
@@ -93,6 +94,13 @@ final class ReportService
         $environmentKey = 'STRIPE_PRICE_' . strtoupper($trackKey);
         $price = trim((string) $this->settings->get('stripe.price_' . $trackKey, $_ENV[$environmentKey] ?? ''));
         return $secret !== '' && $webhook !== '' && $price !== '';
+    }
+
+    private function cashOnDeliveryAvailable(): bool
+    {
+        $value = $this->settings->get('payments.cash_on_delivery_enabled', false);
+        if (is_bool($value)) return $value;
+        return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on'], true);
     }
 
     private function normaliseUpgradePreview(mixed $items): array
