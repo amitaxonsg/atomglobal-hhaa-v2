@@ -19,7 +19,7 @@ test("question numbering and radio groups remain isolated by absolute answer ind
   assert.match(layoutSource, /const answerIndex = offset \+ itemIndex/);
   assert.match(layoutSource, /name={`question-\$\{answerIndex\}`}/);
   assert.match(layoutSource, /checked=\{current\.value === value\}/);
-  assert.match(layoutSource, /<span>\{answerIndex \+ 1\}<\/span>/);
+  assert.match(layoutSource, /<span>\{answerIndex \+ 1\}\.\<\/span>/);
 });
 
 test("participant questions retain the accepted compact UAT presentation without per-question notes", () => {
