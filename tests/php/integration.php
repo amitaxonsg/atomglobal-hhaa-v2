@@ -63,12 +63,12 @@ $created = $container['surveys']->create([
 ]);
 expect((int) $created['id'] > 0, 'Survey session was not created.');
 expect((bool) preg_match('/^[a-f0-9]{64}$/', $created['resumeToken']), 'Resume token is not 256-bit hexadecimal.');
-expect(count($created['assessment']['questions'] ?? []) === 50, 'Published questions were not returned to the participant frontend.');
+expect(count($created['assessment']['questions'] ?? []) === 40, 'V3 published 40 questions were not returned to the participant frontend.');
 expect(count($created['assessment']['sections'] ?? []) === 10, 'Published sections were not returned to the participant frontend.');
 expect(count($created['assessment']['answerChoices'] ?? []) === 5, 'Published answer choices were not returned to the participant frontend.');
 expect(($created['assessment']['questions'][0]['text'] ?? '') !== '', 'Published question text is empty.');
 
-$answers = array_fill(0, 50, ['value' => 3, 'note' => '']);
+$answers = array_fill(0, 40, ['value' => 3, 'note' => '']);
 $answers[0] = ['value' => 5, 'note' => 'Integration note'];
 $saved = $container['surveys']->save((int) $created['id'], [
     'resumeToken' => $created['resumeToken'],
@@ -80,7 +80,7 @@ expect((int) $saved['completionPercentage'] === 100, 'Autosave completion percen
 $resumed = $container['surveys']->resume($created['resumeToken']);
 expect((int) $resumed['answers'][0]['value'] === 5, 'Saved answer was not restored.');
 expect($resumed['participant']['email'] === $participant['email'], 'Participant was not restored.');
-expect(count($resumed['assessment']['questions'] ?? []) === 50, 'Resume did not restore the published question snapshot.');
+expect(count($resumed['assessment']['questions'] ?? []) === 40, 'Resume did not restore the V3 40-question snapshot.');
 
 $completed = $container['surveys']->complete((int) $created['id'], [
     'resumeToken' => $created['resumeToken'],
