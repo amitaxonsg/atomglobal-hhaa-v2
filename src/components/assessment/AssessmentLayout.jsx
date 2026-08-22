@@ -9,10 +9,10 @@ export const blankParticipant = {
 };
 
 const fallbackMeta = {
-  personal: { durationMin: 15, durationMax: 15, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free" },
-  newjoiner: { durationMin: 15, durationMax: 15, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free" },
-  manager: { durationMin: 15, durationMax: 18, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free" },
-  executive: { durationMin: 18, durationMax: 20, questionCount: 50, sectionCount: 10, freeReportLabel: "Lite Report Free" },
+  personal: { durationMin: 12, durationMax: 15, questionCount: 40, sectionCount: 10, freeReportLabel: "Lite Report Free" },
+  newjoiner: { durationMin: 12, durationMax: 15, questionCount: 40, sectionCount: 10, freeReportLabel: "Lite Report Free" },
+  manager: { durationMin: 12, durationMax: 16, questionCount: 40, sectionCount: 10, freeReportLabel: "Lite Report Free" },
+  executive: { durationMin: 15, durationMax: 18, questionCount: 40, sectionCount: 10, freeReportLabel: "Lite Report Free" },
 };
 
 function durationLabel(meta) {
@@ -169,6 +169,16 @@ export function ParticipantDetails({ track, remoteExperience, participant, setPa
   </LatestPage>;
 }
 
+function ProgressMessage({ completed }) {
+  if (completed === 20) {
+    return <div className="latest-progress-message" role="status"><strong>Halfway there — 20 of 40 complete.</strong><span>Keep answering honestly; the value comes from the pattern, not any single response.</span></div>;
+  }
+  if (completed === 40) {
+    return <div className="latest-progress-message" role="status"><strong>All 40 questions complete — well done.</strong><span>Your responses are ready. You can review this section or continue to your result.</span></div>;
+  }
+  return null;
+}
+
 export function Questions({ track, remoteExperience, answers, onAnswer, onNote, section, setSection, onBack, onFinish, saveState, busy, error }) {
   const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
   const subscale = track.subscales[section];
@@ -179,6 +189,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
   const progress = Math.round(answered / Math.max(1, track.allItems.length) * 100);
   const saveLabel = saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : saveState === "error" ? "Save issue" : "";
   const lastSection = section === track.subscales.length - 1;
+  const sectionEnd = offset + subscale.items.length;
   const goBack = () => section ? setSection(section - 1) : onBack();
   const goForward = () => lastSection ? onFinish() : setSection(section + 1);
 
@@ -187,7 +198,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
       <div><span>Section {section + 1} of {track.subscales.length}</span><span>{answered}/{track.allItems.length} answered{saveLabel ? ` · ${saveLabel}` : ""}</span></div>
       <i><b style={{ width: `${progress}%` }} /></i>
     </div>
-    <p className="latest-section-code">{subscale.code} · Section {section + 1} of {track.subscales.length}</p>
+    <p className="latest-section-code">{subscale.name} · Section {section + 1} of {track.subscales.length}</p>
     <h1>{subscale.name}</h1>
     <p className="latest-copy latest-copy--last">{subscale.blurb}</p>
     {error && <p className="form-error" role="alert">{error}</p>}
@@ -206,6 +217,8 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
         {experience.allowAnswerNotes && <textarea className="latest-answer-note" rows="2" value={current.note || ""} onChange={event => onNote(answerIndex, event.target.value)} placeholder="Optional — describe a specific moment this played out for you..." />}
       </div>;
     })}</div>
+
+    {canContinue && <ProgressMessage completed={sectionEnd} />}
 
     <div className="latest-question-navigation">
       <button className="latest-secondary-button" onClick={goBack}>← Back</button>

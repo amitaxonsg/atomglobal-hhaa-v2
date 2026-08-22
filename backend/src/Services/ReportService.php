@@ -7,6 +7,8 @@ use AtomGlobal\Database;
 
 final class ReportService
 {
+    private const RETAKE_PRICE_MINOR = 200;
+
     public function __construct(
         private Database $db,
         private SettingsService $settings,
@@ -18,6 +20,9 @@ final class ReportService
         $token = bin2hex(random_bytes(32));
         $profile = $score['profile'];
         $paidContent = json_decode((string) $profile['paid_content_json'], true, 512, JSON_THROW_ON_ERROR);
+        $comparison = $this->retakeComparison($sessionId, $score);
+        $isRetake = $comparison !== null;
+        if ($comparison) $paidContent['retakeComparison'] = $comparison;
         $upgradePreview = $this->normaliseUpgradePreview($paidContent['upgradeReasons'] ?? []);
 
         $free = [
@@ -25,8 +30,6 @@ final class ReportService
             'total' => $score['total'],
             'summary' => json_decode((string) $profile['free_content_json'], true, 512, JSON_THROW_ON_ERROR),
             'subscales' => $score['subscales'],
-            // Only the approved sales preview is exposed while the Full Report is locked.
-            // The substantive paid content remains private in paid_report_json.
             'upgradePreview' => $upgradePreview,
         ];
         $paid = [
@@ -39,11 +42,17 @@ final class ReportService
             'INSERT INTO generated_reports (survey_session_id, score_snapshot_id, secure_token_hash, token_expires_at, is_unlocked, free_report_json, paid_report_json, created_at, updated_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), 0, ?, ?, NOW(), NOW())',
             [$sessionId, $scoreId, hash('sha256', $token), $this->config['report_token_days'], json_encode($free), json_encode($paid)]
         );
+        if ($isRetake) {
+            $this->db->execute(
+                'UPDATE generated_reports SET is_unlocked = 1, unlocked_at = NOW(), unlock_reason = ?, updated_at = NOW() WHERE id = ?',
+                ['retake_payment', $id]
+            );
+        }
         $this->db->execute(
             'INSERT INTO secure_report_tokens (generated_report_id, token_hash, expires_at, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW())',
             [$id, hash('sha256', $token), $this->config['report_token_days']]
         );
-        return ['id' => $id, 'token' => $token];
+        return ['id' => $id, 'token' => $token, 'isRetake' => $isRetake];
     }
 
     public function byToken(string $token): ?array
@@ -63,6 +72,10 @@ final class ReportService
             $row['checkoutAvailable'] = $this->checkoutAvailable((string) $row['trackKey']);
             $row['checkoutStatus'] = $row['checkoutAvailable'] ? 'available' : 'not_configured';
             $row['cashOnDeliveryAvailable'] = $this->cashOnDeliveryAvailable();
+            $row['retakePriceMinor'] = self::RETAKE_PRICE_MINOR;
+            $row['retakeCurrency'] = 'USD';
+            $row['retakeCheckoutAvailable'] = $row['is_unlocked'] && $this->retakeCheckoutAvailable();
+            $row['retakeRecommendedAt'] = $this->recommendedRetakeAt((string) ($row['completedAt'] ?? ''));
             $this->db->execute('UPDATE generated_reports SET view_count = view_count + 1, last_viewed_at = NOW() WHERE id = ?', [$row['id']]);
         }
         return $row;
@@ -96,11 +109,60 @@ final class ReportService
         return $secret !== '' && $webhook !== '' && $price !== '';
     }
 
+    private function retakeCheckoutAvailable(): bool
+    {
+        $secret = trim((string) $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? ''));
+        $webhook = trim((string) $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? ''));
+        return $secret !== '' && $webhook !== '';
+    }
+
     private function cashOnDeliveryAvailable(): bool
     {
         $value = $this->settings->get('payments.cash_on_delivery_enabled', false);
         if (is_bool($value)) return $value;
         return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on'], true);
+    }
+
+    private function recommendedRetakeAt(string $completedAt): ?string
+    {
+        if ($completedAt === '') return null;
+        try {
+            return (new \DateTimeImmutable($completedAt))->modify('+3 months')->format(DATE_ATOM);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function retakeComparison(int $sessionId, array $score): ?array
+    {
+        $session = $this->db->fetch('SELECT attribution_snapshot_json FROM survey_sessions WHERE id = ? LIMIT 1', [$sessionId]);
+        if (!$session) return null;
+        $attribution = json_decode((string) ($session['attribution_snapshot_json'] ?? '{}'), true) ?: [];
+        $sourceSessionId = (int) ($attribution['retakeOfSessionId'] ?? 0);
+        if ($sourceSessionId < 1) return null;
+
+        $previousReport = $this->db->fetch('SELECT free_report_json FROM generated_reports WHERE survey_session_id = ? ORDER BY id DESC LIMIT 1', [$sourceSessionId]);
+        if (!$previousReport) return null;
+        $previous = json_decode((string) $previousReport['free_report_json'], true) ?: [];
+        $previousSubscales = is_array($previous['subscales'] ?? null) ? $previous['subscales'] : [];
+        $currentSubscales = is_array($score['subscales'] ?? null) ? $score['subscales'] : [];
+        $areas = [];
+        foreach ($currentSubscales as $code => $current) {
+            if (!array_key_exists($code, $previousSubscales)) continue;
+            $before = (int) $previousSubscales[$code];
+            $after = (int) $current;
+            $areas[] = ['code' => (string) $code, 'previous' => $before, 'current' => $after, 'change' => $after - $before];
+        }
+        $previousTotal = (int) ($previous['total'] ?? 0);
+        $currentTotal = (int) ($score['total'] ?? 0);
+        return [
+            'sourceSessionId' => $sourceSessionId,
+            'previousTotal' => $previousTotal,
+            'currentTotal' => $currentTotal,
+            'totalChange' => $currentTotal - $previousTotal,
+            'areas' => $areas,
+            'guidance' => 'Use the comparison to notice meaningful movement, stable strengths, and patterns that return under pressure. A small change is still useful when it reflects a deliberate habit practised consistently.',
+        ];
     }
 
     private function normaliseUpgradePreview(mixed $items): array

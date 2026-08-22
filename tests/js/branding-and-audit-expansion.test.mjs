@@ -56,7 +56,7 @@ test("full audit requires four current v2 assessments and no old traces", () => 
 
 test("guarded smoke test verifies and cleans the complete submission chain", () => {
   assert.match(smoke, /RUN-PRODUCTION-SUBMISSION-SMOKE/);
-  assert.match(smoke, /All 50 frontend answer payloads were persisted/);
+  assert.match(smoke, /All 40 frontend answer payloads were persisted/);
   assert.match(smoke, /Admin participant detail shows the generated report/);
   assert.match(smoke, /Temporary participant, session, answers, score, report/);
   assert.match(readme, /Full production audit and submission smoke test/);

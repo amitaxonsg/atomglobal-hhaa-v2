@@ -30,6 +30,10 @@ This is the independent V2 project. Do not reconnect it to the original reposito
 
 Production Admin and database verification confirmed exactly four published `2.0.0` assessments. All obsolete `1.0.0` questionnaire versions, the unfinished old session and its test participant data were removed after verified MariaDB backups.
 
+## V3 UAT note — 23 August 2026
+
+The isolated `sunil-v3-clean-40q-cms` branch is the V3 UAT build. It intentionally keeps each published assessment version's approved 50-question CMS/source bank intact for version history and rollback, while every new V3 participant session publishes a 40-question runtime: 10 areas × 4 questions. Existing in-progress sessions continue using their own immutable question snapshots. Production `main` is not changed by the V3 branch until UAT/merge/deployment is explicitly completed.
+
 ## Verified production experience
 
 The `main` branch combines the approved questionnaire process with the approved visual branding:
@@ -63,7 +67,7 @@ Existing secure resume links continue using their original assessment version. C
 4. Collect five assessment-specific context fields.
 5. Optionally reveal Department and Level for configured work roles.
 6. Record required privacy and transactional consent; marketing stays optional.
-7. Present 10 autosaved sections of five questions each.
+7. V3 presents 10 autosaved sections of four participant questions each (40 runtime questions); the approved CMS/source bank remains 50 questions per track.
 8. Accept five scored choices or `N/A — doesn’t apply / can’t answer`.
 9. Exclude N/A from scoring.
 10. Save an optional note beneath every question.
@@ -213,7 +217,7 @@ The merged production-ready code passed:
 - clean MySQL migrations and seed;
 - production integration acceptance;
 - N/A persistence/exclusion, notes, autosave, resume, completion and scoring;
-- temporary participant creation, 50-answer persistence, score and report generation;
+- temporary participant creation, V3 40-answer persistence, score and report generation while the 50-question CMS/source bank remains intact;
 - Admin participant-detail visibility and all four participant-flow email queues;
 - automatic removal of temporary smoke-test records;
 - masked-secret protection and CMS-only outbound sender assertions;
@@ -238,7 +242,7 @@ The merged production-ready code passed:
 
 ## Next deployment acceptance
 
-1. Deploy merged `main` using `deploy/update-vps.sh`.
+1. Deploy merged `main` using `deploy/update-vps.sh` for production, or deploy the isolated V3 branch to the documented staging paths for UAT before merge.
 2. Confirm the desktop public page retains the left image and approved branding.
 3. Confirm mobile hides the image and shows the transparent logo.
 4. Confirm public pages do not show Powered by Axon 1Pro.
@@ -246,14 +250,14 @@ The merged production-ready code passed:
 6. Confirm `/api/public/assessment-experience` returns all four managed tracks.
 7. Confirm Personal, New Joiner, Manager and Executive appear together on the right.
 8. Confirm each card starts published CMS assessment version `2.0.0`.
-9. Confirm every track contains the exact attached 10 sections and 50 questions.
+9. Confirm each track retains the exact approved 10 sections and 50-question CMS/source bank, while each new V3 participant session publishes exactly 40 runtime questions (4 per area).
 10. Confirm every new session is pinned to published CMS version `2.0.0`.
 11. Test Questionnaire CMS landing, card, introduction and intake changes.
-12. Run the guarded submission smoke test and verify participant, 50 answers, score, report, Admin detail and four email queues before automatic test-data cleanup.
+12. Run the guarded submission smoke test and verify participant, 40 runtime answers, score, report, Admin detail and four email queues before automatic test-data cleanup.
 13. Run `backend/bin/email-settings-audit.php` and confirm the CMS sender identity without exposing secrets.
 14. Confirm Admin → Settings → Email can be saved with blank secret fields without changing the stored SMTP2GO key.
 15. Send one selected-template email test and confirm SMTP2GO shows the CMS sender identity.
-16. Configure and test Stripe test keys, Price IDs and signed webhooks.
+16. Configure and test Stripe test keys, Price IDs and signed webhooks, including the USD 2 retake flow before production release.
 17. Run `deploy/full-production-audit.sh` (or the compatibility wrapper `deploy/final-production-audit.sh`) from the Git source checkout and retain its output.
 18. Record Amit and client acceptance after production verification.
 
