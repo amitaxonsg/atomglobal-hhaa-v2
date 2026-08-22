@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Guarded end-to-end production smoke test.
  *
- * Creates one temporary participant and assessment session, saves 50 answers,
+ * Creates one temporary participant and assessment session, saves 40 answers,
  * completes scoring/report generation, verifies Admin visibility and queued
  * participant emails, optionally sends those emails, and removes every test
  * database record before exiting.
@@ -22,6 +22,7 @@ declare(strict_types=1);
 
 const CONFIRMATION = 'RUN-PRODUCTION-SUBMISSION-SMOKE';
 const TRACKS = ['personal', 'newjoiner', 'manager', 'executive'];
+const EXPECTED_QUESTION_COUNT = 40;
 const EXPECTED_TEMPLATES = [
     'participant_registration',
     'survey_resume_link',
@@ -168,7 +169,7 @@ try {
     $sessionId = (int) ($created['id'] ?? 0);
     assertSmoke($sessionId > 0, 'Public submission created a survey session');
     assertSmoke(($created['assessmentVersion'] ?? '') === '2.0.0', 'New session is pinned to CMS assessment version 2.0.0');
-    assertSmoke(count($created['assessment']['questions'] ?? []) === 50, 'Session response contains 50 published database questions');
+    assertSmoke(count($created['assessment']['questions'] ?? []) === EXPECTED_QUESTION_COUNT, 'Session response contains the V3 40-question runtime');
     assertSmoke(count($created['assessment']['sections'] ?? []) === 10, 'Session response contains 10 published database sections');
 
     $sessionRow = $db->fetch('SELECT participant_id FROM survey_sessions WHERE id = ?', [$sessionId]);
@@ -176,7 +177,7 @@ try {
     assertSmoke($participantId > 0, 'Participant record was stored in MariaDB');
 
     $answers = [];
-    for ($index = 0; $index < 50; $index++) {
+    for ($index = 0; $index < EXPECTED_QUESTION_COUNT; $index++) {
         $answers[] = [
             'value' => ($index % 5) + 1,
             'note' => $index === 0 ? 'Automated production smoke-test answer.' : '',
@@ -191,7 +192,7 @@ try {
     ]);
 
     $answerCount = (int) (($db->fetch('SELECT COUNT(*) count FROM survey_answers WHERE survey_session_id = ?', [$sessionId])['count'] ?? 0));
-    assertSmoke($answerCount === 50, 'All 50 frontend answer payloads were persisted');
+    assertSmoke($answerCount === EXPECTED_QUESTION_COUNT, 'All 40 frontend answer payloads were persisted');
 
     $completed = $surveys->complete($sessionId, [
         'resumeToken' => (string) $created['resumeToken'],
@@ -212,7 +213,7 @@ try {
 
     $detail = $admin->participant($participantId);
     assertSmoke(count($detail['sessions'] ?? []) === 1, 'Admin participant detail shows the submitted assessment');
-    assertSmoke(count($detail['answers'] ?? []) === 50, 'Admin participant detail shows all 50 answers');
+    assertSmoke(count($detail['answers'] ?? []) === EXPECTED_QUESTION_COUNT, 'Admin participant detail shows all 40 answers');
     assertSmoke(count($detail['reports'] ?? []) === 1, 'Admin participant detail shows the generated report');
     assertSmoke(count($detail['consents'] ?? []) >= 3, 'Admin participant detail shows recorded consent history');
 
