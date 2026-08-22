@@ -30,19 +30,28 @@ test("V3 area-name map covers every track and assessment code", () => {
   }
 });
 
-test("Sunil milestone, report and retake copy is present in the V3 build", () => {
+test("Sunil milestone, report and verified-retake scope is present in the V3 build", () => {
   const layout = fs.readFileSync(new URL("../../src/components/assessment/AssessmentLayout.jsx", import.meta.url), "utf8");
   const report = fs.readFileSync(new URL("../../src/components/assessment/ReportView.jsx", import.meta.url), "utf8");
   const survey = fs.readFileSync(new URL("../../backend/src/Services/SurveyService.php", import.meta.url), "utf8");
   const pdf = fs.readFileSync(new URL("../../backend/src/Services/PdfService.php", import.meta.url), "utf8");
+  const stripe = fs.readFileSync(new URL("../../backend/src/Payments/StripeService.php", import.meta.url), "utf8");
+  const reportService = fs.readFileSync(new URL("../../backend/src/Services/ReportService.php", import.meta.url), "utf8");
 
   assert.match(layout, /20 of 40 complete/);
   assert.match(layout, /All 40 questions complete/);
   assert.match(report, /Top three strengths/i);
   assert.match(report, /Five practical everyday actions/i);
   assert.match(report, /Retake price: USD 2/);
-  assert.match(report, /new result compared against the previous result in the same report/i);
+  assert.match(report, /__RETAKE__/);
+  assert.match(report, /RetakeComparison/);
+  assert.match(report, /compares the new result with the previous result in the same report/i);
   assert.match(pdf, /Retake price: USD 2/);
   assert.match(survey, /V3_QUESTION_COUNT = 40/);
   assert.doesNotMatch(survey, /All 50 questions must be answered/);
+  assert.match(stripe, /RETAKE_AMOUNT_MINOR = 200/);
+  assert.match(stripe, /payment_purpose' => 'retake'/);
+  assert.match(stripe, /retakeOfSessionId/);
+  assert.match(reportService, /retakeComparison/);
+  assert.match(reportService, /retake_payment/);
 });
