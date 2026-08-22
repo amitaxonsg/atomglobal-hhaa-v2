@@ -8,6 +8,10 @@ use AtomGlobal\Mail\MailQueue;
 
 final class SurveyService
 {
+    private const V3_QUESTION_COUNT = 40;
+    private const V3_SECTION_COUNT = 10;
+    private const V3_QUESTIONS_PER_SECTION = 4;
+
     public function __construct(
         private Database $db,
         private ScoringService $scoring,
@@ -190,10 +194,14 @@ final class SurveyService
                 return ['id' => $id, 'status' => 'completed', 'reportId' => $report['id'] ?? null];
             }
 
-            $answerCount = $this->db->fetch('SELECT COUNT(*) count FROM survey_answers WHERE survey_session_id = ?', [$id]);
-            if ((int) ($answerCount['count'] ?? 0) !== 50) throw new \InvalidArgumentException('All 50 questions must be answered before completion.');
-
             $snapshot = json_decode($session['question_snapshot_json'], true, 512, JSON_THROW_ON_ERROR);
+            $expectedQuestionCount = count($snapshot['questions'] ?? []);
+            if ($expectedQuestionCount < 1) throw new \RuntimeException('Assessment question snapshot is unavailable.');
+            $answerCount = $this->db->fetch('SELECT COUNT(*) count FROM survey_answers WHERE survey_session_id = ?', [$id]);
+            if ((int) ($answerCount['count'] ?? 0) !== $expectedQuestionCount) {
+                throw new \InvalidArgumentException("All {$expectedQuestionCount} questions must be answered before completion.");
+            }
+
             $score = $this->scoring->score($snapshot['questions'], $payload['answers'] ?? [], $snapshot['profiles']);
             $answerSnapshot = $this->db->fetchAll('SELECT question_position, answer_value, is_not_applicable, note, answered_at FROM survey_answers WHERE survey_session_id = ? ORDER BY question_position', [$id]);
             $scoreId = $this->db->insert(
@@ -224,9 +232,10 @@ final class SurveyService
         return $session;
     }
 
-    private function completion(array $answers): int
+    private function completion(array $answers, int $expectedQuestionCount): int
     {
-        return (int) round(count(array_filter($answers, fn($item) => ($item['value'] ?? null) !== null)) / 50 * 100);
+        $expectedQuestionCount = max(1, $expectedQuestionCount);
+        return (int) round(count(array_filter($answers, fn($item) => ($item['value'] ?? null) !== null)) / $expectedQuestionCount * 100);
     }
 
     private function persistAnswers(int $id, array $payload): void
@@ -244,19 +253,54 @@ final class SurveyService
                 [$id, $index + 1, $value, $notApplicable ? 1 : 0, mb_substr((string) ($answer['note'] ?? ''), 0, 2000)]
             );
         }
+        $session = $this->db->fetch('SELECT question_snapshot_json FROM survey_sessions WHERE id = ? LIMIT 1', [$id]);
+        $snapshot = json_decode((string) ($session['question_snapshot_json'] ?? '{}'), true) ?: [];
+        $expectedQuestionCount = count($snapshot['questions'] ?? []);
+        if ($expectedQuestionCount < 1) $expectedQuestionCount = self::V3_QUESTION_COUNT;
         $this->db->execute(
             'UPDATE survey_sessions SET current_section = ?, completion_percentage = ?, last_activity_at = NOW(), updated_at = NOW() WHERE id = ? AND status = ?',
-            [max(0, min(9, (int) ($payload['section'] ?? 0))), $this->completion($payload['answers'] ?? []), $id, 'in_progress']
+            [max(0, min(9, (int) ($payload['section'] ?? 0))), $this->completion($payload['answers'] ?? [], $expectedQuestionCount), $id, 'in_progress']
         );
     }
 
     private function versionSnapshot(int $versionId): array
     {
-        $questions = $this->db->fetchAll(
-            'SELECT q.id, q.position, q.question_text, q.scoring_direction direction, s.code subscale_code, s.name subscale_name, s.description subscale_description, s.display_order section_order FROM questions q JOIN assessment_sections s ON s.id = q.section_id WHERE q.assessment_version_id = ? AND q.is_active = 1 ORDER BY q.position',
+        $sourceQuestions = $this->db->fetchAll(
+            'SELECT q.id, q.position, q.question_text, q.scoring_direction direction, s.code subscale_code, s.name subscale_name, s.description subscale_description, s.display_order section_order FROM questions q JOIN assessment_sections s ON s.id = q.section_id WHERE q.assessment_version_id = ? AND q.is_active = 1 ORDER BY s.display_order, q.position',
             [$versionId]
         );
-        if (count($questions) !== 50) throw new \RuntimeException('The published assessment does not contain exactly 50 active questions.');
+        if (count($sourceQuestions) < self::V3_QUESTION_COUNT) {
+            throw new \RuntimeException('The published assessment does not contain enough active questions for the 40-question V3 assessment.');
+        }
+
+        $sections = [];
+        foreach ($sourceQuestions as $question) {
+            $code = (string) $question['subscale_code'];
+            $sections[$code] ??= [];
+            $sections[$code][] = $question;
+        }
+        if (count($sections) !== self::V3_SECTION_COUNT) {
+            throw new \RuntimeException('The published assessment must contain exactly 10 assessment areas.');
+        }
+
+        uasort($sections, static function (array $left, array $right): int {
+            return ((int) ($left[0]['section_order'] ?? 0)) <=> ((int) ($right[0]['section_order'] ?? 0));
+        });
+
+        $questions = [];
+        foreach ($sections as $sectionQuestions) {
+            if (count($sectionQuestions) < self::V3_QUESTIONS_PER_SECTION) {
+                throw new \RuntimeException('Each V3 assessment area must contain at least four active questions.');
+            }
+            foreach (array_slice($sectionQuestions, 0, self::V3_QUESTIONS_PER_SECTION) as $question) {
+                $question['position'] = count($questions) + 1;
+                $questions[] = $question;
+            }
+        }
+        if (count($questions) !== self::V3_QUESTION_COUNT) {
+            throw new \RuntimeException('The V3 assessment snapshot must contain exactly 40 questions.');
+        }
+
         $profiles = $this->db->fetchAll('SELECT profile_key, profile_name, min_score, max_score, free_content_json, paid_content_json FROM report_templates WHERE assessment_version_id = ? ORDER BY min_score', [$versionId]);
         $options = $this->db->fetchAll('SELECT option_value value, label, display_order FROM answer_options WHERE assessment_version_id = ? ORDER BY display_order', [$versionId]);
         if (count($options) !== 5) throw new \RuntimeException('The published assessment does not contain exactly five scored answer choices.');
@@ -265,7 +309,7 @@ final class SurveyService
             'questions' => $questions,
             'profiles' => $profiles,
             'options' => $options,
-            'scoring' => ['scale_min' => 1, 'scale_max' => 5, 'reverse_formula' => '6 - answer', 'not_applicable' => 'excluded from scoring', 'total_formula' => 'round(mean * 50)', 'subscale_formula' => 'round(mean * 5)'],
+            'scoring' => ['scale_min' => 1, 'scale_max' => 5, 'reverse_formula' => '6 - answer', 'not_applicable' => 'excluded from scoring', 'total_formula' => 'round(mean * 50)', 'subscale_formula' => 'round(mean * 5)', 'question_count' => self::V3_QUESTION_COUNT],
         ];
     }
 
