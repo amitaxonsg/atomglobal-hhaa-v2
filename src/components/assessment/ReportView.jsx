@@ -1,6 +1,6 @@
 import React from "react";
 import { api, isMockMode } from "../../api/client";
-import { parseReportPayload, reportSummary } from "../../data/runtimeAssessment";
+import { parseReportPayload, reportSummary, v3AreaName } from "../../data/runtimeAssessment";
 import { AlignmentGauge, RadarChart } from "../shared/Charts";
 import { ArrowRight, Check, Lock } from "../shared/Icons";
 import { StageShell } from "./AssessmentLayout";
@@ -17,24 +17,26 @@ function TextSection({ title, value }) {
   return <section className="report-card"><h3>{title}</h3><p>{text}</p></section>;
 }
 
-function ListSection({ title, items }) {
+function ListSection({ title, items, ordered = false }) {
   if (!Array.isArray(items) || !items.length) return null;
   const values = items.map(item => textValue(item)).filter(Boolean);
   if (!values.length) return null;
-  return <section className="report-card"><h3>{title}</h3><ul>{values.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}</ul></section>;
+  const List = ordered ? "ol" : "ul";
+  return <section className="report-card"><h3>{title}</h3><List>{values.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}</List></section>;
 }
 
 function Roadmap({ content }) {
   const roadmap = Array.isArray(content?.roadmap) ? content.roadmap : [];
   if (!roadmap.length) return null;
-  return <div className="full-report-copy">
+  return <section className="report-card full-report-copy">
     <h3>Development roadmap</h3>
+    <p>Choose two or three changes from this roadmap to practise consistently. The goal is not to change everything at once, but to build a small number of observable habits you can revisit.</p>
     {roadmap.map((item, index) => <article key={item.area || index}>
       <h4>{item.area || `Development area ${index + 1}`}</h4>
       <p>{item.insight || item.summary || ""}</p>
       {Array.isArray(item.steps) && <ul>{item.steps.map(step => <li key={step}>{step}</li>)}</ul>}
     </article>)}
-  </div>;
+  </section>;
 }
 
 function UpgradeReasons({ items, locked = false }) {
@@ -58,45 +60,55 @@ function UpgradeReasons({ items, locked = false }) {
   </section>;
 }
 
-function SubscaleReads({ content }) {
+function SubscaleReads({ content, trackKey }) {
   const reads = content?.subscaleReads;
   if (!reads || typeof reads !== "object" || Array.isArray(reads)) return null;
   const entries = Object.entries(reads).filter(([, value]) => textValue(value));
   if (!entries.length) return null;
   return <section className="report-card"><h3>Your 10-area interpretation</h3>
-    <div className="full-report-copy">{entries.map(([key, value]) => <article key={key}><h4>{key}</h4><p>{textValue(value)}</p></article>)}</div>
+    <div className="full-report-copy">{entries.map(([key, value]) => <article key={key}><h4>{v3AreaName(trackKey, key, key)}</h4><p>{textValue(value)}</p></article>)}</div>
   </section>;
 }
 
-function ScoreBreakdown({ subscales }) {
+function ScoreBreakdown({ subscales, trackKey }) {
   const entries = Object.entries(subscales || {});
   if (entries.length < 3) return null;
+  const labels = entries.map(([label]) => v3AreaName(trackKey, label, label));
   return <div className="report-radar-wrap">
-    <RadarChart values={entries.map(([, value]) => Number(value))} labels={entries.map(([label]) => label)} />
+    <RadarChart values={entries.map(([, value]) => Number(value))} labels={labels} />
     <div className="report-score-list">
-      {entries.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}/25</strong></div>)}
+      {entries.map(([label, value]) => <div key={label}><span>{v3AreaName(trackKey, label, label)}</span><strong>{value}/25</strong></div>)}
     </div>
   </div>;
+}
+
+function RetakePlan() {
+  return <section className="report-card">
+    <h3>3-month retake and progress check</h3>
+    <p>Commit to two or three changes from this report and work on them consistently. Retake the full 40-question assessment in about three months so you can compare what shifted, what stayed stable, and where old patterns still show up under pressure.</p>
+    <p><strong>Retake price: USD 2.</strong> This retake option is for participants who previously completed and unlocked the paid Full Development Report. The retake produces a new Full Development Report, with the new result compared against the previous result in the same report.</p>
+  </section>;
 }
 
 function FullReportContent({ report, summary, content }) {
   if (!content) return <p className="preview-note">Full Report content is unavailable. Contact Atom Global support.</p>;
   return <>
-    <ScoreBreakdown subscales={report?.paid?.subscales || summary.subscales} />
-    <TextSection title="Full profile interpretation" value={content.summary} />
-    <ListSection title="Strengths to build on" items={content.strengths} />
-    <ListSection title="Challenges and watch-outs" items={content.watchouts} />
+    <ScoreBreakdown subscales={report?.paid?.subscales || summary.subscales} trackKey={report?.trackKey} />
+    <TextSection title="Complete profile summary" value={content.summary} />
+    <ListSection title="Full strengths list" items={content.strengths} />
+    <ListSection title="Challenges and development areas" items={content.watchouts} />
     <TextSection title="Development areas" value={content.developmentAreas} />
     <ListSection title="Development areas" items={content.developmentAreas} />
-    <TextSection title="In relationships" value={content.relationships} />
-    <TextSection title="Improving your working style" value={content.work} />
+    <TextSection title="Relationships / team" value={content.relationships} />
+    <TextSection title="Personal / working style" value={content.work} />
     <ListSection title="Working-style actions" items={content.workingStyleTips} />
     <TextSection title="How you handle difficulty" value={content.handlingDifficulty} />
     <TextSection title={content.leadershipImpactLabel || "Leadership impact"} value={content.leadershipImpact} />
     <TextSection title={content.cultureFitLabel || "Culture fit reflection"} value={content.cultureFitPrompt} />
-    <ListSection title="Practical ideas for growth" items={content.growth} />
-    <SubscaleReads content={content} />
+    <ListSection title="Five practical everyday actions" items={(content.growth || []).slice(0, 5)} ordered />
+    <SubscaleReads content={content} trackKey={report?.trackKey} />
     <Roadmap content={content} />
+    <RetakePlan />
     <UpgradeReasons items={content.upgradeReasons} />
     <p className="preview-note">Your private link is time-limited. Open the PDF or print a copy for your records.</p>
   </>;
@@ -163,7 +175,7 @@ export default function ReportView({ payload, token, onReset }) {
     </section>
 
     <div className="report-columns">
-      <section className="report-card"><h2>Strengths to build on</h2><ul>{summary.strengths.map(item => <li key={item}><Check />{item}</li>)}</ul></section>
+      <section className="report-card"><h2>Top three strengths</h2><ul>{summary.strengths.slice(0, 3).map(item => <li key={item}><Check />{item}</li>)}</ul></section>
       <section className="report-card"><h2>Development observations</h2><ul>{summary.watchouts.map(item => <li key={item}><span>—</span>{item}</li>)}</ul></section>
     </div>
 
