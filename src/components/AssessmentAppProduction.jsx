@@ -1,6 +1,6 @@
 import React from "react";
 import { assessmentTracks } from "../data/assessmentData";
-import { buildRuntimeTrack } from "../data/runtimeAssessment";
+import { buildRuntimeTrack, V3_QUESTION_COUNT } from "../data/runtimeAssessment";
 import { api, isMockMode } from "../api/client";
 import AdminApp from "./admin/AdminApp";
 import { ParticipantDetails, Questions, SelectVersion, StageShell, TrackIntroduction, blankParticipant } from "./assessment/AssessmentLayout";
@@ -167,7 +167,8 @@ export default function AssessmentAppProduction() {
   const selectTrack = key => {
     setError("");
     setTrackKey(key);
-    setAnswers(assessmentTracks[key].allItems.map(() => ({ value: null, note: "" })));
+    const v3Track = buildRuntimeTrack(assessmentTracks[key], null);
+    setAnswers(v3Track.allItems.map(() => ({ value: null, note: "" })));
     setStage("intro");
     window.scrollTo(0, 0);
   };
@@ -177,7 +178,7 @@ export default function AssessmentAppProduction() {
     setError("");
     try {
       const created = await api.createSession({ trackKey, participant, section: 0, ...attributionFromLocation() });
-      const count = created.assessment?.questions?.length || 50;
+      const count = created.assessment?.questions?.length || V3_QUESTION_COUNT;
       setAnswers(Array.from({ length: count }, () => ({ value: null, note: "" })));
       setSession(created);
       setStage("questions");
