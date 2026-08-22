@@ -21,6 +21,7 @@ final class ReportService
         $profile = $score['profile'];
         $paidContent = json_decode((string) $profile['paid_content_json'], true, 512, JSON_THROW_ON_ERROR);
         $comparison = $this->retakeComparison($sessionId, $score);
+        $isRetake = $comparison !== null;
         if ($comparison) $paidContent['retakeComparison'] = $comparison;
         $upgradePreview = $this->normaliseUpgradePreview($paidContent['upgradeReasons'] ?? []);
 
@@ -29,8 +30,6 @@ final class ReportService
             'total' => $score['total'],
             'summary' => json_decode((string) $profile['free_content_json'], true, 512, JSON_THROW_ON_ERROR),
             'subscales' => $score['subscales'],
-            // Only the approved sales preview is exposed while the Full Report is locked.
-            // The substantive paid content remains private in paid_report_json.
             'upgradePreview' => $upgradePreview,
         ];
         $paid = [
@@ -43,11 +42,17 @@ final class ReportService
             'INSERT INTO generated_reports (survey_session_id, score_snapshot_id, secure_token_hash, token_expires_at, is_unlocked, free_report_json, paid_report_json, created_at, updated_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), 0, ?, ?, NOW(), NOW())',
             [$sessionId, $scoreId, hash('sha256', $token), $this->config['report_token_days'], json_encode($free), json_encode($paid)]
         );
+        if ($isRetake) {
+            $this->db->execute(
+                'UPDATE generated_reports SET is_unlocked = 1, unlocked_at = NOW(), unlock_reason = ?, updated_at = NOW() WHERE id = ?',
+                ['retake_payment', $id]
+            );
+        }
         $this->db->execute(
             'INSERT INTO secure_report_tokens (generated_report_id, token_hash, expires_at, created_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW())',
             [$id, hash('sha256', $token), $this->config['report_token_days']]
         );
-        return ['id' => $id, 'token' => $token];
+        return ['id' => $id, 'token' => $token, 'isRetake' => $isRetake];
     }
 
     public function byToken(string $token): ?array
