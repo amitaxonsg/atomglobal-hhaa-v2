@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 const CONFIRMATION = 'RUN-PRODUCTION-REPORT-SMOKE';
 const TRACKS = ['personal', 'newjoiner', 'manager', 'executive'];
+const EXPECTED_QUESTION_COUNT = 40;
 
 $options = getopt('', ['recipient:', 'track::', 'confirm:']);
 $recipient = strtolower(trim((string) ($options['recipient'] ?? '')));
@@ -122,9 +123,10 @@ try {
     $session = $db->fetch('SELECT participant_id FROM survey_sessions WHERE id = ?', [$sessionId]);
     $participantId = (int) ($session['participant_id'] ?? 0);
     passReport($sessionId > 0 && $participantId > 0, 'Temporary report test session was created');
+    passReport(count($created['assessment']['questions'] ?? []) === EXPECTED_QUESTION_COUNT, 'V3 report test session contains 40 questions');
 
     $answers = [];
-    for ($index = 0; $index < 50; $index++) $answers[] = ['value' => ($index % 5) + 1, 'note' => ''];
+    for ($index = 0; $index < EXPECTED_QUESTION_COUNT; $index++) $answers[] = ['value' => ($index % 5) + 1, 'note' => ''];
     $completed = $surveys->complete($sessionId, [
         'resumeToken' => (string) $created['resumeToken'],
         'participant' => $participant,
