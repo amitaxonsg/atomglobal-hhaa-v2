@@ -39,7 +39,7 @@ final class PdfService
         if (is_array($summary)) $summary = json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $html = '<!doctype html><html><head><meta charset="utf-8"><style>'
-            . '@page{margin:30mm 22mm 24mm}body{font-family:' . $this->css($body) . ';color:' . $this->css($ink) . ';font-size:11pt;line-height:1.55;background:#fff}h1,h2,h3,h4{font-family:' . $this->css($heading) . ';font-weight:normal}h1{font-size:30pt;margin:0 0 6mm}h2{font-size:18pt;margin-top:10mm;border-bottom:1px solid #ddd;padding-bottom:2mm}h3{font-size:14pt;margin:7mm 0 2mm}h4{font-size:12pt;margin:4mm 0 1mm}.logo{width:54mm;max-height:18mm;object-fit:contain}.brand{font-weight:bold;letter-spacing:.08em;color:' . $this->css($heart) . ';font-size:10pt}.meta{color:' . $this->css($muted) . ';font-size:9pt}.hero{background:' . $this->css($canvas) . ';padding:10mm;margin:8mm 0;border-left:3px solid ' . $this->css($gold) . '}.score{font-family:' . $this->css($heading) . ';font-size:28pt}.report-block{page-break-inside:avoid;border:1px solid #e4ddcf;border-radius:4px;padding:5mm;margin:4mm 0}.subscale{page-break-inside:avoid;margin:3mm 0}.footer{position:fixed;bottom:-14mm;left:0;right:0;color:' . $this->css($muted) . ';font-size:8pt;text-align:center}ul,ol{padding-left:5mm;margin-top:2mm}</style></head><body>'
+            . '@page{margin:30mm 22mm 24mm}body{font-family:' . $this->css($body) . ';color:' . $this->css($ink) . ';font-size:11pt;line-height:1.55;background:#fff}h1,h2,h3,h4{font-family:' . $this->css($heading) . ';font-weight:normal}h1{font-size:30pt;margin:0 0 6mm}h2{font-size:18pt;margin-top:10mm;border-bottom:1px solid #ddd;padding-bottom:2mm}h3{font-size:14pt;margin:7mm 0 2mm}h4{font-size:12pt;margin:4mm 0 1mm}.logo{width:54mm;max-height:18mm;object-fit:contain}.brand{font-weight:bold;letter-spacing:.08em;color:' . $this->css($heart) . ';font-size:10pt}.meta{color:' . $this->css($muted) . ';font-size:9pt}.hero{background:' . $this->css($canvas) . ';padding:10mm;margin:8mm 0;border-left:3px solid ' . $this->css($gold) . '}.score{font-family:' . $this->css($heading) . ';font-size:28pt}.report-block{page-break-inside:avoid;border:1px solid #e4ddcf;border-radius:4px;padding:5mm;margin:4mm 0}.subscale{page-break-inside:avoid;margin:3mm 0}.comparison-row{border-bottom:1px solid #eee;padding:2mm 0}.footer{position:fixed;bottom:-14mm;left:0;right:0;color:' . $this->css($muted) . ';font-size:8pt;text-align:center}ul,ol{padding-left:5mm;margin-top:2mm}</style></head><body>'
             . $brand . '<p class="meta">HEAD–HEART ALIGNMENT · ' . $this->h($row['track_name']) . '</p>'
             . '<h1>' . $this->h($free['profile'] ?? 'Head–Heart Alignment Report') . '</h1>'
             . '<p class="meta">Prepared for ' . $this->h($row['participant_name']) . ' · Completed ' . $this->h((string) ($row['completed_at'] ?? '')) . '</p>'
@@ -117,17 +117,41 @@ final class PdfService
             'growth' => 'Five practical everyday actions',
             'subscaleReads' => 'Your 10-area interpretation',
             'roadmap' => 'Development roadmap',
+            'retakeComparison' => 'Your progress since the previous assessment',
             'upgradeReasons' => 'Full Report applications',
         ];
         $skip = ['profile', 'total', 'hasLeadershipImpact', 'hasCultureFit', 'leadershipImpactLabel', 'cultureFitLabel'];
         $html = '';
         foreach ($content as $key => $value) {
             if (in_array($key, $skip, true) || $value === null || $value === '' || $value === []) continue;
+            if ($key === 'retakeComparison' && is_array($value)) {
+                $html .= $this->renderRetakeComparison($value, $trackKey);
+                continue;
+            }
             $title = $labels[$key] ?? ucwords(str_replace(['_', '-'], ' ', (string) $key));
             if ($key === 'growth' && is_array($value)) $value = array_slice($value, 0, 5);
             $html .= '<div class="report-block"><h3>' . $this->h($title) . '</h3>' . $this->renderValue($value, $trackKey, $key === 'growth') . '</div>';
         }
         return $html;
+    }
+
+    private function renderRetakeComparison(array $comparison, string $trackKey): string
+    {
+        $previous = (int) ($comparison['previousTotal'] ?? 0);
+        $current = (int) ($comparison['currentTotal'] ?? 0);
+        $change = (int) ($comparison['totalChange'] ?? ($current - $previous));
+        $signed = $change > 0 ? '+' . $change : (string) $change;
+        $html = '<div class="report-block"><h3>Your progress since the previous assessment</h3>'
+            . '<p><strong>Overall:</strong> ' . $previous . ' → ' . $current . ' (' . $this->h($signed) . ')</p>';
+        foreach (($comparison['areas'] ?? []) as $area) {
+            if (!is_array($area)) continue;
+            $areaChange = (int) ($area['change'] ?? 0);
+            $areaSigned = $areaChange > 0 ? '+' . $areaChange : (string) $areaChange;
+            $html .= '<div class="comparison-row"><strong>' . $this->h($this->areaName($trackKey, (string) ($area['code'] ?? ''))) . '</strong>: '
+                . (int) ($area['previous'] ?? 0) . ' → ' . (int) ($area['current'] ?? 0) . ' (' . $this->h($areaSigned) . ')</div>';
+        }
+        if (!empty($comparison['guidance'])) $html .= '<p>' . $this->h((string) $comparison['guidance']) . '</p>';
+        return $html . '</div>';
     }
 
     private function renderValue(mixed $value, string $trackKey, bool $ordered = false): string
