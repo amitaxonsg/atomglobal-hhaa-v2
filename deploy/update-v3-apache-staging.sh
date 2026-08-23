@@ -6,6 +6,7 @@ APP_ROOT="/var/www/head-heart-staging.atomglobal.com"
 ENV_FILE="/etc/head-heart-alignment/staging.env"
 EXPECTED_STORAGE_PATH="/var/lib/head-heart-alignment-staging"
 BACKUP_DIR="/var/backups/head-heart-alignment-staging"
+CRON_FILE="/etc/cron.d/head-heart-v3-staging"
 DOMAIN="head-heart-staging.atomglobal.com"
 BRANCH="sunil-v3-clean-40q-cms"
 PHP_FPM_SERVICE="php8.3-fpm"
@@ -45,9 +46,10 @@ trap rollback ERR
 [[ -d "$SOURCE_DIR/.git" ]] || fail "Missing staging source: $SOURCE_DIR"
 [[ -r "$ENV_FILE" ]] || fail "Missing/read-protected staging env: $ENV_FILE"
 
-for command in git php composer mysql mysqldump gzip npm node rsync curl apache2ctl; do
+for command in git php composer mysql mysqldump gzip npm node rsync curl apache2ctl runuser; do
   command -v "$command" >/dev/null 2>&1 || fail "Missing required command: $command"
 done
+PHP_BIN="$(command -v php)"
 
 cd "$SOURCE_DIR"
 git fetch origin
@@ -115,8 +117,18 @@ printf '%s\n' "$COMMIT" > "$APP_ROOT/deployed-commit.txt"
 systemctl reload "$PHP_FPM_SERVICE"
 systemctl reload apache2
 
+cat > "$CRON_FILE.tmp" <<EOF
+MAILTO=""
+*/5 * * * * www-data $PHP_BIN $APP_ROOT/current/backend/bin/cron.php >> $STORAGE_PATH/cron.log 2>&1
+EOF
+install -o root -g root -m 0644 "$CRON_FILE.tmp" "$CRON_FILE"
+rm -f "$CRON_FILE.tmp"
+systemctl reload cron 2>/dev/null || systemctl restart cron
+runuser -u www-data -- "$PHP_BIN" "$APP_ROOT/current/backend/bin/cron.php"
+
 HEALTH="$(curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/health")"
 grep -q '"status":"ok"' <<<"$HEALTH" || fail "Health check failed: $HEALTH"
+grep -q '"cron":true' <<<"$HEALTH" || fail "Staging background processing did not become healthy: $HEALTH"
 curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/" >/dev/null
 
 SWITCHED=0
@@ -127,4 +139,5 @@ echo "V3 staging updated successfully."
 echo "Commit: $COMMIT"
 echo "URL: https://$DOMAIN/"
 echo "Health: $HEALTH"
+echo "Background processing: scheduled every 5 minutes and verified healthy."
 trap - ERR
