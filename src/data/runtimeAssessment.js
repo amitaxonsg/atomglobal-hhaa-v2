@@ -82,7 +82,7 @@ export function buildRuntimeTrack(fallbackTrack, assessment) {
     const fallback = fallbackSections.get(section.code) || {};
     sectionMap.set(section.code, {
       code: section.code,
-      name: v3AreaName(fallbackV3.key, section.code, fallback.name || section.name),
+      name: section.name || fallback.name || v3AreaName(fallbackV3.key, section.code, section.code),
       blurb: section.description || fallback.blurb || "",
       order: Number(section.order || 0),
       items: [],
@@ -95,7 +95,7 @@ export function buildRuntimeTrack(fallbackTrack, assessment) {
     if (!sectionMap.has(code)) {
       sectionMap.set(code, {
         code,
-        name: v3AreaName(fallbackV3.key, code, fallback.name || question.subscaleName || code),
+        name: question.subscaleName || fallback.name || v3AreaName(fallbackV3.key, code, code),
         blurb: question.subscaleDescription || fallback.blurb || "",
         order: Number(question.sectionOrder || sectionMap.size + 1),
         items: [],
@@ -114,7 +114,7 @@ export function buildRuntimeTrack(fallbackTrack, assessment) {
     .sort((left, right) => left.order - right.order)
     .map(section => ({
       code: section.code,
-      name: v3AreaName(fallbackV3.key, section.code, section.name),
+      name: section.name || v3AreaName(fallbackV3.key, section.code, section.code),
       blurb: section.blurb,
       items: section.items
         .sort((left, right) => left.position - right.position)
@@ -158,6 +158,7 @@ export function reportSummary(report) {
     strengths: Array.isArray(summary.strengths) ? summary.strengths : [],
     watchouts: Array.isArray(summary.watchouts) ? summary.watchouts : [],
     subscales: free.subscales || {},
+    areaNames: free.areaNames || {},
   };
 }
 
