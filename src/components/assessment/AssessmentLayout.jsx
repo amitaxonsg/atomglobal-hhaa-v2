@@ -91,8 +91,9 @@ export function SelectVersion({ experience, onSelect }) {
     <p className="latest-copy latest-copy--last">{landing.secondaryCopy}</p>
     <div className="latest-track-cards">
       {tracks.map(track => {
-        const details = trackExperience(track.key, experience?.tracks?.[track.key] || {}, track.priceLabel);
-        const meta = fallbackMeta[track.key];
+        const remote = experience?.tracks?.[track.key] || {};
+        const details = trackExperience(track.key, remote, track.priceLabel);
+        const meta = { ...fallbackMeta[track.key], ...remote };
         return <button className="latest-track-card" key={track.key} onClick={() => onSelect(track.key)}>
           <strong>{landing.cardTitlePrefix} {track.label}</strong>
           <span>{details.tagline}</span>
@@ -169,17 +170,18 @@ export function ParticipantDetails({ track, remoteExperience, participant, setPa
   </LatestPage>;
 }
 
-function ProgressMessage({ completed }) {
+function ProgressMessage({ completed, copy }) {
+  const landing = landingExperience(copy);
   if (completed === 20) {
-    return <div className="latest-progress-message" role="status"><strong>Halfway there — 20 of 40 complete.</strong><span>Keep answering honestly; the value comes from the pattern, not any single response.</span></div>;
+    return <div className="latest-progress-message" role="status"><strong>{landing.halfwayTitle}</strong><span>{landing.halfwayBody}</span></div>;
   }
   if (completed === 40) {
-    return <div className="latest-progress-message" role="status"><strong>All 40 questions complete — well done.</strong><span>Your responses are ready. You can review this section or continue to your result.</span></div>;
+    return <div className="latest-progress-message" role="status"><strong>{landing.completeTitle}</strong><span>{landing.completeBody}</span></div>;
   }
   return null;
 }
 
-export function Questions({ track, remoteExperience, answers, onAnswer, onNote, section, setSection, onBack, onFinish, saveState, busy, error }) {
+export function Questions({ track, remoteExperience, progressExperience, answers, onAnswer, onNote, section, setSection, onBack, onFinish, saveState, busy, error }) {
   const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
   const subscale = track.subscales[section];
   const offset = track.subscales.slice(0, section).reduce((total, item) => total + item.items.length, 0);
@@ -218,7 +220,7 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
       </div>;
     })}</div>
 
-    {canContinue && <ProgressMessage completed={sectionEnd} />}
+    {canContinue && <ProgressMessage completed={sectionEnd} copy={progressExperience} />}
 
     <div className="latest-question-navigation">
       <button className="latest-secondary-button" onClick={goBack}>← Back</button>
