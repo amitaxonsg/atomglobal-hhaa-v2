@@ -4,13 +4,15 @@
   color: var(--ink, #211c16);
   font-size: var(--questionnaire-question-size, 17px);
   line-height: 1.5;
+  font-weight: 400;
 }
 
 .latest-question-legend span {
   color: var(--gold-dark, #af8540);
 }
 
-/* Keep each question in normal document flow after an answer causes a React save/re-render. */
+/* Keep each question in normal document flow after an answer causes a React save/re-render.
+   This avoids the Safari/first-question jump that fieldset/legend rendering could trigger. */
 .latest-question-card {
   display: block;
   min-width: 0;
@@ -18,57 +20,33 @@
   background: transparent;
 }
 
-/* V3 UAT MUST use only Sunil's approved blue Head–Heart visual.
-   This intentionally overrides legacy/CMS stage-image values so an older
-   photographic visual cannot reappear during participant testing. */
-.latest-visual-panel {
-  background-image: url("/media/stages/sunil-head-heart-v3.webp") !important;
-  background-position: 50% 50% !important;
+/* Sunil requested lighter typography and a more visible progress indicator.
+   Branding images, logos and UAT labels are intentionally NOT hard-coded here;
+   they now come from the published CMS/application values. */
+.latest-questionnaire-page h1,
+.latest-visual-panel__copy h2,
+.latest-track-card strong,
+.latest-head-heart-grid article strong {
+  font-weight: 500;
 }
 
-/* Public V3 branding MUST use the supplied Atom Global PNG at top-left.
-   Hide the runtime image source and render the retained PNG asset directly
-   on the existing brand anchors so CMS logo overrides cannot replace it. */
-.latest-visual-panel__logo,
-.latest-public-brand {
-  display: block;
-  width: 190px;
-  height: 64px;
-  background: url("/media/brand/atom-global-wordmark.png") left center / contain no-repeat !important;
+.latest-visual-panel__copy p,
+.latest-primary-button,
+.latest-secondary-button {
+  font-weight: 500;
 }
 
-.latest-visual-panel__logo img,
-.latest-public-brand img {
-  visibility: hidden !important;
+.latest-question-progress > i {
+  height: 8px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 18%, transparent);
 }
 
-/* Client UAT: make the temporary no-payment checkout unmistakable.
-   The backend continues to use its audited manual UAT route; only the
-   participant-facing label is changed from the internal COD terminology. */
-.upgrade-box__actions .button--ghost {
-  font-size: 0 !important;
-}
-
-.upgrade-box__actions .button--ghost::after {
-  content: "UAT Test — No Payment";
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.upgrade-box + .preview-note {
-  font-size: 0 !important;
-}
-
-.upgrade-box + .preview-note::after {
-  content: "UAT testing option: choose ‘UAT Test — No Payment’ to test the Full Report, confirmation and report-email flow without making a Stripe charge.";
-  font-size: 13px;
-  line-height: 1.5;
+.latest-question-progress b {
+  min-width: 2px;
 }
 
 @media (max-width: 900px) {
-  .latest-visual-panel__logo,
-  .latest-public-brand {
-    width: 160px;
-    height: 54px;
+  .latest-question-progress > i {
+    height: 7px;
   }
 }
