@@ -31,6 +31,7 @@ export const landingDefaults = {
   secondaryCopy: "You'll answer 40 statements across 10 areas of life, get an instant free result, and can unlock a full in-depth report. Choose the version that fits you:",
   cardTitlePrefix: "Head-Heart Alignment:",
   showBrandName: true,
+  hideSectionTitles: true,
   halfwayTitle: "Halfway there — 20 of 40 complete.",
   halfwayBody: "Keep answering honestly; the value comes from the pattern, not any single response.",
   completeTitle: "All 40 questions complete — well done.",
@@ -138,10 +139,21 @@ export function landingExperience(remote = {}) {
   return { ...landingDefaults, ...(remote || {}) };
 }
 
+function priceFromRemote(remote, fallback = "") {
+  if (remote?.priceLabel) return remote.priceLabel;
+  const minor = Number(remote?.priceMinor);
+  const currency = String(remote?.currency || "USD").toUpperCase();
+  if (Number.isFinite(minor) && minor > 0 && currency === "USD") {
+    const amount = minor / 100;
+    return amount % 1 === 0 ? `$${amount.toFixed(0)}` : `$${amount.toFixed(2)}`;
+  }
+  return fallback || "the listed price";
+}
+
 export function trackExperience(trackKey, remote = {}, priceLabel = "") {
   const fallback = experienceDefaults[trackKey] || experienceDefaults.personal;
   const intake = remote.intake && typeof remote.intake === "object" ? { ...fallback.intake, ...remote.intake } : fallback.intake;
-  const resolvedPrice = priceLabel || remote.priceLabel || "the listed price";
+  const resolvedPrice = priceFromRemote(remote, priceLabel);
   return {
     ...fallback,
     ...remote,
