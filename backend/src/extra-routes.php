@@ -3,19 +3,42 @@ declare(strict_types=1);
 
 use AtomGlobal\Http\Request;
 use AtomGlobal\Http\Response;
+use AtomGlobal\Security\RateLimiter;
 use Stripe\StripeClient;
 
 // This file is required by public/index.php after the core routes are registered.
 
 $router->add('GET', '/api/reports/{token}/pdf', function (Request $request, array $params) use ($container) {
+    $report = $container['reports']->byToken($params['token']);
+    if (!$report || empty($report['is_unlocked'])) return Response::error('PDF is not available for this report.', 404);
     $path = $container['reports']->pdfByToken($params['token']);
-    if (!$path) return Response::error('PDF is not available for this report.', 404);
+    if (!$path) $path = $container['pdf']->generate((int) $report['id']);
+    if (!$path || !is_file($path)) return Response::error('PDF generation failed.', 500);
     header('Content-Type: application/pdf');
-    header('Content-Disposition: inline; filename="head-heart-alignment-report.pdf"');
+    header('Content-Disposition: inline; filename="head-heart-alignment-full-development-report.pdf"');
     header('Content-Length: ' . filesize($path));
     header('Cache-Control: private, no-store');
     readfile($path);
     exit;
+});
+
+$router->add('POST', '/api/reports/{token}/email', function (Request $request, array $params) use ($container, $db) {
+    $token = (string) ($params['token'] ?? '');
+    $report = $container['reports']->byToken($token);
+    if (!$report || empty($report['is_unlocked'])) return Response::error('Full Development Report is not available.', 404);
+    $limiter = new RateLimiter($db);
+    if (!$limiter->hit('report-email:' . hash('sha256', $token), 3, 3600)) {
+        return Response::error('Please wait before emailing this report again.', 429);
+    }
+    $reportUrl = rtrim((string) $container['config']['url'], '/') . '/report/' . rawurlencode($token);
+    $queueId = $container['mailQueue']->enqueue('paid_report_ready', (string) $report['participantEmail'], [
+        'participantName' => (string) $report['participantName'],
+        'trackName' => (string) $report['trackName'],
+        'reportUrl' => $reportUrl,
+        'paidReportUrl' => $reportUrl,
+        'reportId' => (int) $report['id'],
+    ]);
+    return Response::json(['queued' => true, 'queueId' => $queueId]);
 });
 
 $router->add('POST', '/api/admin/reports/{id}/regenerate', function (Request $request, array $params) use ($auth, $container, $csrf) {
@@ -37,11 +60,11 @@ $router->add('PUT', '/api/admin/assessment-tracks/{id}/settings', function (Requ
     $trackId = (int) $params['id'];
     $payload = $request->body;
     $db->execute(
-        'INSERT INTO assessment_track_settings (track_id, public_title, short_title, audience_label, estimated_minutes_min, estimated_minutes_max, average_seconds_per_question, average_seconds_per_participant_field, free_report_label, paid_report_label, free_report_read_minutes, paid_report_read_minutes, question_count, section_count, show_remaining_time, show_question_count, show_section_count, show_autosave, introductory_note, last_reviewed_date, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE public_title = VALUES(public_title), short_title = VALUES(short_title), audience_label = VALUES(audience_label), estimated_minutes_min = VALUES(estimated_minutes_min), estimated_minutes_max = VALUES(estimated_minutes_max), average_seconds_per_question = VALUES(average_seconds_per_question), average_seconds_per_participant_field = VALUES(average_seconds_per_participant_field), free_report_label = VALUES(free_report_label), paid_report_label = VALUES(paid_report_label), free_report_read_minutes = VALUES(free_report_read_minutes), paid_report_read_minutes = VALUES(paid_report_read_minutes), show_remaining_time = VALUES(show_remaining_time), show_question_count = VALUES(show_question_count), show_section_count = VALUES(show_section_count), show_autosave = VALUES(show_autosave), introductory_note = VALUES(introductory_note), last_reviewed_date = VALUES(last_reviewed_date), updated_at = NOW()',
-        [$trackId, trim((string) ($payload['publicTitle'] ?? '')), trim((string) ($payload['shortTitle'] ?? '')), trim((string) ($payload['audienceLabel'] ?? '')), max(1, (int) ($payload['durationMin'] ?? 15)), max(1, (int) ($payload['durationMax'] ?? 15)), max(5, (int) ($payload['averageSecondsPerQuestion'] ?? 18)), max(5, (int) ($payload['averageSecondsPerParticipantField'] ?? 12)), trim((string) ($payload['freeReportLabel'] ?? 'Lite Report Free')), trim((string) ($payload['paidReportLabel'] ?? 'Full Report')), max(1, (int) ($payload['freeReportReadMinutes'] ?? 3)), max(1, (int) ($payload['paidReportReadMinutes'] ?? 12)), 50, 10, !empty($payload['showRemainingTime']) ? 1 : 0, !empty($payload['showQuestionCount']) ? 1 : 0, !empty($payload['showSectionCount']) ? 1 : 0, !empty($payload['showAutosave']) ? 1 : 0, $payload['introductoryNote'] ?? null, $payload['lastReviewedDate'] ?? null]
+        'INSERT INTO assessment_track_settings (track_id, public_title, short_title, audience_label, estimated_minutes_min, estimated_minutes_max, average_seconds_per_question, average_seconds_per_participant_field, free_report_label, paid_report_label, free_report_read_minutes, paid_report_read_minutes, question_count, section_count, show_remaining_time, show_question_count, show_section_count, show_autosave, introductory_note, last_reviewed_date, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE public_title = VALUES(public_title), short_title = VALUES(short_title), audience_label = VALUES(audience_label), estimated_minutes_min = VALUES(estimated_minutes_min), estimated_minutes_max = VALUES(estimated_minutes_max), average_seconds_per_question = VALUES(average_seconds_per_question), average_seconds_per_participant_field = VALUES(average_seconds_per_participant_field), free_report_label = VALUES(free_report_label), paid_report_label = VALUES(paid_report_label), free_report_read_minutes = VALUES(free_report_read_minutes), paid_report_read_minutes = VALUES(paid_report_read_minutes), question_count = 40, section_count = 10, show_remaining_time = VALUES(show_remaining_time), show_question_count = VALUES(show_question_count), show_section_count = VALUES(show_section_count), show_autosave = VALUES(show_autosave), introductory_note = VALUES(introductory_note), last_reviewed_date = VALUES(last_reviewed_date), updated_at = NOW()',
+        [$trackId, trim((string) ($payload['publicTitle'] ?? '')), trim((string) ($payload['shortTitle'] ?? '')), trim((string) ($payload['audienceLabel'] ?? '')), max(1, (int) ($payload['durationMin'] ?? 15)), max(1, (int) ($payload['durationMax'] ?? 15)), max(5, (int) ($payload['averageSecondsPerQuestion'] ?? 18)), max(5, (int) ($payload['averageSecondsPerParticipantField'] ?? 12)), trim((string) ($payload['freeReportLabel'] ?? 'Lite Report Free')), trim((string) ($payload['paidReportLabel'] ?? 'Full Report')), max(1, (int) ($payload['freeReportReadMinutes'] ?? 3)), max(1, (int) ($payload['paidReportReadMinutes'] ?? 12)), 40, 10, !empty($payload['showRemainingTime']) ? 1 : 0, !empty($payload['showQuestionCount']) ? 1 : 0, !empty($payload['showSectionCount']) ? 1 : 0, !empty($payload['showAutosave']) ? 1 : 0, $payload['introductoryNote'] ?? null, $payload['lastReviewedDate'] ?? null]
     );
-    $db->execute('INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, after_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())', [$user['id'], 'assessment_track.settings_saved', 'assessment_track', (string) $trackId, json_encode($payload)]);
-    return Response::json(['saved' => true]);
+    $db->execute('INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, after_json, created_at) VALUES (?, ?, ?, ?, ?, NOW())', [$user['id'], 'assessment_track.settings_saved', 'assessment_track', (string) $trackId, json_encode(array_merge($payload, ['questionCount' => 40, 'sectionCount' => 10]))]);
+    return Response::json(['saved' => true, 'questionCount' => 40, 'sectionCount' => 10]);
 });
 
 $router->add('PUT', '/api/admin/questions/{id}', function (Request $request, array $params) use ($auth, $db, $csrf) {
@@ -50,12 +73,22 @@ $router->add('PUT', '/api/admin/questions/{id}', function (Request $request, arr
     $id = (int) $params['id'];
     $question = $db->fetch('SELECT q.*, v.status version_status FROM questions q JOIN assessment_versions v ON v.id = q.assessment_version_id WHERE q.id = ?', [$id]);
     if (!$question) return Response::error('Question not found.', 404);
-    if ($question['version_status'] !== 'draft') return Response::error('Only draft assessment versions may be edited.', 422);
+    if ($question['version_status'] !== 'draft') return Response::error('Published and archived questions are immutable. Clone the version before correcting text.', 422);
     $payload = $request->body;
-    $direction = in_array($payload['scoringDirection'] ?? '', ['H','K'], true) ? $payload['scoringDirection'] : $question['scoring_direction'];
-    $db->execute('UPDATE questions SET question_text = ?, scoring_direction = ?, position = ?, is_required = ?, is_active = ? WHERE id = ?', [trim((string) ($payload['questionText'] ?? $question['question_text'])), $direction, max(1, min(50, (int) ($payload['position'] ?? $question['position']))), !empty($payload['required']) ? 1 : 0, !empty($payload['active']) ? 1 : 0, $id]);
-    $db->execute('INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, before_json, after_json, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [$user['id'], 'question.saved', 'question', (string) $id, json_encode($question), json_encode($payload)]);
-    return Response::json(['saved' => true]);
+    foreach (['scoringDirection', 'position', 'required', 'active', 'sectionId', 'stableKey'] as $field) {
+        if (array_key_exists($field, $payload)) {
+            return Response::error('Only question text may be corrected. Scoring, position, section, identity and active state are locked.', 422);
+        }
+    }
+    if (($payload['confirmMeaningUnchanged'] ?? false) !== true) {
+        return Response::error('Confirm that the correction does not change the question meaning or scoring intent.', 422);
+    }
+    $text = trim((string) ($payload['questionText'] ?? ''));
+    if (mb_strlen($text) < 10 || mb_strlen($text) > 2000) return Response::error('Question text must contain between 10 and 2,000 characters.', 422);
+    if ($text === trim((string) $question['question_text'])) return Response::json(['saved' => false, 'unchanged' => true]);
+    $db->execute('UPDATE questions SET question_text = ? WHERE id = ?', [$text, $id]);
+    $db->execute('INSERT INTO audit_logs (admin_user_id, action, entity_type, entity_id, before_json, after_json, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [$user['id'], 'question.text_corrected', 'question', (string) $id, json_encode(['questionText' => $question['question_text'], 'stableKey' => $question['stable_key'], 'scoringDirection' => $question['scoring_direction'], 'position' => (int) $question['position']]), json_encode(['questionText' => $text, 'meaningUnchangedConfirmed' => true, 'stableKey' => $question['stable_key'], 'scoringDirection' => $question['scoring_direction'], 'position' => (int) $question['position']])]);
+    return Response::json(['saved' => true, 'policy' => 'text_correction_only']);
 });
 
 $router->add('PUT', '/api/admin/report-templates/{id}', function (Request $request, array $params) use ($auth, $db, $csrf) {
