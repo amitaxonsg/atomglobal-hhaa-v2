@@ -44,7 +44,12 @@ foreach(($data["settings"]??[]) as $k=>$v){
 }
 $s->set("email.provider","smtp2go",false);
 $s->set("email.public_base_url","https://head-heart-staging.atomglobal.com",false);
-$s->set("branding.logo_url","/media/brand/atom-global-wordmark-transparent.svg",false);
+$logo=(string)($data["settings"]["email.logo_url"]??"");
+if($logo==="") $logo="/media-uploads/atom-global-2019-dc59d6f1ab15aa23112c.png";
+$s->set("branding.logo_url",$logo,false);
+$s->set("branding.email_logo_url",$logo,false);
+$s->set("branding.report_logo_url",$logo,false);
+$s->set("email.logo_url",$logo,false);
 foreach(($data["templates"]??[]) as $t){
   $db->execute(
     "INSERT INTO email_templates (template_key,template_name,subject,html_body,text_body,is_active,created_at,updated_at) VALUES (?,?,?,?,?,?,NOW(),NOW()) ON DUPLICATE KEY UPDATE template_name=VALUES(template_name),subject=VALUES(subject),html_body=VALUES(html_body),text_body=VALUES(text_body),is_active=VALUES(is_active),updated_at=NOW()",
@@ -53,7 +58,7 @@ foreach(($data["templates"]??[]) as $t){
 }
 echo "V3 staging email provider: SMTP2GO\n";
 echo "V3 staging email templates copied: ".count($data["templates"]??[])."\n";
-echo "V3 public logo: transparent Atom Global wordmark\n";
+echo "V3 public/email/report logo: ".$logo."\n";
 echo "V3 public email base URL: https://head-heart-staging.atomglobal.com\n";
 ' "$TMP"
 
@@ -62,4 +67,4 @@ trap - EXIT
 
 php bin/email-settings-audit.php
 
-echo "Copy complete. LIVE Stripe settings were intentionally NOT copied."
+echo "Copy complete. Stripe settings are unchanged by this helper."
