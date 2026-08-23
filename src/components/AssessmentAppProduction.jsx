@@ -228,7 +228,7 @@ export default function AssessmentAppProduction() {
   if (stage === "select") return <SelectVersion experience={experience} onSelect={selectTrack} />;
   if (stage === "intro" && fallbackTrack) return <TrackIntroduction track={fallbackTrack} remoteExperience={remoteExperience} onBack={() => setStage("select")} onContinue={() => setStage("details")} />;
   if (stage === "details" && fallbackTrack) return <ParticipantDetails track={fallbackTrack} remoteExperience={remoteExperience} participant={participant} setParticipant={setParticipant} onBack={() => setStage("intro")} onContinue={begin} error={error} busy={busy} />;
-  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
+  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} progressExperience={experience.landing} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
   if (stage === "report" && report) return <ReportView payload={report} token={session?.reportToken} onReset={reset} />;
   return <StageShell><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
 }
