@@ -17,3 +17,35 @@
   box-sizing: border-box;
   background: transparent;
 }
+
+/* V3 UAT MUST use only Sunil's approved blue Head–Heart visual.
+   This intentionally overrides legacy/CMS stage-image values so an older
+   photographic visual cannot reappear during participant testing. */
+.latest-visual-panel {
+  background-image: url("/media/stages/sunil-head-heart-v3.webp") !important;
+  background-position: 50% 50% !important;
+}
+
+/* Public V3 branding MUST use the supplied Atom Global PNG at top-left.
+   Hide the runtime image source and render the retained PNG asset directly
+   on the existing brand anchors so CMS logo overrides cannot replace it. */
+.latest-visual-panel__logo,
+.latest-public-brand {
+  display: block;
+  width: 190px;
+  height: 64px;
+  background: url("/media/brand/atom-global-wordmark.png") left center / contain no-repeat !important;
+}
+
+.latest-visual-panel__logo img,
+.latest-public-brand img {
+  visibility: hidden !important;
+}
+
+@media (max-width: 900px) {
+  .latest-visual-panel__logo,
+  .latest-public-brand {
+    width: 160px;
+    height: 54px;
+  }
+}
