@@ -13,7 +13,7 @@ import {
 } from "./assessmentData";
 
 const sharedIntro = "Every choice you make is cast by two votes: what you feel and what you reason. This assessment maps which one you actually hand the deciding vote to.";
-const sharedOffer = "Take the full 50-question assessment free and get your Lite Report instantly. Unlock the complete Full Report — development roadmap, working-style plan, and full breakdown — for {{price}}.";
+const sharedOffer = "Take the full 40-question assessment free and get your Lite Report instantly. Unlock the complete Full Report — development roadmap, working-style plan, and full breakdown — for {{price}}.";
 
 const departmentOptions = [
   "Executive / C-Suite", "Sales", "Marketing", "Operations", "Finance", "HR / People", "Engineering / IT",
@@ -28,9 +28,13 @@ const levelOptions = [
 export const landingDefaults = {
   title: "Head–Heart Alignment",
   primaryCopy: "Every choice you make is cast by two votes: what you feel and what you reason. This assessment maps which one you actually hand the deciding vote to — not which one you wish you did.",
-  secondaryCopy: "You'll answer 50 statements across 10 areas of life, get an instant free result, and can unlock a full in-depth report. Choose the version that fits you:",
+  secondaryCopy: "You'll answer 40 statements across 10 areas of life, get an instant free result, and can unlock a full in-depth report. Choose the version that fits you:",
   cardTitlePrefix: "Head-Heart Alignment:",
   showBrandName: true,
+  halfwayTitle: "Halfway there — 20 of 40 complete.",
+  halfwayBody: "Keep answering honestly; the value comes from the pattern, not any single response.",
+  completeTitle: "All 40 questions complete — well done.",
+  completeBody: "Your responses are ready. You can review this section or continue to your result.",
 };
 
 const personalIntake = {
