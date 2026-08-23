@@ -25,6 +25,8 @@ final class MailDeliveryService
         if (!$template) throw new \RuntimeException('Email template is unavailable: ' . $queue['template_key']);
 
         $variables = json_decode($queue['variables_json'], true) ?: [];
+        $attachments = $this->normaliseAttachments($variables['_attachments'] ?? []);
+        unset($variables['_attachments']);
         $subject = $this->render((string) $template['subject'], $variables);
         $content = $this->render((string) $template['html_body'], $variables);
         $html = $this->brandHtml($content, $subject);
@@ -35,11 +37,11 @@ final class MailDeliveryService
         }
 
         return $provider === 'smtp2go'
-            ? $this->sendSmtp2Go($queue['recipient_email'], $subject, $html, $text)
-            : $this->sendSmtp($queue['recipient_email'], $subject, $html, $text);
+            ? $this->sendSmtp2Go($queue['recipient_email'], $subject, $html, $text, $attachments)
+            : $this->sendSmtp($queue['recipient_email'], $subject, $html, $text, $attachments);
     }
 
-    private function sendSmtp2Go(string $recipient, string $subject, string $html, string $text): string
+    private function sendSmtp2Go(string $recipient, string $subject, string $html, string $text, array $attachments = []): string
     {
         $apiKey = trim((string) $this->settings->get('email.smtp2go_api_key', ''));
         if ($apiKey === '') throw new \RuntimeException('CMS SMTP2GO API key is not configured.');
@@ -52,6 +54,17 @@ final class MailDeliveryService
             'html_body' => $html,
             'text_body' => $text,
         ];
+        if ($attachments) {
+            $payload['attachments'] = array_map(static function (array $attachment): array {
+                $data = file_get_contents($attachment['path']);
+                if ($data === false) throw new \RuntimeException('Unable to read email attachment.');
+                return [
+                    'filename' => $attachment['filename'],
+                    'fileblob' => base64_encode($data),
+                    'mimetype' => $attachment['mimetype'],
+                ];
+            }, $attachments);
+        }
         $replyTo = $this->replyTo();
         if ($replyTo !== '') $payload['custom_headers'] = [['header' => 'Reply-To', 'value' => $replyTo]];
 
@@ -59,7 +72,7 @@ final class MailDeliveryService
         curl_setopt_array($curl, [
             CURLOPT_POST => true,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
+            CURLOPT_TIMEOUT => 45,
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_SLASHES),
         ]);
@@ -72,7 +85,7 @@ final class MailDeliveryService
         return (string) ($decoded['data']['email_id'] ?? $decoded['request_id'] ?? 'smtp2go-' . bin2hex(random_bytes(8)));
     }
 
-    private function sendSmtp(string $recipient, string $subject, string $html, string $text): string
+    private function sendSmtp(string $recipient, string $subject, string $html, string $text, array $attachments = []): string
     {
         $host = trim((string) $this->settings->get('email.smtp_host', ''));
         $username = trim((string) $this->settings->get('email.smtp_username', ''));
@@ -94,12 +107,33 @@ final class MailDeliveryService
         $mail->setFrom($this->fromAddress(), $this->fromName());
         if ($this->replyTo() !== '') $mail->addReplyTo($this->replyTo());
         $mail->addAddress($recipient);
+        foreach ($attachments as $attachment) {
+            $mail->addAttachment($attachment['path'], $attachment['filename'], PHPMailer::ENCODING_BASE64, $attachment['mimetype']);
+        }
         $mail->Subject = $subject;
         $mail->isHTML(true);
         $mail->Body = $html;
         $mail->AltBody = $text;
         $mail->send();
         return $mail->getLastMessageID() ?: 'smtp-' . bin2hex(random_bytes(8));
+    }
+
+    private function normaliseAttachments(mixed $items): array
+    {
+        if (!is_array($items)) return [];
+        $result = [];
+        foreach (array_slice($items, 0, 3) as $item) {
+            if (!is_array($item)) continue;
+            $path = realpath((string) ($item['path'] ?? ''));
+            if ($path === false || !is_file($path) || !is_readable($path)) throw new \RuntimeException('Email attachment is missing or unreadable.');
+            $size = filesize($path);
+            if ($size === false || $size > 20 * 1024 * 1024) throw new \RuntimeException('Email attachment exceeds the 20 MB application limit.');
+            $filename = basename((string) ($item['filename'] ?? basename($path)));
+            if ($filename === '' || $filename === '.' || $filename === '..') $filename = 'attachment.pdf';
+            $mimetype = trim((string) ($item['mimetype'] ?? 'application/pdf')) ?: 'application/pdf';
+            $result[] = ['path' => $path, 'filename' => $filename, 'mimetype' => $mimetype];
+        }
+        return $result;
     }
 
     private function brandHtml(string $content, string $subject): string
