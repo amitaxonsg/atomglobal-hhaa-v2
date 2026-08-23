@@ -31,10 +31,10 @@ function Roadmap({ content }) {
   return <section className="report-card full-report-copy">
     <h3>Development roadmap</h3>
     <p>Choose two or three changes from this roadmap to practise consistently. The goal is not to change everything at once, but to build a small number of observable habits you can revisit.</p>
-    {roadmap.map((item, index) => <article key={item.area || index}>
+    {roadmap.slice(0, 5).map((item, index) => <article key={item.area || index}>
       <h4>{item.area || `Development area ${index + 1}`}</h4>
       <p>{item.insight || item.summary || ""}</p>
-      {Array.isArray(item.steps) && <ul>{item.steps.map(step => <li key={step}>{step}</li>)}</ul>}
+      {Array.isArray(item.steps) && <ul>{item.steps.slice(0, 3).map(step => <li key={step}>{step}</li>)}</ul>}
     </article>)}
   </section>;
 }
@@ -58,14 +58,38 @@ function SubscaleReads({ content, trackKey }) {
   if (!reads || typeof reads !== "object" || Array.isArray(reads)) return null;
   const entries = Object.entries(reads).filter(([, value]) => textValue(value));
   if (!entries.length) return null;
-  return <section className="report-card"><h3>Your 10-area interpretation</h3><div className="full-report-copy">{entries.map(([key, value]) => <article key={key}><h4>{v3AreaName(trackKey, key, key)}</h4><p>{textValue(value)}</p></article>)}</div></section>;
+  return <section className="report-card"><h3>Your 10-area deep dive</h3><div className="full-report-copy">{entries.map(([key, value]) => <article key={key}><h4>{v3AreaName(trackKey, key, key)}</h4><p>{textValue(value)}</p></article>)}</div></section>;
 }
 
-function ScoreBreakdown({ subscales, trackKey }) {
+function ScoreBreakdown({ subscales, trackKey, legend }) {
   const entries = Object.entries(subscales || {});
   if (entries.length < 3) return null;
   const labels = entries.map(([label]) => v3AreaName(trackKey, label, label));
-  return <div className="report-radar-wrap"><RadarChart values={entries.map(([, value]) => Number(value))} labels={labels} /><div className="report-score-list">{entries.map(([label, value]) => <div key={label}><span>{v3AreaName(trackKey, label, label)}</span><strong>{value}/25</strong></div>)}</div></div>;
+  return <section className="report-card">
+    <h3>Your 10-area radar and score breakdown</h3>
+    <div className="report-radar-wrap"><RadarChart values={entries.map(([, value]) => Number(value))} labels={labels} /><div className="report-score-list">{entries.map(([label, value]) => <div key={label}><span>{v3AreaName(trackKey, label, label)}</span><strong>{value}/25</strong></div>)}</div></div>
+    {legend && <p className="preview-note"><strong>How to read this chart:</strong> {legend}</p>}
+  </section>;
+}
+
+function EdgeCard({ title, edge, trackKey }) {
+  if (!edge || !edge.code) return null;
+  return <section className="report-card"><h3>{title}</h3><h4>{v3AreaName(trackKey, edge.code, edge.code)} · {edge.score}/25</h4><p>{edge.meaning}</p></section>;
+}
+
+function ProfileSpectrum({ items }) {
+  if (!Array.isArray(items) || !items.length) return null;
+  return <section className="report-card full-report-copy"><h3>Understand the Head–Heart profile spectrum</h3><p>Your profile is one point on a four-profile spectrum. The highlighted definition is your current result; the others show the neighbouring patterns and score bands.</p>{items.map(item => <article key={item.key || item.name} className={item.current ? "current-profile" : ""}><h4>{item.current ? "Your profile — " : ""}{item.name} · {item.min}–{item.max}</h4>{item.summary && <p>{item.summary}</p>}</article>)}</section>;
+}
+
+function WrittenReflections({ items }) {
+  if (!Array.isArray(items) || !items.length) return null;
+  return <section className="report-card full-report-copy"><h3>Your written reflections</h3><p>These are the notes you chose to add while answering the assessment. They are included because your own context can be as important as the numerical pattern.</p>{items.map((item, index) => <article key={`${item.questionPosition}-${index}`}><h4>Question {item.questionPosition}</h4>{item.question && <p><strong>{item.question}</strong></p>}<p>{item.reflection}</p></article>)}</section>;
+}
+
+function Methodology({ items }) {
+  if (!items || typeof items !== "object" || Array.isArray(items)) return null;
+  return <section className="report-card full-report-copy"><h3>Methodology and sourcing</h3>{Object.entries(items).map(([key, value]) => <article key={key}><h4>{key}</h4><p>{textValue(value)}</p></article>)}</section>;
 }
 
 function RetakeComparison({ comparison, trackKey }) {
@@ -99,17 +123,62 @@ function RetakePlan({ report }) {
   return <section className="report-card">
     <h3>3-month retake and progress check</h3>
     <p>Commit to two or three changes from this report and work on them consistently. Retake the full 40-question assessment around <strong>{recommendedLabel}</strong> so you can compare what shifted, what stayed stable, and where old patterns still show up under pressure.</p>
-    <p><strong>Retake price: USD 2.</strong> This option is for participants who previously completed and unlocked the paid Full Development Report. After verified payment, a fresh 40-question retake is created and the new Full Development Report compares the new result with the previous result in the same report.</p>
+    <p><strong>Retake price: USD 2.</strong> This option is only for participants who previously completed a paid Full Development Report assessment. After verified payment, a fresh 40-question retake is created and the new Full Development Report compares the new result with the previous result in the same report.</p>
     {state.error && <p className="form-error" role="alert">{state.error}</p>}
-    <button className="button button--primary" disabled={!available || state.busy} onClick={startRetake}>{state.busy ? "Opening USD 2 checkout…" : available ? "Retake full assessment — USD 2" : "Retake checkout coming soon"}</button>
+    <button className="button button--primary" disabled={!available || state.busy} onClick={startRetake}>{state.busy ? "Opening USD 2 checkout…" : available ? "Retake full assessment — USD 2" : "Retake available after verified paid report"}</button>
   </section>;
 }
 
-function FullReportContent({ report, summary, content }) {
+function fullReportText(report, summary, content) {
+  const lines = [
+    `${report?.trackName || "Head–Heart Alignment"} — Full Development Report`,
+    `Profile: ${summary.profile}`,
+    `Overall score: ${summary.total}/250`,
+    "",
+    "Summary",
+    textValue(content?.summary || summary.summary),
+  ];
+  if (Array.isArray(content?.strengths)) lines.push("", "Strengths", ...content.strengths.map(item => `- ${textValue(item)}`));
+  if (Array.isArray(content?.watchouts)) lines.push("", "Challenges and development", ...content.watchouts.map(item => `- ${textValue(item)}`));
+  if (content?.sharpestEdge?.code) lines.push("", `Sharpest Edge: ${v3AreaName(report?.trackKey, content.sharpestEdge.code, content.sharpestEdge.code)} ${content.sharpestEdge.score}/25`, content.sharpestEdge.meaning || "");
+  if (content?.growthEdge?.code) lines.push("", `Growth Edge: ${v3AreaName(report?.trackKey, content.growthEdge.code, content.growthEdge.code)} ${content.growthEdge.score}/25`, content.growthEdge.meaning || "");
+  if (Array.isArray(content?.growth)) lines.push("", "Five practical everyday actions", ...content.growth.slice(0, 5).map((item, index) => `${index + 1}. ${textValue(item)}`));
+  if (Array.isArray(content?.writtenReflections) && content.writtenReflections.length) lines.push("", "Written reflections", ...content.writtenReflections.map(item => `Q${item.questionPosition}: ${item.reflection}`));
+  if (content?.methodology && typeof content.methodology === "object") lines.push("", "Methodology and sourcing", ...Object.entries(content.methodology).map(([key, value]) => `${key}: ${textValue(value)}`));
+  return lines.filter(value => value !== undefined && value !== null).join("\n");
+}
+
+function FullReportActions({ report, summary, content, token }) {
+  const [state, setState] = React.useState({ message: "", busy: false });
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(fullReportText(report, summary, content));
+      setState({ message: "Report copied as text.", busy: false });
+    } catch {
+      setState({ message: "Copy is unavailable in this browser. Use Print report instead.", busy: false });
+    }
+  };
+  const email = async () => {
+    if (!token || state.busy) return;
+    setState({ message: "", busy: true });
+    try {
+      const response = await fetch(`/api/reports/${encodeURIComponent(token)}/email`, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Unable to email report");
+      setState({ message: "Full Development Report queued to your email with the PDF attached.", busy: false });
+    } catch (error) {
+      setState({ message: error.message, busy: false });
+    }
+  };
+  return <section className="report-card"><h3>Save or share your report</h3><p>Keep a copy of this report for your development work and your three-month comparison.</p><div className="upgrade-box__actions"><button className="button button--ghost" onClick={copy}>Copy as text</button><button className="button button--ghost" disabled={!token || state.busy} onClick={email}>{state.busy ? "Queuing email…" : "Email to self"}</button></div>{state.message && <p className="preview-note" role="status">{state.message}</p>}</section>;
+}
+
+function FullReportContent({ report, summary, content, token }) {
   if (!content) return <p className="preview-note">Full Report content is unavailable. Contact Atom Global support.</p>;
   return <>
     <RetakeComparison comparison={content.retakeComparison} trackKey={report?.trackKey} />
-    <ScoreBreakdown subscales={report?.paid?.subscales || summary.subscales} trackKey={report?.trackKey} />
+    <ScoreBreakdown subscales={report?.paid?.subscales || summary.subscales} trackKey={report?.trackKey} legend={content.radarLegend} />
+    <div className="report-columns"><EdgeCard title="Sharpest Edge" edge={content.sharpestEdge} trackKey={report?.trackKey} /><EdgeCard title="Growth Edge" edge={content.growthEdge} trackKey={report?.trackKey} /></div>
     <TextSection title="Complete profile summary" value={content.summary} />
     <ListSection title="Full strengths list" items={content.strengths} />
     <ListSection title="Challenges and development areas" items={content.watchouts} />
@@ -124,9 +193,13 @@ function FullReportContent({ report, summary, content }) {
     <ListSection title="Five practical everyday actions" items={(content.growth || []).slice(0, 5)} ordered />
     <SubscaleReads content={content} trackKey={report?.trackKey} />
     <Roadmap content={content} />
+    <ProfileSpectrum items={content.profileSpectrum} />
+    <WrittenReflections items={content.writtenReflections} />
+    <Methodology items={content.methodology} />
     <RetakePlan report={report} />
+    <FullReportActions report={report} summary={summary} content={content} token={token} />
     <UpgradeReasons items={content.upgradeReasons} />
-    <p className="preview-note">Your private link is time-limited. Open the PDF or print a copy for your records.</p>
+    <p className="preview-note">Your private link is time-limited. Open the PDF, email it to yourself, copy it as text or print a copy for your records.</p>
   </>;
 }
 
@@ -156,12 +229,12 @@ export default function ReportView({ payload, token, onReset }) {
     try {
       const response = await fetch("/api/payments/cash-on-delivery", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: report.sessionId, track: report.trackKey }) });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || "Cash on Delivery checkout failed");
+      if (!response.ok) throw new Error(result.message || "UAT no-payment checkout failed");
       window.location.href = result.successUrl || result.reportUrl;
     } catch (error) { setCheckout({ busy: false, error: error.message }); }
   };
 
-  const actions = <>{onReset ? <button className="button button--ghost" onClick={onReset}>Start again</button> : <a className="button button--ghost" href="/">New assessment</a>}{unlocked && report?.pdf_available && token && <a className="button button--ghost" href={`/api/reports/${encodeURIComponent(token)}/pdf`} target="_blank" rel="noreferrer">Open PDF</a>}<button className="button button--primary" onClick={() => window.print()}>Print report</button></>;
+  const actions = <>{onReset ? <button className="button button--ghost" onClick={onReset}>Start again</button> : <a className="button button--ghost" href="/">New assessment</a>}{unlocked && token && <a className="button button--ghost" href={`/api/reports/${encodeURIComponent(token)}/pdf`} target="_blank" rel="noreferrer">Open PDF</a>}<button className="button button--primary" onClick={() => window.print()}>Print report</button></>;
 
   return <StageShell stageKey="report" current={4} actions={actions}>
     <p className="eyebrow">{report?.trackName || "Head–Heart Alignment"} result</p><h1>{summary.profile}</h1>
@@ -170,12 +243,12 @@ export default function ReportView({ payload, token, onReset }) {
     <div className="report-columns"><section className="report-card"><h2>Top three strengths</h2><ul>{summary.strengths.slice(0, 3).map(item => <li key={item}><Check />{item}</li>)}</ul></section><section className="report-card"><h2>Development observations</h2><ul>{summary.watchouts.map(item => <li key={item}><span>—</span>{item}</li>)}</ul></section></div>
     <section className={`paid-report ${unlocked ? "unlocked" : "locked"}`}>
       <div className="paid-heading"><div><p className="eyebrow">Complete report</p><h2>{unlocked ? "Your full development report" : "This is the short version"}</h2></div>{!unlocked && <span className="lock-badge"><Lock /> Locked</span>}</div>
-      {unlocked ? <FullReportContent report={report} summary={summary} content={paidContent} /> : <>
+      {unlocked ? <FullReportContent report={report} summary={summary} content={paidContent} token={token} /> : <>
         <p>Your Full Report goes deeper into the patterns behind this result and turns them into practical development guidance.</p><UpgradeReasons items={upgradePreview} locked />
         {!upgradePreview.length && <div className="locked-preview"><div><h3>10-area radar and deep dive</h3><p>See how your pattern shifts across decisions, relationships, conflict and pressure.</p></div><div><h3>Practical development roadmap</h3><p>Receive tailored actions, working-style guidance and track-specific development insights.</p></div></div>}
         {checkout.error && <p className="form-error" role="alert">{checkout.error}</p>}
-        <div className="upgrade-box"><div><span>One-time payment</span><strong>{price}</strong><small>Secure checkout · Printable PDF · Private report link</small></div><div className="upgrade-box__actions"><button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Pay by card" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>{cashOnDeliveryAvailable && <button className="button button--ghost" disabled={checkout.busy} onClick={openCashOnDelivery}>Cash on Delivery</button>}</div></div>
-        {cashOnDeliveryAvailable && <p className="preview-note">Cash on Delivery is temporarily enabled for client UAT. Selecting it unlocks the Full Report and queues the normal confirmation/report emails without charging Stripe.</p>}
+        <div className="upgrade-box"><div><span>One-time payment</span><strong>{price}</strong><small>Secure checkout · Multi-page PDF · Private report link</small></div><div className="upgrade-box__actions"><button className="button button--primary" disabled={!checkoutAvailable || checkout.busy} onClick={openCheckout}>{checkout.busy ? "Opening checkout…" : checkoutAvailable ? "Pay by card" : "Full Report checkout coming soon"} {checkoutAvailable && <ArrowRight />}</button>{cashOnDeliveryAvailable && <button className="button button--ghost" disabled={checkout.busy} onClick={openCashOnDelivery}>UAT Test — No Payment</button>}</div></div>
+        {cashOnDeliveryAvailable && <p className="preview-note">UAT Test — No Payment is temporarily enabled for client testing. It unlocks the Full Report and queues the normal confirmation/report email with the PDF attachment without charging Stripe.</p>}
         {!checkoutAvailable && !cashOnDeliveryAvailable && <p className="preview-note">Your Lite Report is ready now. Full Report purchasing will open after Atom Global completes its secure payment configuration.</p>}
       </>}
     </section>
