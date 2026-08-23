@@ -30,11 +30,12 @@ test("Cash on Delivery queues the normal payment and Full Report emails", () => 
   assert.match(service, /rotateReportAccess/);
 });
 
-test("Public report exposes and renders the guarded Cash on Delivery option", () => {
+test("Public UAT renders the guarded no-payment option while retaining the audited backend route", () => {
   assert.match(reportService, /cashOnDeliveryAvailable/);
   assert.match(routes, /\/api\/payments\/cash-on-delivery/);
-  assert.match(reportView, /Cash on Delivery/);
+  assert.match(reportView, /UAT Test — No Payment/);
   assert.match(reportView, /cashOnDeliveryAvailable/);
-  assert.match(paymentPage, /Cash on Delivery selected/);
+  assert.doesNotMatch(reportView, />Cash on Delivery</);
+  assert.match(paymentPage, /UAT Test — No Payment selected/);
   assert.match(paymentPage, /No Stripe charge was made/);
 });

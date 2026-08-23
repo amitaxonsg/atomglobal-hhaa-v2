@@ -35,10 +35,12 @@ test("latest participant and question process remains wired to the real backend"
 });
 
 test("landing, track cards and intake are editable from the admin CMS", () => {
-  assert.match(admin, /Public landing content/);
+  assert.match(admin, /Public landing and progress content/);
   assert.match(admin, /Track-card description/);
   assert.match(admin, /Department options/);
   assert.match(admin, /Level options/);
+  assert.match(admin, /Question 20 milestone heading/);
+  assert.match(admin, /Question 40 completion heading/);
   assert.match(routes, /\/api\/admin\/assessment-experience\/landing/);
   assert.match(service, /questionnaire\.landing/);
   assert.match(service, /questionnaire_landing\.saved/);
@@ -50,7 +52,9 @@ test("all four published assessments are offered to new participants", () => {
   assert.match(layout, /tracks\.map/);
   assert.match(layout, /experience\?\.tracks\?\.\[track\.key\]/);
   assert.doesNotMatch(survey, /This assessment is not currently open for new participants/);
-  assert.match(admin, /four public assessment choices/);
+  assert.match(admin, /Four public assessment choices/i);
+  assert.match(admin, /40 public questions/);
+  assert.match(admin, /50-question source bank retained/);
 });
 
 test("admin warns that material question changes affect interpretation and history", () => {

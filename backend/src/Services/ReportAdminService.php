@@ -57,6 +57,7 @@ final class ReportAdminService
             'trackName' => $row['track_name'],
             'reportUrl' => $reportUrl,
             'pdfAvailable' => (bool) $row['pdf_path'],
+            'reportId' => $reportId,
         ]);
         $this->db->execute('INSERT INTO report_delivery_log (generated_report_id, delivery_type, recipient_email, email_queue_id, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())', [$reportId, 'admin_resend', $row['email'], $queueId, 'queued', $adminId]);
         return ['queueId' => $queueId, 'reportUrl' => $reportUrl];

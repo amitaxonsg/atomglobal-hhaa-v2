@@ -85,6 +85,7 @@ final class CashOnDeliveryService
                 'reportUrl' => $access['reportUrl'],
                 'paidReportUrl' => $access['reportUrl'],
                 'paymentMethod' => 'Cash on Delivery',
+                'reportId' => $access['reportId'],
             ];
             $this->enqueue('payment_successful', (string) $survey['email'], $variables);
             $this->enqueue('paid_report_ready', (string) $survey['email'], $variables);

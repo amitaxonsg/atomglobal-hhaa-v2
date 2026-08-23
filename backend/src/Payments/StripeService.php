@@ -11,10 +11,19 @@ use Stripe\Webhook;
 
 final class StripeService
 {
+    private const RETAKE_MARKER = '__RETAKE__';
+    private const RETAKE_AMOUNT_MINOR = 200;
+    private const RETAKE_CURRENCY = 'usd';
+    private const RETAKE_QUESTIONS_PER_SECTION = 4;
+
     public function __construct(private Database $db, private SettingsService $settings, private ReportService $reports, private array $config) {}
 
     public function checkout(int $sessionId, string $trackKey, ?string $affiliateCode): array
     {
+        if ($affiliateCode === self::RETAKE_MARKER) {
+            return $this->retakeCheckout($sessionId, $trackKey);
+        }
+
         $secret = $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? '');
         $environmentKey = 'STRIPE_PRICE_' . strtoupper($trackKey);
         $price = $this->settings->get('stripe.price_' . $trackKey, $_ENV[$environmentKey] ?? '');
@@ -40,6 +49,7 @@ final class StripeService
                 'generated_report_id' => (string) $report['id'],
                 'track_key' => $trackKey,
                 'affiliate_code' => $affiliate['affiliate_code'] ?? '',
+                'payment_purpose' => 'full_report',
             ],
         ]);
         $this->db->execute(
@@ -80,9 +90,61 @@ final class StripeService
         });
     }
 
+    private function retakeCheckout(int $sessionId, string $trackKey): array
+    {
+        $secret = trim((string) $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? ''));
+        $webhook = trim((string) $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? ''));
+        if ($secret === '' || $webhook === '') throw new \RuntimeException('Stripe test or live credentials are not configured for the USD 2 retake.');
+
+        $survey = $this->db->fetch(
+            'SELECT s.id, s.status, s.completed_at, p.email, t.track_key, t.name track_name, gr.id report_id, gr.is_unlocked FROM survey_sessions s JOIN participants p ON p.id = s.participant_id JOIN assessment_tracks t ON t.id = s.track_id JOIN generated_reports gr ON gr.survey_session_id = s.id AND gr.revoked_at IS NULL WHERE s.id = ? AND t.track_key = ? LIMIT 1',
+            [$sessionId, $trackKey]
+        );
+        if (!$survey || $survey['status'] !== 'completed' || !(bool) $survey['is_unlocked']) {
+            throw new \InvalidArgumentException('The USD 2 retake is available only after a completed Full Development Report.');
+        }
+        if (!$this->hasPaidAssessment($sessionId)) {
+            throw new \InvalidArgumentException('The USD 2 retake is available only to participants who previously completed a paid Full Development Report assessment.');
+        }
+
+        $stripe = new StripeClient($secret);
+        $checkout = $stripe->checkout->sessions->create([
+            'mode' => 'payment',
+            'customer_email' => $survey['email'],
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => self::RETAKE_CURRENCY,
+                    'unit_amount' => self::RETAKE_AMOUNT_MINOR,
+                    'product_data' => ['name' => 'Head–Heart Alignment 3-Month Retake'],
+                ],
+                'quantity' => 1,
+            ]],
+            'success_url' => $this->config['url'] . '/payment/success?retake=1&checkout={CHECKOUT_SESSION_ID}',
+            'cancel_url' => $this->config['url'] . '/payment/cancelled?retake=1&session=' . $sessionId,
+            'metadata' => [
+                'survey_session_id' => (string) $sessionId,
+                'source_survey_session_id' => (string) $sessionId,
+                'generated_report_id' => (string) $survey['report_id'],
+                'track_key' => $trackKey,
+                'payment_purpose' => 'retake',
+            ],
+        ]);
+        $this->db->execute(
+            'INSERT INTO payments (survey_session_id, affiliate_id, provider, status, stripe_checkout_session_id, amount, currency, metadata_json, created_at, updated_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, NOW(), NOW())',
+            [$sessionId, 'stripe', 'checkout_started', $checkout->id, self::RETAKE_AMOUNT_MINOR, 'USD', json_encode($checkout->metadata)]
+        );
+        return ['url' => $checkout->url, 'checkoutSessionId' => $checkout->id, 'retake' => true, 'amountMinor' => self::RETAKE_AMOUNT_MINOR, 'currency' => 'USD'];
+    }
+
     private function completed(object $checkout): void
     {
         if (($checkout->payment_status ?? '') !== 'paid') return;
+        $purpose = (string) ($checkout->metadata->payment_purpose ?? 'full_report');
+        if ($purpose === 'retake') {
+            $this->completedRetake($checkout);
+            return;
+        }
+
         $sessionId = (int) ($checkout->metadata->survey_session_id ?? 0);
         if ($sessionId < 1) throw new \RuntimeException('Stripe metadata does not contain a survey session.');
         $payment = $this->db->fetch('SELECT * FROM payments WHERE stripe_checkout_session_id = ? FOR UPDATE', [$checkout->id]);
@@ -115,10 +177,101 @@ final class StripeService
                 'currency' => $currency,
                 'reportUrl' => $reportAccess['reportUrl'],
                 'paidReportUrl' => $reportAccess['reportUrl'],
+                'reportId' => $reportAccess['reportId'],
             ];
             $this->enqueue('payment_successful', $participant['email'], $variables);
             $this->enqueue('paid_report_ready', $participant['email'], $variables);
         }
+    }
+
+    private function completedRetake(object $checkout): void
+    {
+        $sourceSessionId = (int) ($checkout->metadata->source_survey_session_id ?? $checkout->metadata->survey_session_id ?? 0);
+        if ($sourceSessionId < 1) throw new \RuntimeException('Retake checkout does not contain a source survey session.');
+        $payment = $this->db->fetch('SELECT * FROM payments WHERE stripe_checkout_session_id = ? FOR UPDATE', [$checkout->id]);
+        if (!$payment) throw new \RuntimeException('Retake payment record was not found.');
+        if ($payment['status'] === 'paid') return;
+
+        $source = $this->db->fetch(
+            'SELECT s.*, p.name participant_name, p.email participant_email, t.name track_name, t.track_key FROM survey_sessions s JOIN participants p ON p.id = s.participant_id JOIN assessment_tracks t ON t.id = s.track_id WHERE s.id = ? AND s.status = ? LIMIT 1',
+            [$sourceSessionId, 'completed']
+        );
+        if (!$source) throw new \RuntimeException('The source assessment for this retake is unavailable.');
+        $sourceReport = $this->db->fetch('SELECT id, is_unlocked FROM generated_reports WHERE survey_session_id = ? AND revoked_at IS NULL LIMIT 1', [$sourceSessionId]);
+        if (!$sourceReport || !(bool) $sourceReport['is_unlocked']) throw new \RuntimeException('The source Full Development Report is not unlocked.');
+        if (!$this->hasPaidAssessment($sourceSessionId)) throw new \RuntimeException('The source assessment does not have a verified paid Full Development Report.');
+
+        $snapshot = $this->normaliseRetakeSnapshot(json_decode((string) $source['question_snapshot_json'], true, 512, JSON_THROW_ON_ERROR));
+        $resumeToken = bin2hex(random_bytes(32));
+        $hours = max(1, (int) ($this->config['resume_token_hours'] ?? 168));
+        $context = json_decode((string) ($source['participant_context_json'] ?? '{}'), true) ?: [];
+        $attribution = json_decode((string) ($source['attribution_snapshot_json'] ?? '{}'), true) ?: [];
+        $attribution['retakeOfSessionId'] = $sourceSessionId;
+        $attribution['retakeSourceReportId'] = (int) $sourceReport['id'];
+        $attribution['retakePaidAt'] = gmdate(DATE_ATOM);
+        $attribution['retakePriceMinor'] = self::RETAKE_AMOUNT_MINOR;
+        $attribution['retakeCurrency'] = 'USD';
+
+        $newSessionId = $this->db->insert(
+            'INSERT INTO survey_sessions (participant_id, track_id, assessment_version_id, affiliate_id, first_click_id, last_click_id, status, resume_token_hash, resume_expires_at, question_snapshot_json, participant_context_json, attribution_snapshot_json, last_activity_at, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, NULL, ?, ?, DATE_ADD(NOW(), INTERVAL ? HOUR), ?, ?, ?, NOW(), NOW(), NOW())',
+            [(int) $source['participant_id'], (int) $source['track_id'], (int) $source['assessment_version_id'], 'in_progress', hash('sha256', $resumeToken), $hours, json_encode($snapshot), json_encode($context), json_encode($attribution)]
+        );
+
+        $amount = (int) ($checkout->amount_total ?? self::RETAKE_AMOUNT_MINOR);
+        $currency = strtoupper((string) ($checkout->currency ?? 'USD'));
+        $this->db->execute(
+            'UPDATE payments SET survey_session_id = ?, status = ?, stripe_payment_intent_id = ?, stripe_customer_id = ?, amount = ?, currency = ?, paid_at = NOW(), updated_at = NOW() WHERE id = ?',
+            [$newSessionId, 'paid', $checkout->payment_intent ?? null, $checkout->customer ?? null, $amount, $currency, $payment['id']]
+        );
+        $this->db->execute(
+            'INSERT INTO analytics_events (survey_session_id, event_name, event_properties_json, consent_state, created_at) VALUES (?, ?, ?, ?, NOW())',
+            [$newSessionId, 'retake_started', json_encode(['sourceSessionId' => $sourceSessionId, 'amountMinor' => $amount, 'currency' => $currency]), 'essential']
+        );
+
+        $resumeUrl = rtrim((string) $this->config['url'], '/') . '/?resume=' . rawurlencode($resumeToken);
+        $this->enqueue('survey_resume_link', (string) $source['participant_email'], [
+            'participantName' => $source['participant_name'],
+            'trackName' => $source['track_name'] . ' Retake',
+            'resumeUrl' => $resumeUrl,
+            'amount' => number_format($amount / 100, 2),
+            'currency' => $currency,
+        ]);
+    }
+
+    private function hasPaidAssessment(int $sessionId): bool
+    {
+        $paid = $this->db->fetch(
+            'SELECT id FROM payments WHERE survey_session_id = ? AND provider = ? AND status = ? ORDER BY paid_at DESC, id DESC LIMIT 1',
+            [$sessionId, 'stripe', 'paid']
+        );
+        return (bool) $paid;
+    }
+
+    private function normaliseRetakeSnapshot(array $snapshot): array
+    {
+        $questions = is_array($snapshot['questions'] ?? null) ? $snapshot['questions'] : [];
+        $sections = [];
+        foreach ($questions as $question) {
+            $code = (string) ($question['subscale_code'] ?? '');
+            if ($code === '') continue;
+            $sections[$code] ??= [];
+            $sections[$code][] = $question;
+        }
+        uasort($sections, static function (array $left, array $right): int {
+            return ((int) ($left[0]['section_order'] ?? 0)) <=> ((int) ($right[0]['section_order'] ?? 0));
+        });
+        $runtime = [];
+        foreach ($sections as $sectionQuestions) {
+            usort($sectionQuestions, static fn(array $a, array $b): int => ((int) ($a['position'] ?? 0)) <=> ((int) ($b['position'] ?? 0)));
+            foreach (array_slice($sectionQuestions, 0, self::RETAKE_QUESTIONS_PER_SECTION) as $question) {
+                $question['position'] = count($runtime) + 1;
+                $runtime[] = $question;
+            }
+        }
+        if (count($runtime) !== 40) throw new \RuntimeException('Retake source could not be normalized to the required 40 questions.');
+        $snapshot['questions'] = $runtime;
+        $snapshot['scoring']['question_count'] = 40;
+        return $snapshot;
     }
 
     private function rotateReportAccess(int $sessionId): array
@@ -150,9 +303,11 @@ final class StripeService
         if (!$payment) return;
         $report = $this->db->fetch('SELECT id, pdf_path FROM generated_reports WHERE survey_session_id = ? FOR UPDATE', [$payment['survey_session_id']]);
         $this->db->execute('UPDATE payments SET status = ?, refunded_at = NOW(), updated_at = NOW() WHERE id = ?', ['refunded', $payment['id']]);
-        $this->db->execute('UPDATE generated_reports SET is_unlocked = 0, unlock_reason = ?, unlocked_at = NULL, pdf_path = NULL, pdf_generated_at = NULL, updated_at = NOW() WHERE survey_session_id = ?', ['stripe_refund', $payment['survey_session_id']]);
-        $this->db->execute('UPDATE affiliate_commissions SET status = ?, adjustment_note = ?, updated_at = NOW() WHERE payment_id = ?', ['void', 'Payment refunded', $payment['id']]);
-        if (!empty($report['pdf_path']) && is_file($report['pdf_path'])) @unlink($report['pdf_path']);
+        if ($report) {
+            $this->db->execute('UPDATE generated_reports SET is_unlocked = 0, unlock_reason = ?, unlocked_at = NULL, pdf_path = NULL, pdf_generated_at = NULL, updated_at = NOW() WHERE survey_session_id = ?', ['stripe_refund', $payment['survey_session_id']]);
+            $this->db->execute('UPDATE affiliate_commissions SET status = ?, adjustment_note = ?, updated_at = NOW() WHERE payment_id = ?', ['void', 'Payment refunded', $payment['id']]);
+            if (!empty($report['pdf_path']) && is_file($report['pdf_path'])) @unlink($report['pdf_path']);
+        }
     }
 
     private function enqueue(string $template, string $recipient, array $variables): void

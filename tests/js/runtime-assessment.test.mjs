@@ -26,19 +26,25 @@ function assessmentSnapshot() {
   return { versionId: 7, sections, questions, answerChoices: ["Never", "Rarely", "Sometimes", "Often", "Always"] };
 }
 
-test("published database assessment replaces static participant questions", () => {
+test("published database assessment is projected into the V3 40-question participant runtime", () => {
   const runtime = buildRuntimeTrack(fallbackTrack(), assessmentSnapshot());
   assert.equal(runtime.assessmentVersionId, 7);
   assert.equal(runtime.subscales.length, 10);
-  assert.equal(runtime.allItems.length, 50);
+  assert.equal(runtime.allItems.length, 40);
+  assert.ok(runtime.subscales.every(section => section.items.length === 4));
   assert.equal(runtime.allItems[0].t, "Database question 1");
   assert.equal(runtime.allItems[1].d, "K");
   assert.deepEqual(runtime.answerChoices, ["Never", "Rarely", "Sometimes", "Often", "Always"]);
 });
 
-test("invalid runtime assessment safely preserves fallback track", () => {
+test("invalid runtime assessment safely preserves the V3 fallback structure", () => {
   const fallback = fallbackTrack();
-  assert.equal(buildRuntimeTrack(fallback, { questions: [] }), fallback);
+  const runtime = buildRuntimeTrack(fallback, { questions: [] });
+  assert.equal(runtime.key, fallback.key);
+  assert.equal(runtime.label, fallback.label);
+  assert.deepEqual(runtime.subscales, fallback.subscales);
+  assert.deepEqual(runtime.allItems, fallback.allItems);
+  assert.equal(runtime.getProfileFn, fallback.getProfileFn);
 });
 
 test("server report JSON is parsed into a safe summary", () => {

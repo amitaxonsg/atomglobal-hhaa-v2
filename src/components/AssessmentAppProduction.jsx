@@ -1,6 +1,6 @@
 import React from "react";
 import { assessmentTracks } from "../data/assessmentData";
-import { buildRuntimeTrack } from "../data/runtimeAssessment";
+import { buildRuntimeTrack, V3_QUESTION_COUNT } from "../data/runtimeAssessment";
 import { api, isMockMode } from "../api/client";
 import AdminApp from "./admin/AdminApp";
 import { ParticipantDetails, Questions, SelectVersion, StageShell, TrackIntroduction, blankParticipant } from "./assessment/AssessmentLayout";
@@ -10,17 +10,17 @@ function PaymentStatus({ cancelled = false }) {
   const params = new URLSearchParams(window.location.search);
   const method = params.get("method") || "";
   const reportUrl = params.get("report") || "";
-  const cashOnDelivery = method === "cash-on-delivery";
+  const uatNoPayment = method === "cash-on-delivery";
 
   return <StageShell>
     <p className="eyebrow">Secure checkout</p>
-    <h1>{cancelled ? "Payment not completed" : cashOnDelivery ? "Cash on Delivery selected" : "Payment received"}</h1>
+    <h1>{cancelled ? "Payment not completed" : uatNoPayment ? "UAT Test — No Payment selected" : "Payment received"}</h1>
     <p className="lead">{cancelled
       ? "Nothing was charged. Return to your private report link when you are ready to try again."
-      : cashOnDelivery
-        ? "Cash on Delivery is enabled for this UAT. No Stripe charge was made. Your Full Report has been unlocked and the normal confirmation and report emails have been queued."
-        : "Stripe is confirming your payment. After the signed webhook is verified, a fresh private Full Report link is sent by email."}</p>
-    {cashOnDelivery && reportUrl
+      : uatNoPayment
+        ? "UAT Test — No Payment is enabled for client testing. No Stripe charge was made. Your Full Report has been unlocked and the normal confirmation and PDF report emails have been queued."
+        : "Stripe is confirming your payment. After the signed webhook is verified, a fresh private Full Report link and PDF report email are sent."}</p>
+    {uatNoPayment && reportUrl
       ? <a className="button button--primary" href={reportUrl}>Open Full Report</a>
       : <a className="button button--primary" href="/">Return to assessment</a>}
   </StageShell>;
@@ -165,19 +165,28 @@ export default function AssessmentAppProduction() {
   }, [answers, section, participant, session?.id, session?.resumeToken, stage]);
 
   const selectTrack = key => {
+    if (!assessmentTracks[key]) return;
     setError("");
     setTrackKey(key);
-    setAnswers(assessmentTracks[key].allItems.map(() => ({ value: null, note: "" })));
+    const v3Track = buildRuntimeTrack(assessmentTracks[key], null);
+    setAnswers(v3Track.allItems.map(() => ({ value: null, note: "" })));
     setStage("intro");
     window.scrollTo(0, 0);
   };
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("resume")) return;
+    const directTrack = String(params.get("track") || "").toLowerCase();
+    if (assessmentTracks[directTrack]) selectTrack(directTrack);
+  }, []);
 
   const begin = async () => {
     setBusy(true);
     setError("");
     try {
       const created = await api.createSession({ trackKey, participant, section: 0, ...attributionFromLocation() });
-      const count = created.assessment?.questions?.length || 50;
+      const count = created.assessment?.questions?.length || V3_QUESTION_COUNT;
       setAnswers(Array.from({ length: count }, () => ({ value: null, note: "" })));
       setSession(created);
       setStage("questions");
@@ -227,7 +236,7 @@ export default function AssessmentAppProduction() {
   if (stage === "select") return <SelectVersion experience={experience} onSelect={selectTrack} />;
   if (stage === "intro" && fallbackTrack) return <TrackIntroduction track={fallbackTrack} remoteExperience={remoteExperience} onBack={() => setStage("select")} onContinue={() => setStage("details")} />;
   if (stage === "details" && fallbackTrack) return <ParticipantDetails track={fallbackTrack} remoteExperience={remoteExperience} participant={participant} setParticipant={setParticipant} onBack={() => setStage("intro")} onContinue={begin} error={error} busy={busy} />;
-  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
+  if (stage === "questions" && track) return <Questions track={track} remoteExperience={remoteExperience} progressExperience={experience.landing} answers={answers} section={section} setSection={setSection} onBack={() => setStage("details")} onAnswer={updateAnswer} onNote={updateNote} onFinish={finish} saveState={saveState} busy={busy} error={error} />;
   if (stage === "report" && report) return <ReportView payload={report} token={session?.reportToken} onReset={reset} />;
   return <StageShell><p className="eyebrow">Assessment</p><h1>Preparing your experience</h1><p className="lead">{error || "Loading the published assessment…"}</p></StageShell>;
 }

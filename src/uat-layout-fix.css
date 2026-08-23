@@ -4,16 +4,49 @@
   color: var(--ink, #211c16);
   font-size: var(--questionnaire-question-size, 17px);
   line-height: 1.5;
+  font-weight: 400;
 }
 
 .latest-question-legend span {
   color: var(--gold-dark, #af8540);
 }
 
-/* Keep each question in normal document flow after an answer causes a React save/re-render. */
+/* Keep each question in normal document flow after an answer causes a React save/re-render.
+   This avoids the Safari/first-question jump that fieldset/legend rendering could trigger. */
 .latest-question-card {
   display: block;
   min-width: 0;
   box-sizing: border-box;
   background: transparent;
+}
+
+/* Sunil requested lighter typography and a more visible progress indicator.
+   Branding images, logos and UAT labels are intentionally NOT hard-coded here;
+   they now come from the published CMS/application values. */
+.latest-questionnaire-page h1,
+.latest-visual-panel__copy h2,
+.latest-track-card strong,
+.latest-head-heart-grid article strong {
+  font-weight: 500;
+}
+
+.latest-visual-panel__copy p,
+.latest-primary-button,
+.latest-secondary-button {
+  font-weight: 500;
+}
+
+.latest-question-progress > i {
+  height: 8px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--questionnaire-progress, var(--gold, #c9a15a)) 18%, transparent);
+}
+
+.latest-question-progress b {
+  min-width: 2px;
+}
+
+@media (max-width: 900px) {
+  .latest-question-progress > i {
+    height: 7px;
+  }
 }

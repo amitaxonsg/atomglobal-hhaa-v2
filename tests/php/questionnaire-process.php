@@ -37,7 +37,7 @@ $ownerId = $owner ? (int) $owner['id'] : $db->insert(
 $savedLanding = $container['assessmentExperience']->saveLanding([
     'title' => 'Head–Heart Alignment',
     'primaryCopy' => 'Every choice you make is cast by two votes: what you feel and what you reason.',
-    'secondaryCopy' => 'Answer 50 statements across 10 areas and choose the version that fits you.',
+    'secondaryCopy' => 'Answer 40 statements across 10 areas and choose the version that fits you.',
     'cardTitlePrefix' => 'Head-Heart Alignment:',
     'showBrandName' => true,
 ], $ownerId);
@@ -62,7 +62,7 @@ $intake = [
 $savedExperience = $container['assessmentExperience']->save((int) $track['id'], [
     'tagline' => 'For anyone who wants to understand how they lead their own life.',
     'introBody' => 'Every choice you make is cast by two votes: what you feel and what you reason.',
-    'introOffer' => 'Take the full 50-question assessment free and get your Lite Report instantly.',
+    'introOffer' => 'Take the full 40-question assessment free and get your Lite Report instantly.',
     'heartLabel' => 'Heart',
     'heartDescription' => 'Feeling, intuition, connection, meaning',
     'headLabel' => 'Head',
@@ -127,7 +127,7 @@ foreach (['personal', 'newjoiner', 'manager', 'executive'] as $availableTrackKey
     ]);
     expectQuestionnaire(($availableSession['trackKey'] ?? '') === $availableTrackKey, "$availableTrackKey did not start its own assessment session.");
     expectQuestionnaire(($availableSession['assessmentVersion'] ?? '') === '2.0.0', "$availableTrackKey did not use published CMS assessment version 2.0.0.");
-    expectQuestionnaire(count($availableSession['assessment']['questions'] ?? []) === 50, "$availableTrackKey did not return 50 published questions.");
+    expectQuestionnaire(count($availableSession['assessment']['questions'] ?? []) === 40, "$availableTrackKey did not return the V3 40-question runtime.");
     expectQuestionnaire(count($availableSession['assessment']['sections'] ?? []) === 10, "$availableTrackKey did not return 10 published sections.");
 
     $storedVersion = $db->fetch(
@@ -166,10 +166,10 @@ $participant = [
 
 $session = $container['surveys']->create(['trackKey' => 'personal', 'participant' => $participant]);
 expectQuestionnaire(($session['assessmentVersion'] ?? '') === '2.0.0', 'Questionnaire session was not pinned to CMS version 2.0.0.');
-expectQuestionnaire(count($session['assessment']['questions'] ?? []) === 50, 'Questionnaire did not return 50 published questions.');
+expectQuestionnaire(count($session['assessment']['questions'] ?? []) === 40, 'Questionnaire did not return the V3 40-question runtime.');
 expectQuestionnaire(count($session['assessment']['sections'] ?? []) === 10, 'Questionnaire did not return 10 sections.');
 
-$answers = array_fill(0, 50, ['value' => 3, 'note' => '']);
+$answers = array_fill(0, 40, ['value' => 3, 'note' => '']);
 $answers[7] = ['value' => 'NA', 'note' => 'This situation does not apply to the participant.'];
 $container['surveys']->save((int) $session['id'], [
     'resumeToken' => $session['resumeToken'],
@@ -183,6 +183,7 @@ expectQuestionnaire($stored['answer_value'] === null, 'N/A answer incorrectly st
 expectQuestionnaire(str_contains((string) $stored['note'], 'does not apply'), 'Optional answer note was not stored.');
 
 $resumed = $container['surveys']->resume($session['resumeToken']);
+expectQuestionnaire(count($resumed['assessment']['questions'] ?? []) === 40, 'Resume did not restore the V3 40-question snapshot.');
 expectQuestionnaire(($resumed['answers'][7]['value'] ?? null) === 'NA', 'N/A answer was not restored on resume.');
 expectQuestionnaire(str_contains((string) ($resumed['answers'][7]['note'] ?? ''), 'does not apply'), 'Answer note was not restored on resume.');
 
