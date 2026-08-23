@@ -9,6 +9,9 @@ final class V3ReportEnhancer
 {
     public static function enrich(Database $db, int $sessionId, array $score, array $snapshot, array $paidContent, array $profile): array
     {
+        $session = $db->fetch('SELECT t.track_key FROM survey_sessions s JOIN assessment_tracks t ON t.id = s.track_id WHERE s.id = ? LIMIT 1', [$sessionId]);
+        $trackKey = (string) ($session['track_key'] ?? 'personal');
+        self::applyTrackSections($paidContent, $trackKey);
         $paidContent['sharpestEdge'] = self::edge($score['subscales'] ?? [], true);
         $paidContent['growthEdge'] = self::edge($score['subscales'] ?? [], false);
         $paidContent['radarLegend'] = 'Each spoke represents one of the 10 Head–Heart areas. Scores run from 5 to 25. A higher score means the Heart-oriented responses were more prominent in that area; a lower score means the Head-oriented responses were more prominent. Read the shape as a pattern across areas rather than treating any single score as good or bad.';
@@ -23,6 +26,22 @@ final class V3ReportEnhancer
             'Source and audit trail' => 'Question wording, scoring direction, answer choices, profile bands and report content are taken from the published assessment version and immutable question snapshot stored with this session, providing an auditable source for the generated result.',
         ];
         return $paidContent;
+    }
+
+    private static function applyTrackSections(array &$paidContent, string $trackKey): void
+    {
+        if ($trackKey === 'personal') {
+            unset($paidContent['leadershipImpact'], $paidContent['cultureFitPrompt']);
+            unset($paidContent['leadershipImpactLabel'], $paidContent['cultureFitLabel']);
+            return;
+        }
+        if ($trackKey === 'newjoiner') {
+            $paidContent['leadershipImpactLabel'] = 'How You’re Coming Across';
+            $paidContent['cultureFitLabel'] = 'Culture fit reflection';
+            return;
+        }
+        $paidContent['leadershipImpactLabel'] = 'Leadership impact';
+        $paidContent['cultureFitLabel'] = 'Culture fit reflection';
     }
 
     private static function edge(array $subscales, bool $highest): ?array
