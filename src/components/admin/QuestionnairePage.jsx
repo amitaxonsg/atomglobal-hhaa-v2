@@ -54,7 +54,7 @@ function LandingEditor({ initial, onSaved }) {
     try {
       const saved = await saveQuestionnaireLanding(form);
       setForm({ ...landingDefaults, ...saved });
-      setNotice("Questionnaire landing copy saved. The approved left-image branding remains controlled under Content and Branding.");
+      setNotice("Questionnaire landing and progress copy saved. The approved left-image branding remains controlled under Content and Branding.");
       onSaved?.();
     } catch (error) {
       setNotice(error.message);
@@ -64,7 +64,7 @@ function LandingEditor({ initial, onSaved }) {
   };
 
   return <form className="admin-card editor-form questionnaire-landing-editor" onSubmit={save}>
-    <div className="card-heading"><div><h2>Public landing content</h2><small>The latest index.html questionnaire process is displayed inside the approved responsive left-image layout.</small></div></div>
+    <div className="card-heading"><div><h2>Public landing and progress content</h2><small>The public V3 assessment is 40 questions across 10 areas. The 50-question source bank remains retained for history and rollback.</small></div></div>
     <Notice>{notice}</Notice>
     <div className="form-grid">
       <label className="form-grid__wide">Main heading<input value={form.title || ""} onChange={update("title")} /></label>
@@ -72,8 +72,12 @@ function LandingEditor({ initial, onSaved }) {
       <label className="form-grid__wide">Second introduction paragraph<textarea rows="4" value={form.secondaryCopy || ""} onChange={update("secondaryCopy")} /></label>
       <label>Track-card title prefix<input value={form.cardTitlePrefix || ""} onChange={update("cardTitlePrefix")} /></label>
       <label className="check-row"><input type="checkbox" checked={Boolean(form.showBrandName)} onChange={update("showBrandName")} /> Show the Atom Global logo on mobile where the left image is hidden</label>
+      <label className="form-grid__wide">Question 20 milestone heading<input value={form.halfwayTitle || ""} onChange={update("halfwayTitle")} /></label>
+      <label className="form-grid__wide">Question 20 milestone message<textarea rows="3" value={form.halfwayBody || ""} onChange={update("halfwayBody")} /></label>
+      <label className="form-grid__wide">Question 40 completion heading<input value={form.completeTitle || ""} onChange={update("completeTitle")} /></label>
+      <label className="form-grid__wide">Question 40 completion message<textarea rows="3" value={form.completeBody || ""} onChange={update("completeBody")} /></label>
     </div>
-    <button className="button button--primary" disabled={busy}>{busy ? "Saving…" : "Save landing page"}</button>
+    <button className="button button--primary" disabled={busy}>{busy ? "Saving…" : "Save landing and progress copy"}</button>
   </form>;
 }
 
@@ -98,7 +102,7 @@ function TrackEditor({ track, onSaved }) {
     try {
       const saved = await api.saveAssessmentExperience(track.trackId, form);
       setForm(normalise(saved, track.trackKey));
-      setNotice("Questionnaire process saved. Existing participant sessions remain pinned to their original published question version and snapshots.");
+      setNotice("Questionnaire process saved. Public metadata remains fixed at 40 questions across 10 areas. Existing participant sessions remain pinned to their original published question version and snapshots.");
       onSaved?.();
     } catch (error) {
       setNotice(error.message);
@@ -170,18 +174,21 @@ export default function QuestionnairePage() {
   const selected = tracks.find(item => item.trackKey === trackKey) || tracks[0];
 
   return <>
-    <PageHeader eyebrow="Latest index.html process · approved branded layout" title="Questionnaire" actions={<button className="button" onClick={() => { assessments.refresh(); configuration.refresh(); }}>Refresh</button>} />
+    <PageHeader eyebrow="V3 public process · CMS controlled" title="Questionnaire" actions={<button className="button" onClick={() => { assessments.refresh(); configuration.refresh(); }}>Refresh</button>} />
     <Notice type="error">{assessments.error || configuration.error}</Notice>
     <section className="admin-card questionnaire-reference">
-      <div><strong>Latest reference verified</strong><span>Responsive left-image layout · four public assessment choices · 10 sections · 50 questions</span></div>
+      <div><strong>V3 public assessment verified</strong><span>Four public assessment choices · 10 areas · 40 public questions · 50-question source bank retained for history/rollback</span></div>
       <small>Reference SHA-256: {questionnaireReference.sourceFileSha256.slice(0, 16)}… · Questionnaire SHA-256: {questionnaireReference.questionnaireSha256.slice(0, 16)}…</small>
     </section>
 
     <LandingEditor initial={configuration.data?.landing} onSaved={configuration.refresh} />
 
     <div className="questionnaire-track-tabs" role="tablist" aria-label="Questionnaire track">
-      {tracks.map(track => <button role="tab" aria-selected={selected?.trackKey === track.trackKey} className={selected?.trackKey === track.trackKey ? "active" : ""} key={track.trackKey} onClick={() => setTrackKey(track.trackKey)}><strong>{track.trackName}</strong><small>{track.questionCount} questions · {track.sectionCount} sections</small></button>)}
+      {tracks.map(track => {
+        const publicTrack = configuration.data?.tracks?.[track.trackKey] || {};
+        return <button role="tab" aria-selected={selected?.trackKey === track.trackKey} className={selected?.trackKey === track.trackKey ? "active" : ""} key={track.trackKey} onClick={() => setTrackKey(track.trackKey)}><strong>{track.trackName}</strong><small>{publicTrack.questionCount || 40} public questions · {publicTrack.sectionCount || 10} areas · {track.questionCount} source questions</small></button>;
+      })}
     </div>
-    {selected && <TrackEditor key={`${selected.trackId}-${revision}`} track={selected} onSaved={() => setRevision(value => value + 1)} />}
+    {selected && <TrackEditor key={`${selected.trackId}-${revision}`} track={selected} onSaved={() => { setRevision(value => value + 1); configuration.refresh(); }} />}
   </>;
 }
