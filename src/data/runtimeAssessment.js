@@ -4,7 +4,7 @@ const V3_QUESTIONS_PER_SECTION = 4;
 
 const V3_AREA_NAMES = {
   personal: {
-    DM: "Personal Decision-Making",
+    DM: "Decision-Making",
     RC: "Relationships & Connection",
     EA: "Emotional Awareness",
     CN: "Conflict Navigation",
@@ -16,7 +16,7 @@ const V3_AREA_NAMES = {
     CS: "Communication Style",
   },
   newjoiner: {
-    DM: "New Joiner Decision-Making as You Start Out",
+    DM: "Decision-Making as You Start Out",
     RC: "Building Relationships at a New Job",
     EA: "Emotional Awareness in a New Environment",
     CN: "Handling Feedback & Early Conflict",
@@ -28,7 +28,7 @@ const V3_AREA_NAMES = {
     CS: "Communication as a New Team Member",
   },
   manager: {
-    DM: "Manager Decision-Making",
+    DM: "Decision-Making",
     RC: "Team Relationships & Trust",
     EA: "Emotional Awareness at Work",
     CN: "Conflict & Difficult Conversations",
@@ -40,7 +40,7 @@ const V3_AREA_NAMES = {
     CS: "Communication as a Manager",
   },
   executive: {
-    DM: "Executive Strategic Decision-Making",
+    DM: "Strategic Decision-Making",
     RC: "Executive Trust & Relationships",
     EA: "Emotional Awareness in the C-Suite",
     CN: "High-Stakes Conflict & Negotiation",
