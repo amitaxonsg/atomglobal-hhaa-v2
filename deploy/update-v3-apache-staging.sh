@@ -4,15 +4,50 @@ set -Eeuo pipefail
 SOURCE_DIR="/srv/head-heart.atomglobal.com/staging-source"
 APP_ROOT="/var/www/head-heart-staging.atomglobal.com"
 ENV_FILE="/etc/head-heart-alignment/staging.env"
-STORAGE_PATH="/var/lib/head-heart-alignment-staging"
+EXPECTED_STORAGE_PATH="/var/lib/head-heart-alignment-staging"
 BACKUP_DIR="/var/backups/head-heart-alignment-staging"
 DOMAIN="head-heart-staging.atomglobal.com"
 BRANCH="sunil-v3-clean-40q-cms"
 PHP_FPM_SERVICE="php8.3-fpm"
+PREVIOUS_RELEASE=""
+SWITCHED=0
 
-[[ "${EUID}" -eq 0 ]] || { echo "Run as root." >&2; exit 1; }
-[[ -d "$SOURCE_DIR/.git" ]] || { echo "Missing staging source: $SOURCE_DIR" >&2; exit 1; }
-[[ -r "$ENV_FILE" ]] || { echo "Missing/read-protected staging env: $ENV_FILE" >&2; exit 1; }
+fail() { echo "ERROR: $*" >&2; exit 1; }
+
+load_env_file() {
+  local line key value
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" == *=* ]] || continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="${key//[[:space:]]/}"
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || fail "Invalid environment key: $key"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then value="${value:1:${#value}-2}"; fi
+    if [[ "$value" == \'*\' && "$value" == *\' ]]; then value="${value:1:${#value}-2}"; fi
+    export "$key=$value"
+  done < "$ENV_FILE"
+}
+
+rollback() {
+  if [[ "$SWITCHED" -eq 1 && -n "$PREVIOUS_RELEASE" && -d "$PREVIOUS_RELEASE" ]]; then
+    echo "Health/deploy failure after switch; restoring previous staging release." >&2
+    ln -sfn "$PREVIOUS_RELEASE" "$APP_ROOT/current.rollback"
+    mv -Tf "$APP_ROOT/current.rollback" "$APP_ROOT/current"
+    systemctl reload "$PHP_FPM_SERVICE" 2>/dev/null || true
+    systemctl reload apache2 2>/dev/null || true
+  fi
+}
+trap rollback ERR
+
+[[ "${EUID}" -eq 0 ]] || fail "Run as root."
+[[ -d "$SOURCE_DIR/.git" ]] || fail "Missing staging source: $SOURCE_DIR"
+[[ -r "$ENV_FILE" ]] || fail "Missing/read-protected staging env: $ENV_FILE"
+
+for command in git php composer mysql mysqldump gzip npm node rsync curl apache2ctl; do
+  command -v "$command" >/dev/null 2>&1 || fail "Missing required command: $command"
+done
 
 cd "$SOURCE_DIR"
 git fetch origin
@@ -23,19 +58,17 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 RELEASE_ID="$(date -u +%Y%m%d%H%M%S)-${COMMIT:0:12}"
 RELEASE_DIR="$APP_ROOT/releases/$RELEASE_ID"
 TEMP_DIR="$APP_ROOT/releases/.$RELEASE_ID.tmp"
+PREVIOUS_RELEASE="$(readlink -f "$APP_ROOT/current" 2>/dev/null || true)"
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
-
-for variable in APP_URL APP_KEY DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD STORAGE_PATH; do
-  [[ -n "${!variable:-}" ]] || { echo "$variable is not configured in $ENV_FILE" >&2; exit 1; }
+load_env_file
+for variable in APP_ENV APP_URL APP_KEY DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD STORAGE_PATH; do
+  [[ -n "${!variable:-}" ]] || fail "$variable is not configured in $ENV_FILE"
 done
 
-[[ "$APP_URL" == "https://$DOMAIN" ]] || { echo "Refusing deploy: APP_URL is not staging ($APP_URL)." >&2; exit 1; }
-[[ "$DB_DATABASE" == *staging* ]] || { echo "Refusing deploy: DB_DATABASE does not look like staging ($DB_DATABASE)." >&2; exit 1; }
-[[ "$STORAGE_PATH" == "/var/lib/head-heart-alignment-staging" ]] || { echo "Refusing deploy: STORAGE_PATH is not staging ($STORAGE_PATH)." >&2; exit 1; }
+[[ "$APP_ENV" == "staging" ]] || fail "APP_ENV must be staging, got: $APP_ENV"
+[[ "$APP_URL" == "https://$DOMAIN" ]] || fail "APP_URL is not staging: $APP_URL"
+[[ "$DB_DATABASE" == *staging* ]] || fail "DB_DATABASE does not look like staging: $DB_DATABASE"
+[[ "$STORAGE_PATH" == "$EXPECTED_STORAGE_PATH" ]] || fail "STORAGE_PATH is not staging: $STORAGE_PATH"
 
 install -d -m 0755 "$APP_ROOT/releases"
 install -d -m 0750 "$BACKUP_DIR" "$STORAGE_PATH" "$STORAGE_PATH/media" "$STORAGE_PATH/reports" "$STORAGE_PATH/tmp"
@@ -43,6 +76,7 @@ chown -R www-data:www-data "$STORAGE_PATH"
 chown root:www-data "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
 
+MYSQL_PWD="$DB_PASSWORD" mysql --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" --database="$DB_DATABASE" --execute='SELECT 1;' >/dev/null
 MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --routines --triggers --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USERNAME" "$DB_DATABASE" | gzip -9 > "$BACKUP_DIR/${DB_DATABASE}-${STAMP}-${COMMIT:0:12}.sql.gz"
 
 ln -sfn "$ENV_FILE" "$SOURCE_DIR/backend/.env"
@@ -72,18 +106,19 @@ find "$TEMP_DIR" -type f -exec chmod 0644 {} \;
 find "$TEMP_DIR/backend/bin" -type f -exec chmod 0755 {} \;
 mv "$TEMP_DIR" "$RELEASE_DIR"
 
+apache2ctl configtest
 ln -sfn "$RELEASE_DIR" "$APP_ROOT/current.new"
 mv -Tf "$APP_ROOT/current.new" "$APP_ROOT/current"
+SWITCHED=1
 printf '%s\n' "$COMMIT" > "$APP_ROOT/deployed-commit.txt"
-
-apache2ctl configtest
 systemctl reload "$PHP_FPM_SERVICE"
 systemctl reload apache2
 
 HEALTH="$(curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/api/health")"
-grep -q '"status":"ok"' <<<"$HEALTH" || { echo "Health check failed: $HEALTH" >&2; exit 1; }
+grep -q '"status":"ok"' <<<"$HEALTH" || fail "Health check failed: $HEALTH"
 curl --fail --silent --show-error --max-time 20 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/" >/dev/null
 
+SWITCHED=0
 find "$APP_ROOT/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | tail -n +11 | cut -d' ' -f2- | xargs -r rm -rf
 find "$BACKUP_DIR" -type f -name '*.sql.gz' -mtime +30 -delete
 
@@ -91,3 +126,4 @@ echo "V3 staging updated successfully."
 echo "Commit: $COMMIT"
 echo "URL: https://$DOMAIN/"
 echo "Health: $HEALTH"
+trap - ERR
