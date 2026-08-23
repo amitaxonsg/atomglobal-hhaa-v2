@@ -42,6 +42,29 @@
   visibility: hidden !important;
 }
 
+/* Client UAT: make the temporary no-payment checkout unmistakable.
+   The backend continues to use its audited manual UAT route; only the
+   participant-facing label is changed from the internal COD terminology. */
+.upgrade-box__actions .button--ghost {
+  font-size: 0 !important;
+}
+
+.upgrade-box__actions .button--ghost::after {
+  content: "UAT Test — No Payment";
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.upgrade-box + .preview-note {
+  font-size: 0 !important;
+}
+
+.upgrade-box + .preview-note::after {
+  content: "UAT testing option: choose ‘UAT Test — No Payment’ to test the Full Report, confirmation and report-email flow without making a Stripe charge.";
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .latest-visual-panel__logo,
   .latest-public-brand {
