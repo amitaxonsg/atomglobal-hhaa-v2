@@ -20,6 +20,7 @@ final class ReportService
         $token = bin2hex(random_bytes(32));
         $profile = $score['profile'];
         $paidContent = json_decode((string) $profile['paid_content_json'], true, 512, JSON_THROW_ON_ERROR);
+        $paidContent = V3ReportEnhancer::enrich($this->db, $sessionId, $score, $snapshot, $paidContent, $profile);
         $comparison = $this->retakeComparison($sessionId, $score);
         $isRetake = $comparison !== null;
         if ($comparison) $paidContent['retakeComparison'] = $comparison;
@@ -74,7 +75,7 @@ final class ReportService
             $row['cashOnDeliveryAvailable'] = $this->cashOnDeliveryAvailable();
             $row['retakePriceMinor'] = self::RETAKE_PRICE_MINOR;
             $row['retakeCurrency'] = 'USD';
-            $row['retakeCheckoutAvailable'] = $row['is_unlocked'] && $this->retakeCheckoutAvailable();
+            $row['retakeCheckoutAvailable'] = $row['is_unlocked'] && $this->retakeCheckoutAvailable((int) $row['sessionId']);
             $row['retakeRecommendedAt'] = $this->recommendedRetakeAt((string) ($row['completedAt'] ?? ''));
             $this->db->execute('UPDATE generated_reports SET view_count = view_count + 1, last_viewed_at = NOW() WHERE id = ?', [$row['id']]);
         }
@@ -109,11 +110,16 @@ final class ReportService
         return $secret !== '' && $webhook !== '' && $price !== '';
     }
 
-    private function retakeCheckoutAvailable(): bool
+    private function retakeCheckoutAvailable(int $sessionId): bool
     {
         $secret = trim((string) $this->settings->get('stripe.secret_key', $_ENV['STRIPE_SECRET_KEY'] ?? ''));
         $webhook = trim((string) $this->settings->get('stripe.webhook_secret', $_ENV['STRIPE_WEBHOOK_SECRET'] ?? ''));
-        return $secret !== '' && $webhook !== '';
+        if ($secret === '' || $webhook === '') return false;
+        $paid = $this->db->fetch(
+            'SELECT id FROM payments WHERE survey_session_id = ? AND provider = ? AND status = ? ORDER BY paid_at DESC, id DESC LIMIT 1',
+            [$sessionId, 'stripe', 'paid']
+        );
+        return (bool) $paid;
     }
 
     private function cashOnDeliveryAvailable(): bool
