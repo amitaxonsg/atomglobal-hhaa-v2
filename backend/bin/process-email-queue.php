@@ -6,6 +6,7 @@ $container = require dirname(__DIR__) . '/src/bootstrap.php';
 $db = $container['db'];
 $queue = $container['mailQueue'];
 $delivery = $container['mailDelivery'];
+$pdf = $container['pdf'];
 $limit = max(1, min(100, (int) ($argv[1] ?? 25)));
 $items = $queue->due($limit);
 
@@ -13,6 +14,25 @@ foreach ($items as $item) {
     $id = (int) $item['id'];
     $db->execute('UPDATE email_queue SET status = ?, attempts = attempts + 1 WHERE id = ? AND status IN (?, ?)', ['retry', $id, 'queued', 'retry']);
     try {
+        if (($item['template_key'] ?? '') === 'paid_report_ready') {
+            $variables = json_decode((string) ($item['variables_json'] ?? '{}'), true) ?: [];
+            $reportId = (int) ($variables['reportId'] ?? 0);
+            if ($reportId > 0) {
+                $report = $db->fetch('SELECT id, is_unlocked, pdf_path FROM generated_reports WHERE id = ? AND revoked_at IS NULL LIMIT 1', [$reportId]);
+                if (!$report || !(bool) $report['is_unlocked']) {
+                    throw new RuntimeException('Paid report email cannot attach a locked or unavailable Full Development Report.');
+                }
+                $pdfPath = (string) ($report['pdf_path'] ?? '');
+                if ($pdfPath === '' || !is_file($pdfPath)) $pdfPath = $pdf->generate($reportId);
+                $variables['_attachments'] = [[
+                    'path' => $pdfPath,
+                    'filename' => 'Head-Heart-Alignment-Full-Development-Report.pdf',
+                    'mimetype' => 'application/pdf',
+                ]];
+                $item['variables_json'] = json_encode($variables, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+        }
+
         $messageId = $delivery->deliver($item);
         $db->transaction(function () use ($db, $item, $id, $messageId) {
             $db->execute('UPDATE email_queue SET status = ?, sent_at = NOW(), provider_message_id = ?, failure_reason = NULL WHERE id = ?', ['sent', $messageId, $id]);
