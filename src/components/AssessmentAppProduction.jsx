@@ -10,17 +10,17 @@ function PaymentStatus({ cancelled = false }) {
   const params = new URLSearchParams(window.location.search);
   const method = params.get("method") || "";
   const reportUrl = params.get("report") || "";
-  const cashOnDelivery = method === "cash-on-delivery";
+  const uatNoPayment = method === "cash-on-delivery";
 
   return <StageShell>
     <p className="eyebrow">Secure checkout</p>
-    <h1>{cancelled ? "Payment not completed" : cashOnDelivery ? "Cash on Delivery selected" : "Payment received"}</h1>
+    <h1>{cancelled ? "Payment not completed" : uatNoPayment ? "UAT Test — No Payment selected" : "Payment received"}</h1>
     <p className="lead">{cancelled
       ? "Nothing was charged. Return to your private report link when you are ready to try again."
-      : cashOnDelivery
-        ? "Cash on Delivery is enabled for this UAT. No Stripe charge was made. Your Full Report has been unlocked and the normal confirmation and report emails have been queued."
-        : "Stripe is confirming your payment. After the signed webhook is verified, a fresh private Full Report link is sent by email."}</p>
-    {cashOnDelivery && reportUrl
+      : uatNoPayment
+        ? "UAT Test — No Payment is enabled for client testing. No Stripe charge was made. Your Full Report has been unlocked and the normal confirmation and PDF report emails have been queued."
+        : "Stripe is confirming your payment. After the signed webhook is verified, a fresh private Full Report link and PDF report email are sent."}</p>
+    {uatNoPayment && reportUrl
       ? <a className="button button--primary" href={reportUrl}>Open Full Report</a>
       : <a className="button button--primary" href="/">Return to assessment</a>}
   </StageShell>;
@@ -165,6 +165,7 @@ export default function AssessmentAppProduction() {
   }, [answers, section, participant, session?.id, session?.resumeToken, stage]);
 
   const selectTrack = key => {
+    if (!assessmentTracks[key]) return;
     setError("");
     setTrackKey(key);
     const v3Track = buildRuntimeTrack(assessmentTracks[key], null);
@@ -172,6 +173,13 @@ export default function AssessmentAppProduction() {
     setStage("intro");
     window.scrollTo(0, 0);
   };
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("resume")) return;
+    const directTrack = String(params.get("track") || "").toLowerCase();
+    if (assessmentTracks[directTrack]) selectTrack(directTrack);
+  }, []);
 
   const begin = async () => {
     setBusy(true);
