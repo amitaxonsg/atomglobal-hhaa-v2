@@ -101,7 +101,10 @@ final class StripeService
             [$sessionId, $trackKey]
         );
         if (!$survey || $survey['status'] !== 'completed' || !(bool) $survey['is_unlocked']) {
-            throw new \InvalidArgumentException('The USD 2 retake is available only after a completed, unlocked Full Development Report.');
+            throw new \InvalidArgumentException('The USD 2 retake is available only after a completed Full Development Report.');
+        }
+        if (!$this->hasPaidAssessment($sessionId)) {
+            throw new \InvalidArgumentException('The USD 2 retake is available only to participants who previously completed a paid Full Development Report assessment.');
         }
 
         $stripe = new StripeClient($secret);
@@ -174,6 +177,7 @@ final class StripeService
                 'currency' => $currency,
                 'reportUrl' => $reportAccess['reportUrl'],
                 'paidReportUrl' => $reportAccess['reportUrl'],
+                'reportId' => $reportAccess['reportId'],
             ];
             $this->enqueue('payment_successful', $participant['email'], $variables);
             $this->enqueue('paid_report_ready', $participant['email'], $variables);
@@ -195,6 +199,7 @@ final class StripeService
         if (!$source) throw new \RuntimeException('The source assessment for this retake is unavailable.');
         $sourceReport = $this->db->fetch('SELECT id, is_unlocked FROM generated_reports WHERE survey_session_id = ? AND revoked_at IS NULL LIMIT 1', [$sourceSessionId]);
         if (!$sourceReport || !(bool) $sourceReport['is_unlocked']) throw new \RuntimeException('The source Full Development Report is not unlocked.');
+        if (!$this->hasPaidAssessment($sourceSessionId)) throw new \RuntimeException('The source assessment does not have a verified paid Full Development Report.');
 
         $snapshot = $this->normaliseRetakeSnapshot(json_decode((string) $source['question_snapshot_json'], true, 512, JSON_THROW_ON_ERROR));
         $resumeToken = bin2hex(random_bytes(32));
@@ -231,6 +236,15 @@ final class StripeService
             'amount' => number_format($amount / 100, 2),
             'currency' => $currency,
         ]);
+    }
+
+    private function hasPaidAssessment(int $sessionId): bool
+    {
+        $paid = $this->db->fetch(
+            'SELECT id FROM payments WHERE survey_session_id = ? AND provider = ? AND status = ? ORDER BY paid_at DESC, id DESC LIMIT 1',
+            [$sessionId, 'stripe', 'paid']
+        );
+        return (bool) $paid;
     }
 
     private function normaliseRetakeSnapshot(array $snapshot): array
