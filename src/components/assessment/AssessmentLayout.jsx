@@ -92,7 +92,7 @@ export function SelectVersion({ experience, onSelect }) {
     <div className="latest-track-cards">
       {tracks.map(track => {
         const remote = experience?.tracks?.[track.key] || {};
-        const details = trackExperience(track.key, remote, track.priceLabel);
+        const details = trackExperience(track.key, remote, remote.priceLabel || track.priceLabel);
         const meta = { ...fallbackMeta[track.key], ...remote };
         return <button className="latest-track-card" key={track.key} onClick={() => onSelect(track.key)}>
           <strong>{landing.cardTitlePrefix} {track.label}</strong>
@@ -105,7 +105,7 @@ export function SelectVersion({ experience, onSelect }) {
 }
 
 export function TrackIntroduction({ track, remoteExperience, onBack, onContinue }) {
-  const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
+  const experience = trackExperience(track.key, remoteExperience, remoteExperience?.priceLabel || track.priceLabel);
   return <LatestPage width="720" className="latest-track-introduction" stageKey={track.key}>
     <button className="latest-text-back" onClick={onBack}>← Back</button>
     <AssessmentMeta trackKey={track.key} />
@@ -125,7 +125,7 @@ function SelectField({ label, options = [], value, onChange, required = true }) 
 }
 
 export function ParticipantDetails({ track, remoteExperience, participant, setParticipant, onBack, onContinue, error, busy }) {
-  const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
+  const experience = trackExperience(track.key, remoteExperience, remoteExperience?.priceLabel || track.priceLabel);
   const config = experience.intake;
   const update = key => event => setParticipant(current => ({ ...current, [key]: event.target.type === "checkbox" ? event.target.checked : event.target.value }));
   const companyTriggers = Array.isArray(config.companyRoleTriggers) ? config.companyRoleTriggers : [];
@@ -182,7 +182,9 @@ function ProgressMessage({ completed, copy }) {
 }
 
 export function Questions({ track, remoteExperience, progressExperience, answers, onAnswer, onNote, section, setSection, onBack, onFinish, saveState, busy, error }) {
-  const experience = trackExperience(track.key, remoteExperience, track.priceLabel);
+  const experience = trackExperience(track.key, remoteExperience, remoteExperience?.priceLabel || track.priceLabel);
+  const landing = landingExperience(progressExperience);
+  const hideSectionTitles = landing.hideSectionTitles !== false;
   const subscale = track.subscales[section];
   const offset = track.subscales.slice(0, section).reduce((total, item) => total + item.items.length, 0);
   const canContinue = answers.slice(offset, offset + subscale.items.length).every(answer => answer?.value != null);
@@ -200,9 +202,14 @@ export function Questions({ track, remoteExperience, progressExperience, answers
       <div><span>Section {section + 1} of {track.subscales.length}</span><span>{answered}/{track.allItems.length} answered{saveLabel ? ` · ${saveLabel}` : ""}</span></div>
       <i><b style={{ width: `${progress}%` }} /></i>
     </div>
-    <p className="latest-section-code">{subscale.name} · Section {section + 1} of {track.subscales.length}</p>
-    <h1>{subscale.name}</h1>
-    <p className="latest-copy latest-copy--last">{subscale.blurb}</p>
+    {hideSectionTitles ? <>
+      <p className="latest-section-code">Section {section + 1} of {track.subscales.length}</p>
+      <h1>Assessment questions</h1>
+    </> : <>
+      <p className="latest-section-code">{subscale.name} · Section {section + 1} of {track.subscales.length}</p>
+      <h1>{subscale.name}</h1>
+      <p className="latest-copy latest-copy--last">{subscale.blurb}</p>
+    </>}
     {error && <p className="form-error" role="alert">{error}</p>}
 
     <div className="latest-question-list">{subscale.items.map((item, itemIndex) => {
