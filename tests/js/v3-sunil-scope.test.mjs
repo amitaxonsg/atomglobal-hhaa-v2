@@ -23,6 +23,17 @@ test("V3 publishes 40 questions as ten four-question areas while preserving the 
   }
 });
 
+test("V3 public CMS metadata also publishes 40 questions", () => {
+  const seed = fs.readFileSync(new URL("../../backend/bin/seed.php", import.meta.url), "utf8");
+  const migration = fs.readFileSync(new URL("../../database/migrations/013_v3_public_question_count_40.sql", import.meta.url), "utf8");
+
+  assert.match(seed, /3, 12, 40, 10/);
+  assert.match(seed, /question_count = 40/);
+  assert.doesNotMatch(seed, /question_count = 50/);
+  assert.match(migration, /ats\.question_count = 40/);
+  assert.match(migration, /personal','newjoiner','manager','executive/);
+});
+
 test("V3 area-name map covers every track and assessment code", () => {
   const codes = ["DM", "RC", "EA", "CN", "TI", "EC", "AE", "SP", "VP", "CS"];
   for (const trackKey of Object.keys(expectedNames)) {
