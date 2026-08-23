@@ -9,6 +9,7 @@ $settings = $container['settings'];
 const V3_PUBLIC_QUESTION_COUNT = 40;
 const V3_PUBLIC_SECTION_COUNT = 10;
 const V3_STAGE_IMAGE = '/media/stages/sunil-head-heart-v3.webp';
+const V3_STAGE_ALT = 'A translucent blue head with a heart representing Head–Heart Alignment';
 
 $areaNames = [
     'personal' => [
@@ -125,14 +126,39 @@ $db->transaction(function () use ($db, $settings, $areaNames, $prices, $priceLab
     $landing['hideSectionTitles'] = true;
     $settings->set('questionnaire.landing', $landing);
 
-    $db->execute(
-        'UPDATE content_stages SET image_url = ?, mobile_image_url = NULL, focal_point = ?, overlay_opacity = 0, updated_at = NOW() WHERE stage_key IN (?, ?, ?, ?, ?, ?, ?)',
-        [V3_STAGE_IMAGE, '50% 50%', 'version', 'participant', 'personal', 'newjoiner', 'manager', 'executive', 'report']
-    );
+    // content_stages stores media-library foreign keys, not raw image URL columns.
+    // Register/reuse the approved repository-backed V3 visual in the CMS media table,
+    // then point every public V3 stage at that CMS media record.
+    $media = $db->fetch('SELECT id FROM media_library WHERE storage_path = ? ORDER BY id DESC LIMIT 1', [V3_STAGE_IMAGE]);
+    if (!$media) {
+        $assetPath = dirname(__DIR__, 2) . '/public' . V3_STAGE_IMAGE;
+        if (!is_file($assetPath)) {
+            throw new RuntimeException('Approved V3 stage image is missing: ' . $assetPath);
+        }
+        $dimensions = @getimagesize($assetPath) ?: [null, null];
+        $mediaId = $db->insert(
+            'INSERT INTO media_library (file_name, storage_path, mime_type, file_size, width, height, alt_text, focal_x, focal_y, variants_json, uploaded_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 50, 50, NULL, NULL, NOW(), NOW())',
+            [basename(V3_STAGE_IMAGE), V3_STAGE_IMAGE, 'image/webp', filesize($assetPath), $dimensions[0] ?: null, $dimensions[1] ?: null, V3_STAGE_ALT]
+        );
+    } else {
+        $mediaId = (int) $media['id'];
+        $db->execute(
+            'UPDATE media_library SET alt_text = ?, focal_x = 50, focal_y = 50, updated_at = NOW() WHERE id = ?',
+            [V3_STAGE_ALT, $mediaId]
+        );
+    }
+
+    $stageKeys = ['version', 'participant', 'personal', 'newjoiner', 'manager', 'executive', 'report'];
+    foreach ($stageKeys as $stageKey) {
+        $db->execute(
+            'UPDATE content_stages SET desktop_media_id = ?, mobile_media_id = NULL, image_alt = ?, focal_x = 50, focal_y = 50, overlay_strength = 0, updated_at = NOW() WHERE stage_key = ?',
+            [$mediaId, V3_STAGE_ALT, $stageKey]
+        );
+    }
     $db->execute(
         'UPDATE content_stages SET supporting_text = ?, updated_at = NOW() WHERE stage_key = ?',
         ['Align with what you feel and what you reason with.', 'version']
     );
 });
 
-echo "V3 public CMS normalised: Sunil 40-question scope, exact area names, approved prices, opening visual/copy and hidden topic titles applied.\n";
+echo "V3 public CMS normalised: Sunil 40-question scope, exact area names, approved prices, CMS stage media/opening copy and hidden topic titles applied.\n";
