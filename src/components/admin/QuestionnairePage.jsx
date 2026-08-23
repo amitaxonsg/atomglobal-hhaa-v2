@@ -54,7 +54,7 @@ function LandingEditor({ initial, onSaved }) {
     try {
       const saved = await saveQuestionnaireLanding(form);
       setForm({ ...landingDefaults, ...saved });
-      setNotice("Questionnaire landing and progress copy saved. The approved left-image branding remains controlled under Content and Branding.");
+      setNotice("Questionnaire landing, topic-visibility rule and progress copy saved. The approved left-image branding remains controlled under Content and Branding.");
       onSaved?.();
     } catch (error) {
       setNotice(error.message);
@@ -72,6 +72,7 @@ function LandingEditor({ initial, onSaved }) {
       <label className="form-grid__wide">Second introduction paragraph<textarea rows="4" value={form.secondaryCopy || ""} onChange={update("secondaryCopy")} /></label>
       <label>Track-card title prefix<input value={form.cardTitlePrefix || ""} onChange={update("cardTitlePrefix")} /></label>
       <label className="check-row"><input type="checkbox" checked={Boolean(form.showBrandName)} onChange={update("showBrandName")} /> Show the Atom Global logo on mobile where the left image is hidden</label>
+      <label className="check-row form-grid__wide"><input type="checkbox" checked={form.hideSectionTitles !== false} onChange={update("hideSectionTitles")} /> Hide assessment-area/topic titles while participants answer questions, so the subject of each question group is not revealed</label>
       <label className="form-grid__wide">Question 20 milestone heading<input value={form.halfwayTitle || ""} onChange={update("halfwayTitle")} /></label>
       <label className="form-grid__wide">Question 20 milestone message<textarea rows="3" value={form.halfwayBody || ""} onChange={update("halfwayBody")} /></label>
       <label className="form-grid__wide">Question 40 completion heading<input value={form.completeTitle || ""} onChange={update("completeTitle")} /></label>
@@ -119,7 +120,7 @@ function TrackEditor({ track, onSaved }) {
         <label className="form-grid__wide">Track-card description<textarea rows="3" value={form.tagline || ""} onChange={update("tagline")} /></label>
         <label className="form-grid__wide">Introduction heading<input value={form.introHeadline || `Head–Heart Alignment: ${track.trackName}`} onChange={update("introHeadline")} /></label>
         <label className="form-grid__wide">Introduction copy<textarea rows="5" value={form.introBody || ""} onChange={update("introBody")} /></label>
-        <label className="form-grid__wide">Lite/Full report offer<textarea rows="4" value={form.introOffer || ""} onChange={update("introOffer")} /><small>Use <code>{"{{price}}"}</code> where the track price should appear.</small></label>
+        <label className="form-grid__wide">Lite/Full report offer<textarea rows="4" value={form.introOffer || ""} onChange={update("introOffer")} /><small>Use <code>{"{{price}}"}</code> where the CMS track price should appear.</small></label>
         <label>Heart label<input value={form.heartLabel || ""} onChange={update("heartLabel")} /></label>
         <label>Head label<input value={form.headLabel || ""} onChange={update("headLabel")} /></label>
         <label>Heart explanation<input value={form.heartDescription || ""} onChange={update("heartDescription")} /></label>
@@ -186,7 +187,8 @@ export default function QuestionnairePage() {
     <div className="questionnaire-track-tabs" role="tablist" aria-label="Questionnaire track">
       {tracks.map(track => {
         const publicTrack = configuration.data?.tracks?.[track.trackKey] || {};
-        return <button role="tab" aria-selected={selected?.trackKey === track.trackKey} className={selected?.trackKey === track.trackKey ? "active" : ""} key={track.trackKey} onClick={() => setTrackKey(track.trackKey)}><strong>{track.trackName}</strong><small>{publicTrack.questionCount || 40} public questions · {publicTrack.sectionCount || 10} areas · {track.questionCount} source questions</small></button>;
+        const price = Number(publicTrack.priceMinor || 0) / 100;
+        return <button role="tab" aria-selected={selected?.trackKey === track.trackKey} className={selected?.trackKey === track.trackKey ? "active" : ""} key={track.trackKey} onClick={() => setTrackKey(track.trackKey)}><strong>{track.trackName}</strong><small>{publicTrack.questionCount || 40} public questions · {publicTrack.sectionCount || 10} areas · {track.questionCount} source questions{price > 0 ? ` · USD ${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}` : ""}</small></button>;
       })}
     </div>
     {selected && <TrackEditor key={`${selected.trackId}-${revision}`} track={selected} onSaved={() => { setRevision(value => value + 1); configuration.refresh(); }} />}
