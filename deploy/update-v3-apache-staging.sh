@@ -86,6 +86,7 @@ ln -sfn "$ENV_FILE" "$SOURCE_DIR/backend/.env"
   composer lint
   php bin/migrate.php
   php bin/seed.php
+  php bin/apply-v3-public-cms.php
   php ../tests/php/run.php
 )
 (
