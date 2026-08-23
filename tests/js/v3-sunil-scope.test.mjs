@@ -95,10 +95,10 @@ test("Sunil landing, pricing, topic hiding and progress copy are CMS-backed", ()
   assert.doesNotMatch(defaults, /You'll answer 50 statements/);
   assert.match(defaults, /Take the full 40-question assessment/);
   assert.match(service, /hideSectionTitles/);
-  assert.match(normaliser, /\['personal' => 499/);
-  assert.match(normaliser, /'newjoiner' => 2900/);
-  assert.match(normaliser, /'manager' => 4900/);
-  assert.match(normaliser, /'executive' => 9900/);
+  assert.match(normaliser, /'personal'\s*=>\s*499/);
+  assert.match(normaliser, /'newjoiner'\s*=>\s*2900/);
+  assert.match(normaliser, /'manager'\s*=>\s*4900/);
+  assert.match(normaliser, /'executive'\s*=>\s*9900/);
   assert.match(normaliser, /Align with what you feel and what you reason with\./);
   assert.match(mock, /Align with what you feel and what you reason with\./);
   assert.match(layout, /hideSectionTitles/);
