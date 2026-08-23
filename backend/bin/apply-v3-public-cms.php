@@ -8,6 +8,7 @@ $settings = $container['settings'];
 
 const V3_PUBLIC_QUESTION_COUNT = 40;
 const V3_PUBLIC_SECTION_COUNT = 10;
+const V3_STAGE_IMAGE = '/media/stages/sunil-head-heart-v3.webp';
 
 $areaNames = [
     'personal' => [
@@ -125,9 +126,13 @@ $db->transaction(function () use ($db, $settings, $areaNames, $prices, $priceLab
     $settings->set('questionnaire.landing', $landing);
 
     $db->execute(
+        'UPDATE content_stages SET image_url = ?, mobile_image_url = NULL, focal_point = ?, overlay_opacity = 0, updated_at = NOW() WHERE stage_key IN (?, ?, ?, ?, ?, ?, ?)',
+        [V3_STAGE_IMAGE, '50% 50%', 'version', 'participant', 'personal', 'newjoiner', 'manager', 'executive', 'report']
+    );
+    $db->execute(
         'UPDATE content_stages SET supporting_text = ?, updated_at = NOW() WHERE stage_key = ?',
         ['Align with what you feel and what you reason with.', 'version']
     );
 });
 
-echo "V3 public CMS normalised: Sunil 40-question scope, exact area names, approved prices, opening copy and hidden topic titles applied.\n";
+echo "V3 public CMS normalised: Sunil 40-question scope, exact area names, approved prices, opening visual/copy and hidden topic titles applied.\n";
