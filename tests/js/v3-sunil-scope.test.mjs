@@ -47,6 +47,21 @@ test("every CMS save and deploy path enforces 40 public questions and 10 areas",
   assert.doesNotMatch(extraRoutes, /, 50, 10,/);
 });
 
+test("V3 approved stage visual is CMS-backed through the real media foreign-key schema", () => {
+  const normaliser = read("../../backend/bin/apply-v3-public-cms.php");
+  const schema = read("../../database/migrations/001_initial_schema.sql");
+
+  assert.match(schema, /desktop_media_id BIGINT UNSIGNED NULL/);
+  assert.match(schema, /mobile_media_id BIGINT UNSIGNED NULL/);
+  assert.match(normaliser, /SELECT id FROM media_library WHERE storage_path = \?/);
+  assert.match(normaliser, /INSERT INTO media_library/);
+  assert.match(normaliser, /UPDATE content_stages SET desktop_media_id = \?, mobile_media_id = NULL/);
+  assert.match(normaliser, /sunil-head-heart-v3\.webp/);
+  assert.doesNotMatch(normaliser, /SET image_url =/);
+  assert.doesNotMatch(normaliser, /mobile_image_url/);
+  assert.doesNotMatch(normaliser, /overlay_opacity/);
+});
+
 test("Sunil exact area names are CMS-backed and real sessions prefer the database names", () => {
   const codes = ["DM", "RC", "EA", "CN", "TI", "EC", "AE", "SP", "VP", "CS"];
   const cmsNormaliser = read("../../backend/bin/apply-v3-public-cms.php");
