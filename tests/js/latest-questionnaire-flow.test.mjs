@@ -27,7 +27,11 @@ test("latest participant and question process remains wired to the real backend"
   assert.match(layout, /department/);
   assert.match(layout, /level/);
   assert.match(layout, /N\/A — doesn’t apply \/ can’t answer/);
-  assert.match(layout, /Optional — describe a specific moment/);
+  assert.match(layout, /latest-answer-note-dropdown/);
+  assert.match(layout, /Add more \(optional\)/);
+  assert.match(layout, /lastSection/);
+  assert.match(layout, /Is there anything else you would like to add/);
+  assert.doesNotMatch(layout, /Optional — describe a specific moment/);
   assert.match(app, /createSession/);
   assert.match(app, /saveSession/);
   assert.match(app, /completeSession/);
