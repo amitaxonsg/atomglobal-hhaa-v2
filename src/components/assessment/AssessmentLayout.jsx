@@ -203,9 +203,13 @@ export function Questions({ track, remoteExperience, answers, onAnswer, onNote, 
           return <label className={current.value === value ? "selected" : ""} key={choice}><input type="radio" name={`question-${answerIndex}`} checked={current.value === value} onChange={() => onAnswer(answerIndex, value)} /><strong>{value}</strong><span>{choice}</span></label>;
         })}</div>
         {experience.allowNotApplicable && <div className="latest-na-row"><label className={current.value === "NA" ? "selected" : ""}><input type="radio" name={`question-${answerIndex}`} checked={current.value === "NA"} onChange={() => onAnswer(answerIndex, "NA")} />N/A — doesn’t apply / can’t answer</label></div>}
-        {experience.allowAnswerNotes && <textarea className="latest-answer-note" rows="2" value={current.note || ""} onChange={event => onNote(answerIndex, event.target.value)} placeholder="Optional — describe a specific moment this played out for you..." />}
       </div>;
     })}</div>
+
+    {experience.allowAnswerNotes && lastSection && <details className="latest-answer-note-dropdown latest-final-note" open={Boolean(answers[answers.length - 1]?.note)}>
+      <summary>Add more (optional)</summary>
+      <textarea className="latest-answer-note" rows="3" value={answers[answers.length - 1]?.note || ""} onChange={event => onNote(answers.length - 1, event.target.value)} placeholder="Is there anything else you would like to add?" />
+    </details>}
 
     <div className="latest-question-navigation">
       <button className="latest-secondary-button" onClick={goBack}>← Back</button>
