@@ -45,8 +45,112 @@
   min-width: 2px;
 }
 
+/* Mobile burn-in hardening — 2026-09-02.
+   Prevent native select controls and long selected option text from expanding the
+   document viewport on iOS/Android browsers. */
+.latest-questionnaire-shell,
+.latest-questionnaire-content,
+.latest-questionnaire-page,
+.latest-intake-grid,
+.latest-field,
+.latest-field input,
+.latest-field select,
+.latest-consents,
+.latest-question-card,
+.latest-scale-options,
+.upgrade-box,
+.upgrade-box > div,
+.upgrade-box__actions {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.latest-field select {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  text-overflow: ellipsis;
+}
+
+.latest-field select option {
+  max-width: 100%;
+}
+
+/* Keep report/payment actions reachable on narrow phones instead of allowing
+   long button labels or checkout copy to push the report wider than the viewport. */
+.upgrade-box__actions {
+  flex-wrap: wrap;
+}
+
+.upgrade-box__actions .button,
+.upgrade-box__actions button,
+.upgrade-box__actions a {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.preview-note,
+.form-error,
+.report-card,
+.paid-report,
+.locked-preview,
+.report-score-list,
+.report-columns {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 900px) {
   .latest-question-progress > i {
     height: 7px;
+  }
+}
+
+@media (max-width: 680px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .latest-questionnaire-page {
+    width: calc(100% - 28px);
+    max-width: calc(100vw - 28px);
+  }
+
+  .latest-field input,
+  .latest-field select {
+    font-size: 16px; /* prevents iOS form-control zoom/reflow */
+  }
+
+  .upgrade-box {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .upgrade-box__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .upgrade-box__actions .button,
+  .upgrade-box__actions button,
+  .upgrade-box__actions a {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+  }
+
+  .paid-heading,
+  .latest-question-progress > div {
+    min-width: 0;
+    flex-wrap: wrap;
   }
 }
