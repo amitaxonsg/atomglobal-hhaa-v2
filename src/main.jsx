@@ -65,12 +65,38 @@ function ServiceWorkerUpdate() {
   </aside>;
 }
 
+/* Burn-in recovery guard.
+   Some mobile browsers preserve the report tab exactly as it was when a Stripe
+   tab/window is closed, leaving the React checkout button in its temporary
+   "Opening checkout…" state. When the report regains focus, reload only if that
+   stale loading state is still present. The report is server-backed, so reload
+   restores the authoritative lock/unlock/payment state rather than fabricating
+   a result client-side. */
+function CheckoutRecovery() {
+  React.useEffect(() => {
+    const recover = () => {
+      if (!window.location.pathname.startsWith("/report/")) return;
+      const buttons = Array.from(document.querySelectorAll(".upgrade-box__actions button"));
+      const stale = buttons.some(button => button.disabled && /opening checkout/i.test(button.textContent || ""));
+      if (stale) window.location.reload();
+    };
+    window.addEventListener("focus", recover);
+    document.addEventListener("visibilitychange", recover);
+    return () => {
+      window.removeEventListener("focus", recover);
+      document.removeEventListener("visibilitychange", recover);
+    };
+  }, []);
+  return null;
+}
+
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <AppErrorBoundary>
       <BrandProvider>
         <AssessmentAppProduction />
         <ServiceWorkerUpdate />
+        <CheckoutRecovery />
       </BrandProvider>
     </AppErrorBoundary>
   </React.StrictMode>,
