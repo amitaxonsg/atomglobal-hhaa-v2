@@ -97,14 +97,22 @@ expect($report['paid_report_json'] === null, 'Paid report content leaked before 
 expect($report['participantEmail'] === $participant['email'], 'Report participant metadata is missing.');
 expect($report['trackKey'] === 'personal', 'Report track metadata is missing.');
 
-$pdfPath = $container['pdf']->generate((int) $completed['reportId']);
-expect(is_file($pdfPath) && filesize($pdfPath) > 1000, 'PDF generation failed.');
+/* A locked Lite Report must not be able to generate or expose the paid PDF. */
+$lockedPdfBlocked = false;
+try {
+    $container['pdf']->generate((int) $completed['reportId']);
+} catch (RuntimeException $error) {
+    $lockedPdfBlocked = str_contains($error->getMessage(), 'locked');
+}
+expect($lockedPdfBlocked, 'Locked report unexpectedly allowed Full Development Report PDF generation.');
 expect($container['reports']->pdfByToken($completed['reportToken']) === null, 'Locked report exposed a paid PDF.');
 
 $container['reports']->unlockBySession((int) $created['id'], 'integration_test');
 $unlocked = $container['reports']->byToken($completed['reportToken']);
 expect($unlocked['is_unlocked'] === true, 'Report did not unlock.');
 expect($unlocked['paid_report_json'] !== null, 'Unlocked paid report content is missing.');
+$pdfPath = $container['pdf']->generate((int) $completed['reportId']);
+expect(is_file($pdfPath) && filesize($pdfPath) > 1000, 'Unlocked PDF generation failed.');
 expect($container['reports']->pdfByToken($completed['reportToken']) === $pdfPath, 'Unlocked secure PDF lookup failed.');
 
 $draftBranding = $configuration['branding'];
